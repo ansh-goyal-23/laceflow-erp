@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedPurchaseOrdersRouteImport } from './routes/_authenticated.purchase-orders'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated.clients'
 import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated.brands'
+import { Route as AuthenticatedPurchaseOrdersNewRouteImport } from './routes/_authenticated.purchase-orders.new'
+import { Route as AuthenticatedPurchaseOrdersIdEditRouteImport } from './routes/_authenticated.purchase-orders.$id.edit'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -30,6 +33,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedPurchaseOrdersRoute =
+  AuthenticatedPurchaseOrdersRouteImport.update({
+    id: '/purchase-orders',
+    path: '/purchase-orders',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -45,6 +54,18 @@ const AuthenticatedBrandsRoute = AuthenticatedBrandsRouteImport.update({
   path: '/brands',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPurchaseOrdersNewRoute =
+  AuthenticatedPurchaseOrdersNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedPurchaseOrdersRoute,
+  } as any)
+const AuthenticatedPurchaseOrdersIdEditRoute =
+  AuthenticatedPurchaseOrdersIdEditRouteImport.update({
+    id: '/$id/edit',
+    path: '/$id/edit',
+    getParentRoute: () => AuthenticatedPurchaseOrdersRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +73,9 @@ export interface FileRoutesByFullPath {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/purchase-orders': typeof AuthenticatedPurchaseOrdersRouteWithChildren
+  '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +83,9 @@ export interface FileRoutesByTo {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/purchase-orders': typeof AuthenticatedPurchaseOrdersRouteWithChildren
+  '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +95,31 @@ export interface FileRoutesById {
   '/_authenticated/brands': typeof AuthenticatedBrandsRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/purchase-orders': typeof AuthenticatedPurchaseOrdersRouteWithChildren
+  '/_authenticated/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/_authenticated/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/brands' | '/clients' | '/dashboard'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/brands'
+    | '/clients'
+    | '/dashboard'
+    | '/purchase-orders'
+    | '/purchase-orders/new'
+    | '/purchase-orders/$id/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/brands' | '/clients' | '/dashboard'
+  to:
+    | '/'
+    | '/login'
+    | '/brands'
+    | '/clients'
+    | '/dashboard'
+    | '/purchase-orders'
+    | '/purchase-orders/new'
+    | '/purchase-orders/$id/edit'
   id:
     | '__root__'
     | '/'
@@ -82,6 +128,9 @@ export interface FileRouteTypes {
     | '/_authenticated/brands'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
+    | '/_authenticated/purchase-orders'
+    | '/_authenticated/purchase-orders/new'
+    | '/_authenticated/purchase-orders/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -113,6 +162,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/purchase-orders': {
+      id: '/_authenticated/purchase-orders'
+      path: '/purchase-orders'
+      fullPath: '/purchase-orders'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -134,19 +190,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrandsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/purchase-orders/new': {
+      id: '/_authenticated/purchase-orders/new'
+      path: '/new'
+      fullPath: '/purchase-orders/new'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedPurchaseOrdersRoute
+    }
+    '/_authenticated/purchase-orders/$id/edit': {
+      id: '/_authenticated/purchase-orders/$id/edit'
+      path: '/$id/edit'
+      fullPath: '/purchase-orders/$id/edit'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersIdEditRouteImport
+      parentRoute: typeof AuthenticatedPurchaseOrdersRoute
+    }
   }
 }
+
+interface AuthenticatedPurchaseOrdersRouteChildren {
+  AuthenticatedPurchaseOrdersNewRoute: typeof AuthenticatedPurchaseOrdersNewRoute
+  AuthenticatedPurchaseOrdersIdEditRoute: typeof AuthenticatedPurchaseOrdersIdEditRoute
+}
+
+const AuthenticatedPurchaseOrdersRouteChildren: AuthenticatedPurchaseOrdersRouteChildren =
+  {
+    AuthenticatedPurchaseOrdersNewRoute: AuthenticatedPurchaseOrdersNewRoute,
+    AuthenticatedPurchaseOrdersIdEditRoute:
+      AuthenticatedPurchaseOrdersIdEditRoute,
+  }
+
+const AuthenticatedPurchaseOrdersRouteWithChildren =
+  AuthenticatedPurchaseOrdersRoute._addFileChildren(
+    AuthenticatedPurchaseOrdersRouteChildren,
+  )
 
 interface AuthenticatedRouteChildren {
   AuthenticatedBrandsRoute: typeof AuthenticatedBrandsRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedPurchaseOrdersRoute: typeof AuthenticatedPurchaseOrdersRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBrandsRoute: AuthenticatedBrandsRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedPurchaseOrdersRoute:
+    AuthenticatedPurchaseOrdersRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
