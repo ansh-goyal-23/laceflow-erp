@@ -277,7 +277,6 @@ async function insertItems(poId: string, items: POLineItem[]) {
     article_code: i.articleCode,
     lace_type: i.laceType,
     material_type: i.materialType,
-    no_of_colors: i.noOfColors,
     width: i.width,
     length: i.length,
     color: i.color,
