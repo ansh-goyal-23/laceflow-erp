@@ -48,13 +48,13 @@ export function AppSidebar() {
       </nav>
       <div className="p-3 border-t border-sidebar-border">
         <div className="px-3 py-2 text-xs text-sidebar-foreground/70">
-          Signed in as <span className="font-medium text-sidebar-foreground">{user?.username}</span>
+          Signed in as <span className="font-medium text-sidebar-foreground">{user?.email}</span>
         </div>
         <Button
           variant="ghost"
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          onClick={() => {
-            logout();
+          onClick={async () => {
+            await logout();
             navigate({ to: "/login", replace: true });
           }}
         >
