@@ -15,7 +15,7 @@ import { toast } from "sonner";
 function emptyItem(): POLineItem {
   return {
     id: crypto.randomUUID(),
-    articleCode: "", laceType: "", materialType: "", noOfColors: "",
+    articleCode: "", laceType: "", materialType: "",
     width: "", length: "", color: "", uom: "Mtr", quantity: 0, rate: 0,
   };
 }
@@ -157,7 +157,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
                   <TableHead className="min-w-32">Article Code</TableHead>
                   <TableHead className="min-w-32">Lace Type</TableHead>
                   <TableHead className="min-w-32">Material Type</TableHead>
-                  <TableHead className="w-24">Colors</TableHead>
+                  
                   <TableHead className="w-24">Width</TableHead>
                   <TableHead className="w-24">Length</TableHead>
                   <TableHead className="min-w-28">Color</TableHead>
@@ -174,7 +174,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
                     <TableCell><Input value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
                     <TableCell><Input value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
                     <TableCell><Input value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
-                    <TableCell><Input value={it.noOfColors} onChange={(e) => updateItem(it.id, { noOfColors: e.target.value })} /></TableCell>
+                    
                     <TableCell><Input value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
                     <TableCell><Input value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
                     <TableCell><Input value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
