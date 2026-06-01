@@ -14,18 +14,21 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { user, ready, login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("admin");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (ready && user) navigate({ to: "/dashboard", replace: true });
   }, [ready, user, navigate]);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    const r = login(username, password);
+    setLoading(true);
+    const r = await login(email, password);
+    setLoading(false);
     if (!r.ok) setErr(r.error ?? "Login failed");
     else navigate({ to: "/dashboard", replace: true });
   }
@@ -43,17 +46,19 @@ function LoginPage() {
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="u">Username</Label>
-              <Input id="u" value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" />
+              <Label htmlFor="u">Email</Label>
+              <Input id="u" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="p">Password</Label>
               <Input id="p" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
             </div>
             {err && <p className="text-sm text-destructive">{err}</p>}
-            <Button type="submit" className="w-full">Sign In</Button>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in…" : "Sign In"}
+            </Button>
             <p className="text-xs text-muted-foreground text-center pt-2">
-              Default admin — <span className="font-mono">admin</span> / <span className="font-mono">admin123</span>
+              Create users in your Supabase dashboard → Authentication → Users.
             </p>
           </form>
         </CardContent>

@@ -1,49 +1,62 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { store } from "@/lib/store";
+import type { Session } from "@supabase/supabase-js";
 
 interface AuthUser {
-  username: string;
+  id: string;
+  email: string;
   role: "admin";
 }
 
 interface AuthCtx {
   user: AuthUser | null;
   ready: boolean;
-  login: (u: string, p: string) => { ok: boolean; error?: string };
-  logout: () => void;
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  logout: () => Promise<void>;
 }
 
-const KEY = "shree_lace_erp_auth";
-const ADMIN = { username: "admin", password: "admin123" };
-
 const Ctx = createContext<AuthCtx | null>(null);
+
+function fromSession(s: Session | null): AuthUser | null {
+  if (!s?.user) return null;
+  return { id: s.user.id, email: s.user.email ?? "", role: "admin" };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) setUser(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
-    setReady(true);
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      const u = fromSession(session);
+      setUser(u);
+      if (u) {
+        // fire and forget hydration
+        void store.hydrate();
+      } else {
+        store.reset();
+      }
+    });
+
+    supabase.auth.getSession().then(({ data }) => {
+      const u = fromSession(data.session);
+      setUser(u);
+      if (u) void store.hydrate();
+      setReady(true);
+    });
+
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  const login = (u: string, p: string) => {
-    if (u === ADMIN.username && p === ADMIN.password) {
-      const next: AuthUser = { username: u, role: "admin" };
-      localStorage.setItem(KEY, JSON.stringify(next));
-      setUser(next);
-      return { ok: true };
-    }
-    return { ok: false, error: "Invalid username or password" };
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
   };
 
-  const logout = () => {
-    localStorage.removeItem(KEY);
-    setUser(null);
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
   return <Ctx.Provider value={{ user, ready, login, logout }}>{children}</Ctx.Provider>;
