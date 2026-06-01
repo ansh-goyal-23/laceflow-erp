@@ -22,7 +22,7 @@ export interface POLineItem {
   articleCode: string;
   laceType: string;
   materialType: string;
-  noOfColors: string;
+  
   width: string;
   length: string;
   color: string;
@@ -80,7 +80,7 @@ type POItemRow = {
   article_code: string | null;
   lace_type: string | null;
   material_type: string | null;
-  no_of_colors: string | null;
+  
   width: string | null;
   length: string | null;
   color: string | null;
@@ -115,7 +115,6 @@ const toItem = (r: POItemRow): POLineItem => ({
   articleCode: r.article_code ?? "",
   laceType: r.lace_type ?? "",
   materialType: r.material_type ?? "",
-  noOfColors: r.no_of_colors ?? "",
   width: r.width ?? "",
   length: r.length ?? "",
   color: r.color ?? "",
