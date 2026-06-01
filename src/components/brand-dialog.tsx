@@ -23,19 +23,22 @@ export function BrandDialog({
     if (open) setName(brand?.name ?? "");
   }, [open, brand]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    if (brand) {
-      store.updateBrand(brand.id, n);
-      toast.success("Brand updated");
+    try {
+      if (brand) {
+        await store.updateBrand(brand.id, n);
+        toast.success("Brand updated");
+      } else {
+        const b = await store.addBrand(n);
+        toast.success("Brand added");
+        onSaved?.(b);
+      }
       onOpenChange(false);
-    } else {
-      const b = store.addBrand(n);
-      toast.success("Brand added");
-      onSaved?.(b);
-      onOpenChange(false);
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to save brand");
     }
   }
 
