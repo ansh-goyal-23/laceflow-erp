@@ -87,6 +87,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Shree Lace ERP" },
+      { name: "twitter:description", content: "ERP for Shree Lace Industries — manufacturer of shoe laces and webbing." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1ccbb7f0-f104-4441-b201-a3222e856575/id-preview-081f47db--59734082-54a7-44a1-ad17-ddfe2fb71b55.lovable.app-1780326313421.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1ccbb7f0-f104-4441-b201-a3222e856575/id-preview-081f47db--59734082-54a7-44a1-ad17-ddfe2fb71b55.lovable.app-1780326313421.png" },
     ],
     links: [
       {
