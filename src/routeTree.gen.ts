@@ -9,38 +9,152 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
+import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated.clients'
+import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated.brands'
+import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_authenticated.purchase-orders.index'
+import { Route as AuthenticatedPurchaseOrdersNewRouteImport } from './routes/_authenticated.purchase-orders.new'
+import { Route as AuthenticatedPurchaseOrdersIdEditRouteImport } from './routes/_authenticated.purchase-orders.$id.edit'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedBrandsRoute = AuthenticatedBrandsRouteImport.update({
+  id: '/brands',
+  path: '/brands',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPurchaseOrdersIndexRoute =
+  AuthenticatedPurchaseOrdersIndexRouteImport.update({
+    id: '/purchase-orders/',
+    path: '/purchase-orders/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPurchaseOrdersNewRoute =
+  AuthenticatedPurchaseOrdersNewRouteImport.update({
+    id: '/purchase-orders/new',
+    path: '/purchase-orders/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPurchaseOrdersIdEditRoute =
+  AuthenticatedPurchaseOrdersIdEditRouteImport.update({
+    id: '/purchase-orders/$id/edit',
+    path: '/purchase-orders/$id/edit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/brands': typeof AuthenticatedBrandsRoute
+  '/clients': typeof AuthenticatedClientsRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
+  '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/brands': typeof AuthenticatedBrandsRoute
+  '/clients': typeof AuthenticatedClientsRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
+  '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_authenticated/brands': typeof AuthenticatedBrandsRoute
+  '/_authenticated/clients': typeof AuthenticatedClientsRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
+  '/_authenticated/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/brands'
+    | '/clients'
+    | '/dashboard'
+    | '/purchase-orders/new'
+    | '/purchase-orders/'
+    | '/purchase-orders/$id/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/brands'
+    | '/clients'
+    | '/dashboard'
+    | '/purchase-orders/new'
+    | '/purchase-orders'
+    | '/purchase-orders/$id/edit'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/login'
+    | '/_authenticated/brands'
+    | '/_authenticated/clients'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/purchase-orders/new'
+    | '/_authenticated/purchase-orders/'
+    | '/_authenticated/purchase-orders/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +162,78 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/clients': {
+      id: '/_authenticated/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof AuthenticatedClientsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/brands': {
+      id: '/_authenticated/brands'
+      path: '/brands'
+      fullPath: '/brands'
+      preLoaderRoute: typeof AuthenticatedBrandsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/purchase-orders/': {
+      id: '/_authenticated/purchase-orders/'
+      path: '/purchase-orders'
+      fullPath: '/purchase-orders/'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/purchase-orders/new': {
+      id: '/_authenticated/purchase-orders/new'
+      path: '/purchase-orders/new'
+      fullPath: '/purchase-orders/new'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/purchase-orders/$id/edit': {
+      id: '/_authenticated/purchase-orders/$id/edit'
+      path: '/purchase-orders/$id/edit'
+      fullPath: '/purchase-orders/$id/edit'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersIdEditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
+interface AuthenticatedRouteChildren {
+  AuthenticatedBrandsRoute: typeof AuthenticatedBrandsRoute
+  AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedPurchaseOrdersNewRoute: typeof AuthenticatedPurchaseOrdersNewRoute
+  AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
+  AuthenticatedPurchaseOrdersIdEditRoute: typeof AuthenticatedPurchaseOrdersIdEditRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedBrandsRoute: AuthenticatedBrandsRoute,
+  AuthenticatedClientsRoute: AuthenticatedClientsRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedPurchaseOrdersNewRoute: AuthenticatedPurchaseOrdersNewRoute,
+  AuthenticatedPurchaseOrdersIndexRoute: AuthenticatedPurchaseOrdersIndexRoute,
+  AuthenticatedPurchaseOrdersIdEditRoute:
+    AuthenticatedPurchaseOrdersIdEditRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
