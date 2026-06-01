@@ -29,18 +29,21 @@ export function ClientDialog({
     }
   }, [open, client]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    if (client) {
-      store.updateClient(client.id, form);
-      toast.success("Client updated");
+    try {
+      if (client) {
+        await store.updateClient(client.id, form);
+        toast.success("Client updated");
+      } else {
+        const c = await store.addClient(form);
+        toast.success("Client added");
+        onSaved?.(c);
+      }
       onOpenChange(false);
-    } else {
-      const c = store.addClient(form);
-      toast.success("Client added");
-      onSaved?.(c);
-      onOpenChange(false);
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to save client");
     }
   }
 
