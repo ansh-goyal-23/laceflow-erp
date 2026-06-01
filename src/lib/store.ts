@@ -70,7 +70,7 @@ type ClientRow = {
   id: string;
   name: string;
   address: string | null;
-  gst_number: string | null;
+  gstin: string | null;
   phone: string | null;
   email: string | null;
   created_at: string;
@@ -97,7 +97,7 @@ type PORow = {
   delivery_date: string;
   status: "draft" | "submitted";
   created_at: string;
-  po_items: POItemRow[];
+  purchase_order_items: POItemRow[];
 };
 
 const toBrand = (r: BrandRow): Brand => ({ id: r.id, name: r.name, createdAt: r.created_at });
@@ -105,7 +105,7 @@ const toClient = (r: ClientRow): Client => ({
   id: r.id,
   name: r.name,
   address: r.address ?? "",
-  gstNumber: r.gst_number ?? "",
+  gstNumber: r.gstin ?? "",
   phone: r.phone ?? "",
   email: r.email ?? "",
   createdAt: r.created_at,
@@ -132,7 +132,7 @@ const toPO = (r: PORow): PurchaseOrder => ({
   deliveryDate: r.delivery_date,
   status: r.status,
   createdAt: r.created_at,
-  items: (r.po_items ?? []).map(toItem),
+  items: (r.purchase_order_items ?? []).map(toItem),
 });
 
 // ---------- store ----------
@@ -149,7 +149,7 @@ export const store = {
       supabase.from("clients").select("*").order("created_at"),
       supabase
         .from("purchase_orders")
-        .select("*, po_items(*)")
+        .select("*, purchase_order_items(*)")
         .order("created_at", { ascending: false }),
     ]);
     if (b.error) throw b.error;
@@ -164,10 +164,9 @@ export const store = {
 
   // ---- Brands ----
   async addBrand(name: string): Promise<Brand> {
-    const uid = (await supabase.auth.getUser()).data.user?.id;
     const { data, error } = await supabase
       .from("brands")
-      .insert({ name: name.trim(), user_id: uid })
+      .insert({ name: name.trim() })
       .select()
       .single();
     if (error) throw error;
@@ -188,16 +187,14 @@ export const store = {
 
   // ---- Clients ----
   async addClient(c: Omit<Client, "id" | "createdAt">): Promise<Client> {
-    const uid = (await supabase.auth.getUser()).data.user?.id;
     const { data, error } = await supabase
       .from("clients")
       .insert({
         name: c.name,
         address: c.address,
-        gst_number: c.gstNumber,
+        gstin: c.gstNumber,
         phone: c.phone,
         email: c.email,
-        user_id: uid,
       })
       .select()
       .single();
@@ -212,7 +209,7 @@ export const store = {
       .update({
         name: c.name,
         address: c.address,
-        gst_number: c.gstNumber,
+        gstin: c.gstNumber,
         phone: c.phone,
         email: c.email,
       })
@@ -238,7 +235,7 @@ export const store = {
         po_date: po.poDate,
         delivery_date: po.deliveryDate,
         status: po.status,
-        user_id: uid,
+        created_by: uid,
       })
       .select()
       .single();
@@ -262,7 +259,7 @@ export const store = {
       .eq("id", id);
     if (error) throw error;
     // Replace items: delete all then insert fresh
-    const del = await supabase.from("po_items").delete().eq("po_id", id);
+    const del = await supabase.from("purchase_order_items").delete().eq("po_id", id);
     if (del.error) throw del.error;
     await insertItems(id, po.items);
     await refreshPO(id);
@@ -276,7 +273,7 @@ export const store = {
 
 async function insertItems(poId: string, items: POLineItem[]) {
   if (!items.length) return;
-  const rows = items.map((i) => ({
+  const rows = items.map((i, idx) => ({
     po_id: poId,
     article_code: i.articleCode,
     lace_type: i.laceType,
@@ -288,15 +285,16 @@ async function insertItems(poId: string, items: POLineItem[]) {
     uom: i.uom,
     quantity: i.quantity,
     rate: i.rate,
+    sort_order: idx,
   }));
-  const { error } = await supabase.from("po_items").insert(rows);
+  const { error } = await supabase.from("purchase_order_items").insert(rows);
   if (error) throw error;
 }
 
 async function refreshPO(id: string) {
   const { data, error } = await supabase
     .from("purchase_orders")
-    .select("*, po_items(*)")
+    .select("*, purchase_order_items(*)")
     .eq("id", id)
     .single();
   if (error) throw error;
