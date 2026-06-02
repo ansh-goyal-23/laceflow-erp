@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -17,12 +17,20 @@ const poNav: { to: string; label: string; icon: typeof Plus; exact?: boolean }[]
   { to: "/purchase-orders/import-history", label: "Import History", icon: History },
 ];
 
+const dispatchNav: { to: string; label: string; icon: typeof Plus; exact?: boolean }[] = [
+  { to: "/invoices/new", label: "Create Invoice", icon: Plus },
+  { to: "/invoices", label: "Invoice List", icon: List, exact: true },
+  { to: "/invoices/import", label: "Import Dispatch Excel", icon: Upload },
+];
+
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [poOpen, setPoOpen] = useState(true);
   const poActive = pathname === "/purchase-orders" || pathname.startsWith("/purchase-orders/");
+  const [dispatchOpen, setDispatchOpen] = useState(true);
+  const dispatchActive = pathname === "/invoices" || pathname.startsWith("/invoices/");
 
   return (
     <aside className="hidden md:flex md:w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
@@ -71,6 +79,44 @@ export function AppSidebar() {
         {poOpen && (
           <div className="ml-3 pl-3 border-l border-sidebar-border space-y-1">
             {poNav.map((item) => {
+              const active = item.exact
+                ? pathname === item.to
+                : pathname === item.to || pathname.startsWith(item.to + "/");
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setDispatchOpen((o) => !o)}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+            dispatchActive
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          }`}
+        >
+          <Truck className="h-4 w-4" />
+          <span className="flex-1 text-left">Dispatch</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${dispatchOpen ? "" : "-rotate-90"}`} />
+        </button>
+        {dispatchOpen && (
+          <div className="ml-3 pl-3 border-l border-sidebar-border space-y-1">
+            {dispatchNav.map((item) => {
               const active = item.exact
                 ? pathname === item.to
                 : pathname === item.to || pathname.startsWith(item.to + "/");
