@@ -22,6 +22,33 @@ export const Route = createFileRoute("/_authenticated/purchase-orders/")({
 
 const PAGE_SIZE = 10;
 
+function cmpStr(a: string, b: string, dir: number) {
+  return a.localeCompare(b) * dir;
+}
+function cmpNumStr(a: string, b: string, dir: number) {
+  const na = parseInt(a.replace(/\D/g, ""), 10) || 0;
+  const nb = parseInt(b.replace(/\D/g, ""), 10) || 0;
+  if (na !== nb) return (na - nb) * dir;
+  return a.localeCompare(b) * dir;
+}
+
+type SortKey = "poNumber" | "brand" | "client" | "poDate" | "deliveryDate" | "status" | "createdAt";
+
+function SortHeader({ label, active, dir, onClick, align = "left" }: {
+  label: string; active: boolean; dir: "asc" | "desc"; onClick: () => void; align?: "left" | "right";
+}) {
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap ${align === "right" ? "ml-auto" : ""}`}
+    >
+      {label}
+      <Icon className={`h-3.5 w-3.5 ${active ? "text-foreground" : "text-muted-foreground/50"}`} />
+    </button>
+  );
+}
+
 function POList() {
   const pos = useStore((s) => s.purchaseOrders);
   const brands = useStore((s) => s.brands);
@@ -34,7 +61,7 @@ function POList() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
-  const [sortKey, setSortKey] = useState<"poNumber" | "poDate" | "deliveryDate" | "createdAt">("createdAt");
+  const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [confirm, setConfirm] = useState<PurchaseOrder | null>(null);
@@ -42,6 +69,12 @@ function POList() {
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
+  }
 
   const filtered = useMemo(() => {
     const t = q.toLowerCase();
@@ -55,10 +88,13 @@ function POList() {
       )
       .sort((a, b) => {
         const dir = sortDir === "asc" ? 1 : -1;
-        if (sortKey === "poNumber") return a.poNumber.localeCompare(b.poNumber) * dir;
-        if (sortKey === "poDate") return a.poDate.localeCompare(b.poDate) * dir;
-        if (sortKey === "deliveryDate") return a.deliveryDate.localeCompare(b.deliveryDate) * dir;
-        return a.createdAt.localeCompare(b.createdAt) * dir;
+        if (sortKey === "poNumber") return cmpNumStr(a.poNumber, b.poNumber, dir);
+        if (sortKey === "brand") return cmpStr(brandName(a.brandId), brandName(b.brandId), dir);
+        if (sortKey === "client") return cmpStr(clientName(a.clientId), clientName(b.clientId), dir);
+        if (sortKey === "poDate") return cmpStr(a.poDate, b.poDate, dir);
+        if (sortKey === "deliveryDate") return cmpStr(a.deliveryDate, b.deliveryDate, dir);
+        if (sortKey === "status") return cmpStr(a.status, b.status, dir);
+        return cmpStr(a.createdAt, b.createdAt, dir);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos, q, statusFilter, brandFilter, clientFilter, sortKey, sortDir, brands, clients]);
