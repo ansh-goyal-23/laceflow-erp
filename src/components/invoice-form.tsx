@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useStore, store, type Invoice, type InvoiceItem, type PurchaseOrder, type POLineItem } from "@/lib/store";
-import { dispatchedByPOItem, dispatchedByPO, poFulfillmentStatus, statusBadgeClass } from "@/lib/dispatch";
+import { dispatchedByPOItem, dispatchedByPO, poFulfillmentStatus } from "@/lib/dispatch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Send, AlertTriangle } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Trash2, Send, AlertTriangle, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Draft = Omit<InvoiceItem, "id" | "invoiceId">;
