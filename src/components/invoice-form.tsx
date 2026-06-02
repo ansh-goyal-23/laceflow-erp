@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useStore, store, type Invoice, type InvoiceItem, type PurchaseOrder, type POLineItem } from "@/lib/store";
-import { dispatchedByPOItem, dispatchedByPO, poFulfillmentStatus, statusBadgeClass } from "@/lib/dispatch";
+import { dispatchedByPOItem, dispatchedByPO, poFulfillmentStatus } from "@/lib/dispatch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Send, AlertTriangle } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Trash2, Send, AlertTriangle, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Draft = Omit<InvoiceItem, "id" | "invoiceId">;
@@ -174,42 +177,53 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
 
       {clientId && (
         <Card>
-          <CardHeader><CardTitle>Open Purchase Orders</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Select Purchase Order</CardTitle></CardHeader>
           <CardContent>
             {clientPOs.length === 0 ? (
               <div className="text-sm text-muted-foreground">No open purchase orders for this client.</div>
             ) : (
-              <div className="overflow-x-auto border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>PO Number</TableHead>
-                      <TableHead>PO Date</TableHead>
-                      <TableHead>Delivery Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-28"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {clientPOs.map(({ po, status }) => (
-                      <TableRow key={po.id} data-state={selectedPoId === po.id ? "selected" : undefined}>
-                        <TableCell className="font-medium">{po.poNumber}</TableCell>
-                        <TableCell>{po.poDate}</TableCell>
-                        <TableCell>{po.deliveryDate}</TableCell>
-                        <TableCell>
-                          <span className={`text-xs px-2 py-1 rounded-full ${statusBadgeClass(status)}`}>{status}</span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" variant={selectedPoId === po.id ? "default" : "outline"}
-                            onClick={() => setSelectedPoId(po.id === selectedPoId ? "" : po.id)}>
-                            {selectedPoId === po.id ? "Selected" : "Select"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full md:w-80 justify-between"
+                  >
+                    {selectedPO ? selectedPO.poNumber : "Search and select PO…"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full md:w-80 p-0">
+                  <Command>
+                    <CommandInput placeholder="Search PO number…" />
+                    <CommandList>
+                      <CommandEmpty>No open PO found.</CommandEmpty>
+                      <CommandGroup>
+                        {clientPOs.map(({ po }) => (
+                          <CommandItem
+                            key={po.id}
+                            value={po.poNumber}
+                            onSelect={() => {
+                              setSelectedPoId(po.id === selectedPoId ? "" : po.id);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedPoId === po.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {po.poNumber}
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {po.poDate}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             )}
           </CardContent>
         </Card>
