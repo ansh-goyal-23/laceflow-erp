@@ -21,6 +21,7 @@ import { Route as AuthenticatedPurchaseOrdersNewRouteImport } from './routes/_au
 import { Route as AuthenticatedPurchaseOrdersImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.import-history'
 import { Route as AuthenticatedPurchaseOrdersImportRouteImport } from './routes/_authenticated/purchase-orders.import'
 import { Route as AuthenticatedInvoicesNewRouteImport } from './routes/_authenticated/invoices.new'
+import { Route as AuthenticatedInvoicesImportRouteImport } from './routes/_authenticated/invoices.import'
 import { Route as AuthenticatedPurchaseOrdersIdEditRouteImport } from './routes/_authenticated/purchase-orders.$id.edit'
 import { Route as AuthenticatedInvoicesIdEditRouteImport } from './routes/_authenticated/invoices.$id.edit'
 
@@ -89,6 +90,12 @@ const AuthenticatedInvoicesNewRoute =
     path: '/invoices/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedInvoicesImportRoute =
+  AuthenticatedInvoicesImportRouteImport.update({
+    id: '/invoices/import',
+    path: '/invoices/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPurchaseOrdersIdEditRoute =
   AuthenticatedPurchaseOrdersIdEditRouteImport.update({
     id: '/purchase-orders/$id/edit',
@@ -108,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
   '/purchase-orders/import-history': typeof AuthenticatedPurchaseOrdersImportHistoryRoute
@@ -123,6 +131,7 @@ export interface FileRoutesByTo {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
   '/purchase-orders/import-history': typeof AuthenticatedPurchaseOrdersImportHistoryRoute
@@ -140,6 +149,7 @@ export interface FileRoutesById {
   '/_authenticated/brands': typeof AuthenticatedBrandsRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/_authenticated/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/_authenticated/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
   '/_authenticated/purchase-orders/import-history': typeof AuthenticatedPurchaseOrdersImportHistoryRoute
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/brands'
     | '/clients'
     | '/dashboard'
+    | '/invoices/import'
     | '/invoices/new'
     | '/purchase-orders/import'
     | '/purchase-orders/import-history'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/brands'
     | '/clients'
     | '/dashboard'
+    | '/invoices/import'
     | '/invoices/new'
     | '/purchase-orders/import'
     | '/purchase-orders/import-history'
@@ -188,6 +200,7 @@ export interface FileRouteTypes {
     | '/_authenticated/brands'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
+    | '/_authenticated/invoices/import'
     | '/_authenticated/invoices/new'
     | '/_authenticated/purchase-orders/import'
     | '/_authenticated/purchase-orders/import-history'
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvoicesNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/invoices/import': {
+      id: '/_authenticated/invoices/import'
+      path: '/invoices/import'
+      fullPath: '/invoices/import'
+      preLoaderRoute: typeof AuthenticatedInvoicesImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/purchase-orders/$id/edit': {
       id: '/_authenticated/purchase-orders/$id/edit'
       path: '/purchase-orders/$id/edit'
@@ -311,6 +331,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBrandsRoute: typeof AuthenticatedBrandsRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInvoicesImportRoute: typeof AuthenticatedInvoicesImportRoute
   AuthenticatedInvoicesNewRoute: typeof AuthenticatedInvoicesNewRoute
   AuthenticatedPurchaseOrdersImportRoute: typeof AuthenticatedPurchaseOrdersImportRoute
   AuthenticatedPurchaseOrdersImportHistoryRoute: typeof AuthenticatedPurchaseOrdersImportHistoryRoute
@@ -325,6 +346,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBrandsRoute: AuthenticatedBrandsRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInvoicesImportRoute: AuthenticatedInvoicesImportRoute,
   AuthenticatedInvoicesNewRoute: AuthenticatedInvoicesNewRoute,
   AuthenticatedPurchaseOrdersImportRoute:
     AuthenticatedPurchaseOrdersImportRoute,
@@ -349,3 +371,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
