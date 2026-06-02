@@ -148,19 +148,7 @@ function POList() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={sortKey} onValueChange={(v) => { setSortKey(v as typeof sortKey); setPage(1); }}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Sort by" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="createdAt">Date Created</SelectItem>
-                <SelectItem value="poNumber">PO Number</SelectItem>
-                <SelectItem value="poDate">PO Date</SelectItem>
-                <SelectItem value="deliveryDate">Delivery Date</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")} title={sortDir === "asc" ? "Ascending" : "Descending"}>
-              {sortDir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-            </Button>
-            {(q || statusFilter !== "all" || brandFilter !== "all" || clientFilter !== "all" || sortKey !== "createdAt" || sortDir !== "desc") && (
+            {(q || statusFilter !== "all" || brandFilter !== "all" || clientFilter !== "all") && (
               <Button variant="ghost" size="sm" onClick={() => {
                 setQ(""); setStatusFilter("all"); setBrandFilter("all"); setClientFilter("all"); setSortKey("createdAt"); setSortDir("desc"); setPage(1);
               }}>
