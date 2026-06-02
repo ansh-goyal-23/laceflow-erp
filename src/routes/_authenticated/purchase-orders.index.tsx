@@ -29,6 +29,10 @@ function POList() {
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [brandFilter, setBrandFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<"poNumber" | "poDate" | "deliveryDate" | "createdAt">("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [confirm, setConfirm] = useState<PurchaseOrder | null>(null);
   const [viewing, setViewing] = useState<PurchaseOrder | null>(null);
