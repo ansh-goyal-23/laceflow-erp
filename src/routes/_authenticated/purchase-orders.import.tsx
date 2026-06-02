@@ -82,11 +82,11 @@ function ImportExcelPage() {
     let brandsCreated = 0;
     let clientsCreated = 0;
 
-    // Group valid rows
+    // Group rows by the database uniqueness rule: one PO number per client.
+    // Multiple Excel rows for the same client + PO are imported as line items.
     const groups = new Map<string, { sample: ImportRow; items: ImportRow[] }>();
     for (const r of parsed.validRows) {
-      const brandKey = (r.brand.trim() ? r.brand : "Unbranded").toLowerCase();
-      const key = `${brandKey}||${r.client.toLowerCase()}||${r.poNumber}||${r.poDate}||${r.deliveryDate}`;
+      const key = `${r.client.trim().toLowerCase()}||${r.poNumber.trim()}`;
       const g = groups.get(key);
       if (g) g.items.push(r);
       else groups.set(key, { sample: r, items: [r] });
