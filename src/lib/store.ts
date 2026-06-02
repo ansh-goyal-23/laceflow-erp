@@ -46,13 +46,41 @@ export interface PurchaseOrder {
   createdBy: string | null;
 }
 
+export interface InvoiceItem {
+  id: string;
+  invoiceId: string;
+  poId: string | null;
+  poItemId: string | null;
+  poNumber: string;
+  articleCode: string;
+  laceType: string;
+  materialType: string;
+  width: string;
+  length: string;
+  color: string;
+  uom: string;
+  dispatchQty: number;
+  rate: number;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  dispatchDate: string;
+  clientId: string;
+  createdAt: string;
+  createdBy: string | null;
+  items: InvoiceItem[];
+}
+
 type StoreShape = {
   brands: Brand[];
   clients: Client[];
   purchaseOrders: PurchaseOrder[];
+  invoices: Invoice[];
 };
 
-const empty: StoreShape = { brands: [], clients: [], purchaseOrders: [] };
+const empty: StoreShape = { brands: [], clients: [], purchaseOrders: [], invoices: [] };
 let state: StoreShape = empty;
 const listeners = new Set<() => void>();
 
@@ -141,6 +169,57 @@ const toPO = (r: PORow): PurchaseOrder => ({
   items: (r.purchase_order_items ?? []).map(toItem),
 });
 
+type InvoiceItemRow = {
+  id: string;
+  invoice_id: string;
+  po_id: string | null;
+  po_item_id: string | null;
+  po_number: string | null;
+  article_code: string | null;
+  lace_type: string | null;
+  material_type: string | null;
+  width: string | null;
+  length: string | null;
+  color: string | null;
+  uom: string;
+  dispatch_qty: number;
+  rate: number;
+};
+type InvoiceRow = {
+  id: string;
+  invoice_number: string;
+  dispatch_date: string;
+  client_id: string;
+  created_at: string;
+  created_by: string | null;
+  invoice_items: InvoiceItemRow[];
+};
+const toInvoiceItem = (r: InvoiceItemRow): InvoiceItem => ({
+  id: r.id,
+  invoiceId: r.invoice_id,
+  poId: r.po_id,
+  poItemId: r.po_item_id,
+  poNumber: r.po_number ?? "",
+  articleCode: r.article_code ?? "",
+  laceType: r.lace_type ?? "",
+  materialType: r.material_type ?? "",
+  width: r.width ?? "",
+  length: r.length ?? "",
+  color: r.color ?? "",
+  uom: r.uom,
+  dispatchQty: Number(r.dispatch_qty),
+  rate: Number(r.rate),
+});
+const toInvoice = (r: InvoiceRow): Invoice => ({
+  id: r.id,
+  invoiceNumber: r.invoice_number,
+  dispatchDate: r.dispatch_date,
+  clientId: r.client_id,
+  createdAt: r.created_at,
+  createdBy: r.created_by ?? null,
+  items: (r.invoice_items ?? []).map(toInvoiceItem),
+});
+
 // ---------- store ----------
 
 export const store = {
@@ -150,21 +229,27 @@ export const store = {
     set(empty);
   },
   async hydrate() {
-    const [b, c, p] = await Promise.all([
+    const [b, c, p, inv] = await Promise.all([
       supabase.from("brands").select("*").order("created_at"),
       supabase.from("clients").select("*").order("created_at"),
       supabase
         .from("purchase_orders")
         .select("*, purchase_order_items(*)")
         .order("created_at", { ascending: false }),
+      supabase
+        .from("invoices")
+        .select("*, invoice_items(*)")
+        .order("created_at", { ascending: false }),
     ]);
     if (b.error) throw b.error;
     if (c.error) throw c.error;
     if (p.error) throw p.error;
+    if (inv.error) throw inv.error;
     set({
       brands: (b.data as BrandRow[]).map(toBrand),
       clients: (c.data as ClientRow[]).map(toClient),
       purchaseOrders: (p.data as PORow[]).map(toPO),
+      invoices: (inv.data as InvoiceRow[]).map(toInvoice),
     });
   },
 
@@ -275,7 +360,89 @@ export const store = {
     if (error) throw error;
     set({ ...state, purchaseOrders: state.purchaseOrders.filter((p) => p.id !== id) });
   },
+
+  // ---- Invoices ----
+  async addInvoice(inv: Omit<Invoice, "id" | "createdAt" | "createdBy" | "items"> & { items: Omit<InvoiceItem, "id" | "invoiceId">[] }): Promise<Invoice> {
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    const { data, error } = await supabase
+      .from("invoices")
+      .insert({
+        invoice_number: inv.invoiceNumber.trim(),
+        dispatch_date: inv.dispatchDate,
+        client_id: inv.clientId,
+        created_by: uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    const invId = (data as InvoiceRow).id;
+    await insertInvoiceItems(invId, inv.items);
+    await refreshInvoice(invId);
+    return state.invoices.find((i) => i.id === invId)!;
+  },
+  async updateInvoice(
+    id: string,
+    inv: Omit<Invoice, "id" | "createdAt" | "createdBy" | "items"> & { items: Omit<InvoiceItem, "id" | "invoiceId">[] },
+  ) {
+    const { error } = await supabase
+      .from("invoices")
+      .update({
+        invoice_number: inv.invoiceNumber.trim(),
+        dispatch_date: inv.dispatchDate,
+        client_id: inv.clientId,
+      })
+      .eq("id", id);
+    if (error) throw error;
+    const del = await supabase.from("invoice_items").delete().eq("invoice_id", id);
+    if (del.error) throw del.error;
+    await insertInvoiceItems(id, inv.items);
+    await refreshInvoice(id);
+  },
+  async deleteInvoice(id: string) {
+    const { error } = await supabase.from("invoices").delete().eq("id", id);
+    if (error) throw error;
+    set({ ...state, invoices: state.invoices.filter((i) => i.id !== id) });
+  },
 };
+
+async function insertInvoiceItems(invoiceId: string, items: Omit<InvoiceItem, "id" | "invoiceId">[]) {
+  if (!items.length) return;
+  const rows = items.map((i, idx) => ({
+    invoice_id: invoiceId,
+    po_id: i.poId,
+    po_item_id: i.poItemId,
+    po_number: i.poNumber,
+    article_code: i.articleCode,
+    lace_type: i.laceType,
+    material_type: i.materialType,
+    width: i.width,
+    length: i.length,
+    color: i.color,
+    uom: i.uom,
+    dispatch_qty: i.dispatchQty,
+    rate: i.rate,
+    sort_order: idx,
+  }));
+  const { error } = await supabase.from("invoice_items").insert(rows);
+  if (error) throw error;
+}
+
+async function refreshInvoice(id: string) {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("*, invoice_items(*)")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  const inv = toInvoice(data as InvoiceRow);
+  const existing = state.invoices.find((i) => i.id === id);
+  set({
+    ...state,
+    invoices: existing
+      ? state.invoices.map((i) => (i.id === id ? inv : i))
+      : [inv, ...state.invoices],
+  });
+}
 
 // ---- Bulk import helpers ----
 
