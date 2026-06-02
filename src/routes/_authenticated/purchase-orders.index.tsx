@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/purchase-orders/")({
   component: POList,
@@ -26,6 +27,8 @@ function POList() {
   const brands = useStore((s) => s.brands);
   const clients = useStore((s) => s.clients);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canModify = (p: PurchaseOrder) => !!user && (user.role === "admin" || p.createdBy === user.id);
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -161,12 +164,16 @@ function POList() {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => setViewing(p)} title="View"><Eye className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" asChild title="Edit">
-                      <Link to="/purchase-orders/$id/edit" params={{ id: p.id }}><Pencil className="h-4 w-4" /></Link>
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setConfirm(p)} title="Delete">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    {canModify(p) && (
+                      <>
+                        <Button variant="ghost" size="icon" asChild title="Edit">
+                          <Link to="/purchase-orders/$id/edit" params={{ id: p.id }}><Pencil className="h-4 w-4" /></Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setConfirm(p)} title="Delete">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
