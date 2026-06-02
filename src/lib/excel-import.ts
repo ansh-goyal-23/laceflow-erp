@@ -152,7 +152,7 @@ export async function parseExcel(file: File): Promise<ParseResult> {
   const validRows = rows.filter((r) => r.errors.length === 0);
   const invalidRows = rows.filter((r) => r.errors.length > 0);
   const uniqueKey = (r: ImportRow) =>
-    `${r.brand}||${r.client}||${r.poNumber}||${r.poDate}||${r.deliveryDate}`;
+    `${r.client.trim().toLowerCase()}||${r.poNumber.trim()}`;
   const uniquePOs = new Set(validRows.map(uniqueKey)).size;
   const brands = Array.from(new Set(rows.map((r) => r.brand).filter(Boolean)));
   const clients = Array.from(new Set(rows.map((r) => r.client).filter(Boolean)));
