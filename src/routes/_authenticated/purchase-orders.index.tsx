@@ -174,12 +174,12 @@ function POList() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>PO Number</TableHead>
-                <TableHead>Brand</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>PO Date</TableHead>
-                <TableHead>Delivery Date</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead><SortHeader label="PO Number" active={sortKey === "poNumber"} dir={sortDir} onClick={() => toggleSort("poNumber")} /></TableHead>
+                <TableHead><SortHeader label="Brand" active={sortKey === "brand"} dir={sortDir} onClick={() => toggleSort("brand")} /></TableHead>
+                <TableHead><SortHeader label="Client" active={sortKey === "client"} dir={sortDir} onClick={() => toggleSort("client")} /></TableHead>
+                <TableHead><SortHeader label="PO Date" active={sortKey === "poDate"} dir={sortDir} onClick={() => toggleSort("poDate")} /></TableHead>
+                <TableHead><SortHeader label="Delivery Date" active={sortKey === "deliveryDate"} dir={sortDir} onClick={() => toggleSort("deliveryDate")} /></TableHead>
+                <TableHead><SortHeader label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} /></TableHead>
                 <TableHead className="text-right w-40">Actions</TableHead>
               </TableRow>
             </TableHeader>
