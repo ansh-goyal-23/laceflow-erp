@@ -85,7 +85,8 @@ function ImportExcelPage() {
     // Group valid rows
     const groups = new Map<string, { sample: ImportRow; items: ImportRow[] }>();
     for (const r of parsed.validRows) {
-      const key = `${r.brand.toLowerCase()}||${r.client.toLowerCase()}||${r.poNumber}||${r.poDate}||${r.deliveryDate}`;
+      const brandKey = (r.brand.trim() ? r.brand : "Unbranded").toLowerCase();
+      const key = `${brandKey}||${r.client.toLowerCase()}||${r.poNumber}||${r.poDate}||${r.deliveryDate}`;
       const g = groups.get(key);
       if (g) g.items.push(r);
       else groups.set(key, { sample: r, items: [r] });
