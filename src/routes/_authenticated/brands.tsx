@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { BrandDialog } from "@/components/brand-dialog";
+import { useAuth } from "@/lib/auth";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -20,6 +21,8 @@ export const Route = createFileRoute("/_authenticated/brands")({
 
 function BrandsPage() {
   const brands = useStore((s) => s.brands);
+  const { user } = useAuth();
+  const canModify = (b: Brand) => !!user && (user.role === "admin" || b.createdBy === user.id);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Brand | null>(null);
@@ -62,12 +65,18 @@ function BrandsPage() {
               <TableRow key={b.id}>
                 <TableCell className="font-medium">{b.name}</TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => { setEditing(b); setOpen(true); }}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setConfirm(b)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {canModify(b) ? (
+                    <>
+                      <Button variant="ghost" size="icon" onClick={() => { setEditing(b); setOpen(true); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setConfirm(b)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
