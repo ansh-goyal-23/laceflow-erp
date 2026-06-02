@@ -44,13 +44,21 @@ function POList() {
     const t = q.toLowerCase();
     return pos
       .filter((p) => statusFilter === "all" || p.status === statusFilter)
+      .filter((p) => brandFilter === "all" || p.brandId === brandFilter)
+      .filter((p) => clientFilter === "all" || p.clientId === clientFilter)
       .filter((p) =>
         [p.poNumber, brandName(p.brandId), clientName(p.clientId)]
           .some((v) => v.toLowerCase().includes(t)),
       )
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      .sort((a, b) => {
+        const dir = sortDir === "asc" ? 1 : -1;
+        if (sortKey === "poNumber") return a.poNumber.localeCompare(b.poNumber) * dir;
+        if (sortKey === "poDate") return a.poDate.localeCompare(b.poDate) * dir;
+        if (sortKey === "deliveryDate") return a.deliveryDate.localeCompare(b.deliveryDate) * dir;
+        return a.createdAt.localeCompare(b.createdAt) * dir;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos, q, statusFilter, brands, clients]);
+  }, [pos, q, statusFilter, brandFilter, clientFilter, sortKey, sortDir, brands, clients]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
