@@ -132,7 +132,7 @@ function ImportExcelPage() {
             rate: 0,
           }));
 
-          const existing = bulkImport.findPOByNumber(sample.poNumber);
+          const existing = bulkImport.findPOByNumber(sample.poNumber, clientId);
           if (existing) {
             if (duplicateStrategy === "skip") {
               for (const it of items) failed.push({ ...it, errors: [`PO ${sample.poNumber} exists — skipped`] });

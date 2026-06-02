@@ -308,8 +308,10 @@ export const bulkImport = {
     });
     return { id: nc.id, created: true };
   },
-  findPOByNumber(poNumber: string): PurchaseOrder | undefined {
-    return state.purchaseOrders.find((p) => p.poNumber === poNumber);
+  findPOByNumber(poNumber: string, clientId?: string): PurchaseOrder | undefined {
+    return state.purchaseOrders.find(
+      (p) => p.poNumber === poNumber && (clientId ? p.clientId === clientId : true),
+    );
   },
   async createPO(input: BulkPOInput): Promise<{ poId: string; itemCount: number }> {
     const uid = (await supabase.auth.getUser()).data.user?.id;
