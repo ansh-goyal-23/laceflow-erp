@@ -192,7 +192,7 @@ export const store = {
   },
 
   // ---- Clients ----
-  async addClient(c: Omit<Client, "id" | "createdAt">): Promise<Client> {
+  async addClient(c: Omit<Client, "id" | "createdAt" | "createdBy">): Promise<Client> {
     const { data, error } = await supabase
       .from("clients")
       .insert({
@@ -209,7 +209,7 @@ export const store = {
     set({ ...state, clients: [...state.clients, nc] });
     return nc;
   },
-  async updateClient(id: string, c: Omit<Client, "id" | "createdAt">) {
+  async updateClient(id: string, c: Omit<Client, "id" | "createdAt" | "createdBy">) {
     const { error } = await supabase
       .from("clients")
       .update({
@@ -230,7 +230,7 @@ export const store = {
   },
 
   // ---- POs ----
-  async addPO(po: Omit<PurchaseOrder, "id" | "createdAt">): Promise<PurchaseOrder> {
+  async addPO(po: Omit<PurchaseOrder, "id" | "createdAt" | "createdBy">): Promise<PurchaseOrder> {
     const uid = (await supabase.auth.getUser()).data.user?.id;
     const { data, error } = await supabase
       .from("purchase_orders")
@@ -251,7 +251,7 @@ export const store = {
     await refreshPO(poId);
     return state.purchaseOrders.find((p) => p.id === poId)!;
   },
-  async updatePO(id: string, po: Omit<PurchaseOrder, "id" | "createdAt">) {
+  async updatePO(id: string, po: Omit<PurchaseOrder, "id" | "createdAt" | "createdBy">) {
     const { error } = await supabase
       .from("purchase_orders")
       .update({
