@@ -77,19 +77,58 @@ function POList() {
       />
 
       <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex flex-col xl:flex-row gap-3 mb-4 items-start xl:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="Search by PO #, brand or client…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           </div>
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="submitted">Submitted</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap gap-2 items-center">
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="submitted">Submitted</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={brandFilter} onValueChange={(v) => { setBrandFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Brand" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brands.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={clientFilter} onValueChange={(v) => { setClientFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="Client" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Clients</SelectItem>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sortKey} onValueChange={(v) => { setSortKey(v as typeof sortKey); setPage(1); }}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Sort by" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt">Date Created</SelectItem>
+                <SelectItem value="poNumber">PO Number</SelectItem>
+                <SelectItem value="poDate">PO Date</SelectItem>
+                <SelectItem value="deliveryDate">Delivery Date</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")} title={sortDir === "asc" ? "Ascending" : "Descending"}>
+              {sortDir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+            </Button>
+            {(q || statusFilter !== "all" || brandFilter !== "all" || clientFilter !== "all" || sortKey !== "createdAt" || sortDir !== "desc") && (
+              <Button variant="ghost" size="sm" onClick={() => {
+                setQ(""); setStatusFilter("all"); setBrandFilter("all"); setClientFilter("all"); setSortKey("createdAt"); setSortDir("desc"); setPage(1);
+              }}>
+                <X className="h-4 w-4 mr-1" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
