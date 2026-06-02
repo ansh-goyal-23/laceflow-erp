@@ -270,6 +270,135 @@ export const store = {
   },
 };
 
+// ---- Bulk import helpers ----
+
+export type DuplicateStrategy = "skip" | "update" | "replace";
+
+export interface BulkPOInput {
+  poNumber: string;
+  brandId: string;
+  clientId: string;
+  poDate: string;
+  deliveryDate: string;
+  items: Omit<POLineItem, "id">[];
+}
+
+export const bulkImport = {
+  async ensureBrand(name: string): Promise<{ id: string; created: boolean }> {
+    const trimmed = name.trim();
+    const existing = state.brands.find(
+      (b) => b.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (existing) return { id: existing.id, created: false };
+    const b = await store.addBrand(trimmed);
+    return { id: b.id, created: true };
+  },
+  async ensureClient(name: string): Promise<{ id: string; created: boolean }> {
+    const trimmed = name.trim();
+    const existing = state.clients.find(
+      (c) => c.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (existing) return { id: existing.id, created: false };
+    const nc = await store.addClient({
+      name: trimmed,
+      address: "",
+      gstNumber: "",
+      phone: "",
+      email: "",
+    });
+    return { id: nc.id, created: true };
+  },
+  findPOByNumber(poNumber: string): PurchaseOrder | undefined {
+    return state.purchaseOrders.find((p) => p.poNumber === poNumber);
+  },
+  async createPO(input: BulkPOInput): Promise<{ poId: string; itemCount: number }> {
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    const { data, error } = await supabase
+      .from("purchase_orders")
+      .insert({
+        po_number: input.poNumber,
+        brand_id: input.brandId,
+        client_id: input.clientId,
+        po_date: input.poDate,
+        delivery_date: input.deliveryDate,
+        status: "submitted",
+        created_by: uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    const poId = (data as PORow).id;
+    const items: POLineItem[] = input.items.map((i) => ({ ...i, id: crypto.randomUUID() }));
+    await insertItems(poId, items);
+    await refreshPO(poId);
+    return { poId, itemCount: items.length };
+  },
+  async appendItemsToPO(poId: string, items: Omit<POLineItem, "id">[]): Promise<number> {
+    const withIds: POLineItem[] = items.map((i) => ({ ...i, id: crypto.randomUUID() }));
+    await insertItems(poId, withIds);
+    await refreshPO(poId);
+    return withIds.length;
+  },
+  async replacePO(poId: string, input: BulkPOInput): Promise<number> {
+    const { error } = await supabase
+      .from("purchase_orders")
+      .update({
+        brand_id: input.brandId,
+        client_id: input.clientId,
+        po_date: input.poDate,
+        delivery_date: input.deliveryDate,
+        status: "submitted",
+      })
+      .eq("id", poId);
+    if (error) throw error;
+    const del = await supabase.from("purchase_order_items").delete().eq("po_id", poId);
+    if (del.error) throw del.error;
+    const items: POLineItem[] = input.items.map((i) => ({ ...i, id: crypto.randomUUID() }));
+    await insertItems(poId, items);
+    await refreshPO(poId);
+    return items.length;
+  },
+  async logImport(record: {
+    fileName: string;
+    totalRows: number;
+    successfulRows: number;
+    failedRows: number;
+    posCreated: number;
+    posUpdated: number;
+    lineItemsCreated: number;
+    brandsCreated: number;
+    clientsCreated: number;
+    status: string;
+    errors?: unknown;
+  }) {
+    const u = (await supabase.auth.getUser()).data.user;
+    await supabase.from("po_import_history").insert({
+      file_name: record.fileName,
+      uploaded_by: u?.id ?? null,
+      uploaded_by_email: u?.email ?? null,
+      total_rows: record.totalRows,
+      successful_rows: record.successfulRows,
+      failed_rows: record.failedRows,
+      pos_created: record.posCreated,
+      pos_updated: record.posUpdated,
+      line_items_created: record.lineItemsCreated,
+      brands_created: record.brandsCreated,
+      clients_created: record.clientsCreated,
+      status: record.status,
+      errors: record.errors ?? null,
+    });
+  },
+  async fetchImportHistory() {
+    const { data, error } = await supabase
+      .from("po_import_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return data ?? [];
+  },
+};
+
 async function insertItems(poId: string, items: POLineItem[]) {
   if (!items.length) return;
   const rows = items.map((i, idx) => ({
