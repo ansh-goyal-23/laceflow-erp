@@ -85,7 +85,8 @@ function ImportExcelPage() {
     // Group valid rows
     const groups = new Map<string, { sample: ImportRow; items: ImportRow[] }>();
     for (const r of parsed.validRows) {
-      const key = `${r.brand.toLowerCase()}||${r.client.toLowerCase()}||${r.poNumber}||${r.poDate}||${r.deliveryDate}`;
+      const brandKey = (r.brand.trim() ? r.brand : "Unbranded").toLowerCase();
+      const key = `${brandKey}||${r.client.toLowerCase()}||${r.poNumber}||${r.poDate}||${r.deliveryDate}`;
       const g = groups.get(key);
       if (g) g.items.push(r);
       else groups.set(key, { sample: r, items: [r] });
@@ -99,7 +100,9 @@ function ImportExcelPage() {
       // Ensure brands/clients (sequential to avoid duplicate creation)
       const brandIds = new Map<string, string>();
       const clientIds = new Map<string, string>();
-      const allBrands = Array.from(new Set(parsed.validRows.map((r) => r.brand)));
+      const allBrands = Array.from(
+        new Set(parsed.validRows.map((r) => (r.brand.trim() ? r.brand : "Unbranded"))),
+      );
       const allClients = Array.from(new Set(parsed.validRows.map((r) => r.client)));
       for (const b of allBrands) {
         const { id, created } = await bulkImport.ensureBrand(b);
@@ -114,7 +117,8 @@ function ImportExcelPage() {
 
       for (const { sample, items } of groups.values()) {
         try {
-          const brandId = brandIds.get(sample.brand.toLowerCase())!;
+          const brandKey = (sample.brand.trim() ? sample.brand : "Unbranded").toLowerCase();
+          const brandId = brandIds.get(brandKey)!;
           const clientId = clientIds.get(sample.client.toLowerCase())!;
           const lineItems = items.map((i) => ({
             articleCode: i.articleCode,
