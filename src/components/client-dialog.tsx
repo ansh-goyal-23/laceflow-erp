@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { store, type Client } from "@/lib/store";
 import { toast } from "sonner";
 
-type Form = Omit<Client, "id" | "createdAt">;
+type Form = Omit<Client, "id" | "createdAt" | "createdBy">;
 const empty: Form = { name: "", address: "", gstNumber: "", phone: "", email: "" };
 
 export function ClientDialog({
