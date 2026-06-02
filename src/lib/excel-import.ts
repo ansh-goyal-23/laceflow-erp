@@ -140,7 +140,6 @@ export async function parseExcel(file: File): Promise<ParseResult> {
       })(),
       errors: [],
     };
-    if (!row.brand) row.errors.push("Missing Brand");
     if (!row.client) row.errors.push("Missing Client");
     if (!row.poNumber) row.errors.push("Missing PO Number");
     if (!row.poDate) row.errors.push("Invalid/Missing PO Date");
