@@ -5,6 +5,7 @@ export interface Brand {
   id: string;
   name: string;
   createdAt: string;
+  createdBy: string | null;
 }
 
 export interface Client {
@@ -15,6 +16,7 @@ export interface Client {
   phone: string;
   email: string;
   createdAt: string;
+  createdBy: string | null;
 }
 
 export interface POLineItem {
@@ -41,6 +43,7 @@ export interface PurchaseOrder {
   items: POLineItem[];
   status: "draft" | "submitted";
   createdAt: string;
+  createdBy: string | null;
 }
 
 type StoreShape = {
@@ -65,7 +68,7 @@ function subscribe(fn: () => void) {
 
 // ---------- mappers ----------
 
-type BrandRow = { id: string; name: string; created_at: string };
+type BrandRow = { id: string; name: string; created_at: string; created_by: string | null };
 type ClientRow = {
   id: string;
   name: string;
@@ -74,6 +77,7 @@ type ClientRow = {
   phone: string | null;
   email: string | null;
   created_at: string;
+  created_by: string | null;
 };
 type POItemRow = {
   id: string;
@@ -97,10 +101,11 @@ type PORow = {
   delivery_date: string;
   status: "draft" | "submitted";
   created_at: string;
+  created_by: string | null;
   purchase_order_items: POItemRow[];
 };
 
-const toBrand = (r: BrandRow): Brand => ({ id: r.id, name: r.name, createdAt: r.created_at });
+const toBrand = (r: BrandRow): Brand => ({ id: r.id, name: r.name, createdAt: r.created_at, createdBy: r.created_by ?? null });
 const toClient = (r: ClientRow): Client => ({
   id: r.id,
   name: r.name,
@@ -109,6 +114,7 @@ const toClient = (r: ClientRow): Client => ({
   phone: r.phone ?? "",
   email: r.email ?? "",
   createdAt: r.created_at,
+  createdBy: r.created_by ?? null,
 });
 const toItem = (r: POItemRow): POLineItem => ({
   id: r.id,
@@ -131,6 +137,7 @@ const toPO = (r: PORow): PurchaseOrder => ({
   deliveryDate: r.delivery_date,
   status: r.status,
   createdAt: r.created_at,
+  createdBy: r.created_by ?? null,
   items: (r.purchase_order_items ?? []).map(toItem),
 });
 
@@ -185,7 +192,7 @@ export const store = {
   },
 
   // ---- Clients ----
-  async addClient(c: Omit<Client, "id" | "createdAt">): Promise<Client> {
+  async addClient(c: Omit<Client, "id" | "createdAt" | "createdBy">): Promise<Client> {
     const { data, error } = await supabase
       .from("clients")
       .insert({
@@ -202,7 +209,7 @@ export const store = {
     set({ ...state, clients: [...state.clients, nc] });
     return nc;
   },
-  async updateClient(id: string, c: Omit<Client, "id" | "createdAt">) {
+  async updateClient(id: string, c: Omit<Client, "id" | "createdAt" | "createdBy">) {
     const { error } = await supabase
       .from("clients")
       .update({
@@ -223,7 +230,7 @@ export const store = {
   },
 
   // ---- POs ----
-  async addPO(po: Omit<PurchaseOrder, "id" | "createdAt">): Promise<PurchaseOrder> {
+  async addPO(po: Omit<PurchaseOrder, "id" | "createdAt" | "createdBy">): Promise<PurchaseOrder> {
     const uid = (await supabase.auth.getUser()).data.user?.id;
     const { data, error } = await supabase
       .from("purchase_orders")
@@ -244,7 +251,7 @@ export const store = {
     await refreshPO(poId);
     return state.purchaseOrders.find((p) => p.id === poId)!;
   },
-  async updatePO(id: string, po: Omit<PurchaseOrder, "id" | "createdAt">) {
+  async updatePO(id: string, po: Omit<PurchaseOrder, "id" | "createdAt" | "createdBy">) {
     const { error } = await supabase
       .from("purchase_orders")
       .update({

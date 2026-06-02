@@ -6,7 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 interface AuthUser {
   id: string;
   email: string;
-  role: "admin";
+  role: "admin" | "user";
 }
 
 interface AuthCtx {
@@ -20,7 +20,17 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 function fromSession(s: Session | null): AuthUser | null {
   if (!s?.user) return null;
-  return { id: s.user.id, email: s.user.email ?? "", role: "admin" };
+  return { id: s.user.id, email: s.user.email ?? "", role: "user" };
+}
+
+async function fetchRole(userId: string): Promise<"admin" | "user"> {
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  return data ? "admin" : "user";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -28,21 +38,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+    const apply = async (session: Session | null) => {
       const u = fromSession(session);
-      setUser(u);
       if (u) {
-        // fire and forget hydration
+        const role = await fetchRole(u.id).catch(() => "user" as const);
+        setUser({ ...u, role });
         void store.hydrate();
       } else {
+        setUser(null);
         store.reset();
       }
+    };
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      void apply(session);
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      const u = fromSession(data.session);
-      setUser(u);
-      if (u) void store.hydrate();
+    supabase.auth.getSession().then(async ({ data }) => {
+      await apply(data.session);
       setReady(true);
     });
 

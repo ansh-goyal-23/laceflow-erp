@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { ClientDialog } from "@/components/client-dialog";
+import { useAuth } from "@/lib/auth";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -20,6 +21,8 @@ export const Route = createFileRoute("/_authenticated/clients")({
 
 function ClientsPage() {
   const clients = useStore((s) => s.clients);
+  const { user } = useAuth();
+  const canModify = (c: Client) => !!user && (user.role === "admin" || c.createdBy === user.id);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
@@ -73,12 +76,18 @@ function ClientsPage() {
                   <TableCell>{c.email || "—"}</TableCell>
                   <TableCell className="max-w-xs truncate">{c.address || "—"}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => { setEditing(c); setOpen(true); }}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setConfirm(c)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    {canModify(c) ? (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => { setEditing(c); setOpen(true); }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setConfirm(c)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

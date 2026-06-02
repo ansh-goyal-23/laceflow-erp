@@ -5,6 +5,7 @@ import { POForm } from "@/components/po-form";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/purchase-orders/$id/edit")({
   component: EditPO,
@@ -14,6 +15,8 @@ function EditPO() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const po = useStore((s) => s.purchaseOrders.find((p) => p.id === id));
+  const { user } = useAuth();
+  const allowed = !!po && !!user && (user.role === "admin" || po.createdBy === user.id);
 
   useEffect(() => {
     if (po === undefined) {
@@ -21,7 +24,10 @@ function EditPO() {
       const t = setTimeout(() => navigate({ to: "/purchase-orders", replace: true }), 200);
       return () => clearTimeout(t);
     }
-  }, [po, navigate]);
+    if (po && user && !allowed) {
+      navigate({ to: "/purchase-orders", replace: true });
+    }
+  }, [po, navigate, user, allowed]);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl">
@@ -34,7 +40,7 @@ function EditPO() {
           </Button>
         }
       />
-      {po ? <POForm existing={po} /> : <div className="text-sm text-muted-foreground">Loading…</div>}
+      {po && allowed ? <POForm existing={po} /> : <div className="text-sm text-muted-foreground">Loading…</div>}
     </div>
   );
 }
