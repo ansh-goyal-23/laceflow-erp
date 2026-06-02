@@ -10,12 +10,12 @@ const nav = [
   { to: "/clients", label: "Client Master", icon: Users },
 ] as const;
 
-const poNav = [
+const poNav: { to: string; label: string; icon: typeof Plus; exact?: boolean }[] = [
   { to: "/purchase-orders/new", label: "Add PO", icon: Plus },
   { to: "/purchase-orders", label: "PO List", icon: List, exact: true },
   { to: "/purchase-orders/import", label: "Import Excel", icon: Upload },
   { to: "/purchase-orders/import-history", label: "Import History", icon: History },
-] as const;
+];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
