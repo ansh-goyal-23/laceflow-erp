@@ -7,6 +7,11 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  nitro: {
+    // Render runs the production app as a Node web service, so force a Node bundle
+    // outside Lovable instead of skipping Nitro or building the Cloudflare target.
+    preset: "render-com",
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
