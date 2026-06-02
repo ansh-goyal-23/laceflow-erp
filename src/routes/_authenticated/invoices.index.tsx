@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Search, Eye, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Eye, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -22,6 +22,36 @@ export const Route = createFileRoute("/_authenticated/invoices/")({
 
 const PAGE_SIZE = 10;
 
+function cmpNum(a: number, b: number, dir: number) {
+  return (a - b) * dir;
+}
+function cmpStr(a: string, b: string, dir: number) {
+  return a.localeCompare(b) * dir;
+}
+function cmpInvoiceNum(a: string, b: string, dir: number) {
+  const na = parseInt(a.replace(/\D/g, ""), 10) || 0;
+  const nb = parseInt(b.replace(/\D/g, ""), 10) || 0;
+  if (na !== nb) return (na - nb) * dir;
+  return a.localeCompare(b) * dir;
+}
+
+type SortKey = "invoiceNumber" | "dispatchDate" | "client" | "totalQty" | "totalAmount" | "createdAt";
+
+function SortHeader({ label, active, dir, onClick, align = "left" }: {
+  label: string; active: boolean; dir: "asc" | "desc"; onClick: () => void; align?: "left" | "right";
+}) {
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap ${align === "right" ? "ml-auto" : ""}`}
+    >
+      {label}
+      <Icon className={`h-3.5 w-3.5 ${active ? "text-foreground" : "text-muted-foreground/50"}`} />
+    </button>
+  );
+}
+
 function InvoiceList() {
   const invoices = useStore((s) => s.invoices);
   const clients = useStore((s) => s.clients);
@@ -31,7 +61,7 @@ function InvoiceList() {
 
   const [q, setQ] = useState("");
   const [clientFilter, setClientFilter] = useState("all");
-  const [sortKey, setSortKey] = useState<"invoiceNumber" | "dispatchDate" | "createdAt">("dispatchDate");
+  const [sortKey, setSortKey] = useState<SortKey>("dispatchDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [confirm, setConfirm] = useState<Invoice | null>(null);
@@ -43,24 +73,33 @@ function InvoiceList() {
     invoices.map((i) => {
       const qty = i.items.reduce((s, x) => s + (Number(x.dispatchQty) || 0), 0);
       const amt = i.items.reduce((s, x) => s + (Number(x.dispatchQty) || 0) * (Number(x.rate) || 0), 0);
-      return { inv: i, qty, amt };
-    }), [invoices]);
+      return { inv: i, qty, amt, clientName: clientName(i.clientId) };
+    }), [invoices, clients]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
+  }
 
   const filtered = useMemo(() => {
     const t = q.toLowerCase();
     return enriched
       .filter(({ inv }) => clientFilter === "all" || inv.clientId === clientFilter)
-      .filter(({ inv }) =>
-        [inv.invoiceNumber, clientName(inv.clientId)].some((v) => v.toLowerCase().includes(t)),
+      .filter(({ inv, clientName: cn }) =>
+        [inv.invoiceNumber, cn].some((v) => v.toLowerCase().includes(t)),
       )
       .sort((a, b) => {
         const dir = sortDir === "asc" ? 1 : -1;
-        if (sortKey === "invoiceNumber") return a.inv.invoiceNumber.localeCompare(b.inv.invoiceNumber) * dir;
-        if (sortKey === "dispatchDate") return a.inv.dispatchDate.localeCompare(b.inv.dispatchDate) * dir;
-        return a.inv.createdAt.localeCompare(b.inv.createdAt) * dir;
+        if (sortKey === "invoiceNumber") return cmpInvoiceNum(a.inv.invoiceNumber, b.inv.invoiceNumber, dir);
+        if (sortKey === "dispatchDate") return cmpStr(a.inv.dispatchDate, b.inv.dispatchDate, dir);
+        if (sortKey === "client") return cmpStr(a.clientName, b.clientName, dir);
+        if (sortKey === "totalQty") return cmpNum(a.qty, b.qty, dir);
+        if (sortKey === "totalAmount") return cmpNum(a.amt, b.amt, dir);
+        return cmpStr(a.inv.createdAt, b.inv.createdAt, dir);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enriched, q, clientFilter, sortKey, sortDir, clients]);
+  }, [enriched, q, clientFilter, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
