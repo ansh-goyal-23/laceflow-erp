@@ -136,18 +136,7 @@ function InvoiceList() {
                 {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dispatchDate">Dispatch Date</SelectItem>
-                <SelectItem value="invoiceNumber">Invoice #</SelectItem>
-                <SelectItem value="createdAt">Created</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")}>
-              {sortDir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-            </Button>
-            {(q || clientFilter !== "all" || sortKey !== "dispatchDate" || sortDir !== "desc") && (
+            {(q || clientFilter !== "all") && (
               <Button variant="ghost" size="sm" onClick={() => { setQ(""); setClientFilter("all"); setSortKey("dispatchDate"); setSortDir("desc"); setPage(1); }}>
                 <X className="h-4 w-4 mr-1" /> Clear
               </Button>
@@ -159,11 +148,11 @@ function InvoiceList() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Dispatch Date</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="text-right">Total Qty</TableHead>
-                <TableHead className="text-right">Total Amount</TableHead>
+                <TableHead><SortHeader label="Invoice #" active={sortKey === "invoiceNumber"} dir={sortDir} onClick={() => toggleSort("invoiceNumber")} /></TableHead>
+                <TableHead><SortHeader label="Dispatch Date" active={sortKey === "dispatchDate"} dir={sortDir} onClick={() => toggleSort("dispatchDate")} /></TableHead>
+                <TableHead><SortHeader label="Client" active={sortKey === "client"} dir={sortDir} onClick={() => toggleSort("client")} /></TableHead>
+                <TableHead className="text-right"><SortHeader label="Total Qty" align="right" active={sortKey === "totalQty"} dir={sortDir} onClick={() => toggleSort("totalQty")} /></TableHead>
+                <TableHead className="text-right"><SortHeader label="Total Amount" align="right" active={sortKey === "totalAmount"} dir={sortDir} onClick={() => toggleSort("totalAmount")} /></TableHead>
                 <TableHead className="text-right w-40">Actions</TableHead>
               </TableRow>
             </TableHeader>
