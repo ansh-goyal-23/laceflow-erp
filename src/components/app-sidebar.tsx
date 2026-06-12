@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -14,6 +14,8 @@ const poNav: { to: string; label: string; icon: typeof Plus; exact?: boolean }[]
   { to: "/purchase-orders/new", label: "Add PO", icon: Plus },
   { to: "/purchase-orders", label: "PO List", icon: List, exact: true },
   { to: "/purchase-orders/import", label: "Import Excel", icon: Upload },
+  { to: "/purchase-orders/import-pdf", label: "Import PDF PO", icon: FileScan },
+  { to: "/purchase-orders/pdf-import-history", label: "PDF Import History", icon: History },
   { to: "/purchase-orders/import-history", label: "Import History", icon: History },
 ];
 
@@ -138,6 +140,18 @@ export function AppSidebar() {
             })}
           </div>
         )}
+
+        <Link
+          to="/ai-learning"
+          className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+            pathname === "/ai-learning"
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          }`}
+        >
+          <Brain className="h-4 w-4" />
+          AI Learning
+        </Link>
       </nav>
       <div className="p-3 border-t border-sidebar-border">
         <div className="px-3 py-2 text-xs text-sidebar-foreground/70">
