@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
+const MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 interface LearnedMapping {
   field: string;
@@ -81,53 +81,51 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
 
-    const fileName = data.fileName || "purchase-order.pdf";
-    const dataUrl = `data:application/pdf;base64,${data.fileBase64}`;
     const sys = systemPrompt() + hintsBlock(data.hints ?? [], data.clientHints ?? []);
 
     const body = {
-      model: MODEL,
-      messages: [
-        { role: "system", content: sys },
+      systemInstruction: { parts: [{ text: sys }] },
+      contents: [
         {
           role: "user",
-          content: [
+          parts: [
             {
-              type: "text",
               text: "Extract the Purchase Order data from this PDF and return strict JSON per the schema in the system prompt.",
             },
-            { type: "file", file: { filename: fileName, file_data: dataUrl } },
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: data.fileBase64,
+              },
+            },
           ],
         },
       ],
-      response_format: { type: "json_object" },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0,
+      },
     };
 
-    const upstream = await fetch(GATEWAY_URL, {
+    const upstream = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "Lovable-API-Key": apiKey,
-        "X-Lovable-AIG-SDK": "raw-fetch",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
     if (upstream.status === 429) throw new Error("Rate limit exceeded. Try again shortly.");
-    if (upstream.status === 402) {
-      throw new Error("AI credits exhausted. Please add credits in workspace settings.");
-    }
     if (!upstream.ok) {
       const text = await upstream.text();
-      throw new Error(`AI gateway error (${upstream.status}): ${text.slice(0, 500)}`);
+      throw new Error(`Gemini API error (${upstream.status}): ${text.slice(0, 500)}`);
     }
 
-    const json = (await upstream.json()) as { choices?: { message?: { content?: string } }[] };
-    const raw = json.choices?.[0]?.message?.content ?? "";
+    const json = (await upstream.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    const raw = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
     try {
       return { extraction: JSON.parse(raw) };
     } catch {
