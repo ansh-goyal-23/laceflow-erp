@@ -216,15 +216,14 @@ export async function recordCorrection(opts: {
 
   if (opts.originalValue?.trim() && opts.correctedValue?.trim()) {
     // upsert mapping (incr confirmations on conflict)
-    const { data: existing } = await supabase
+    let q = supabase
       .from("description_mappings")
       .select("id, confirmations")
       .eq("field", opts.field)
       .eq("original_text", opts.originalValue)
-      .eq("mapped_value", opts.correctedValue)
-      .is("client_id", opts.clientId ? undefined : null)
-      .eq("client_id", opts.clientId ?? "")
-      .maybeSingle();
+      .eq("mapped_value", opts.correctedValue);
+    q = opts.clientId ? q.eq("client_id", opts.clientId) : q.is("client_id", null);
+    const { data: existing } = await q.maybeSingle();
     if (existing) {
       await supabase
         .from("description_mappings")
