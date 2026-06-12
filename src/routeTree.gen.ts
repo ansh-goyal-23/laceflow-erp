@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiExtractPoPdfRouteImport } from './routes/api/extract-po-pdf'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated/brands'
@@ -37,6 +38,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExtractPoPdfRoute = ApiExtractPoPdfRouteImport.update({
+  id: '/api/extract-po-pdf',
+  path: '/api/extract-po-pdf',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/extract-po-pdf': typeof ApiExtractPoPdfRoute
   '/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/extract-po-pdf': typeof ApiExtractPoPdfRoute
   '/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/_authenticated/brands': typeof AuthenticatedBrandsRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/extract-po-pdf': typeof ApiExtractPoPdfRoute
   '/_authenticated/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/_authenticated/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/_authenticated/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/brands'
     | '/clients'
     | '/dashboard'
+    | '/api/extract-po-pdf'
     | '/invoices/import'
     | '/invoices/new'
     | '/purchase-orders/import'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/brands'
     | '/clients'
     | '/dashboard'
+    | '/api/extract-po-pdf'
     | '/invoices/import'
     | '/invoices/new'
     | '/purchase-orders/import'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/_authenticated/brands'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
+    | '/api/extract-po-pdf'
     | '/_authenticated/invoices/import'
     | '/_authenticated/invoices/new'
     | '/_authenticated/purchase-orders/import'
@@ -215,6 +227,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiExtractPoPdfRoute: typeof ApiExtractPoPdfRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -238,6 +251,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/extract-po-pdf': {
+      id: '/api/extract-po-pdf'
+      path: '/api/extract-po-pdf'
+      fullPath: '/api/extract-po-pdf'
+      preLoaderRoute: typeof ApiExtractPoPdfRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/dashboard': {
@@ -367,7 +387,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiExtractPoPdfRoute: ApiExtractPoPdfRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
