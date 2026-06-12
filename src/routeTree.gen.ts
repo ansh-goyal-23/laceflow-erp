@@ -16,9 +16,12 @@ import { Route as ApiExtractPoPdfRouteImport } from './routes/api/extract-po-pdf
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated/brands'
+import { Route as AuthenticatedAiLearningRouteImport } from './routes/_authenticated/ai-learning'
 import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_authenticated/purchase-orders.index'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
+import { Route as AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.pdf-import-history'
 import { Route as AuthenticatedPurchaseOrdersNewRouteImport } from './routes/_authenticated/purchase-orders.new'
+import { Route as AuthenticatedPurchaseOrdersImportPdfRouteImport } from './routes/_authenticated/purchase-orders.import-pdf'
 import { Route as AuthenticatedPurchaseOrdersImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.import-history'
 import { Route as AuthenticatedPurchaseOrdersImportRouteImport } from './routes/_authenticated/purchase-orders.import'
 import { Route as AuthenticatedInvoicesNewRouteImport } from './routes/_authenticated/invoices.new'
@@ -60,6 +63,11 @@ const AuthenticatedBrandsRoute = AuthenticatedBrandsRouteImport.update({
   path: '/brands',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAiLearningRoute = AuthenticatedAiLearningRouteImport.update({
+  id: '/ai-learning',
+  path: '/ai-learning',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPurchaseOrdersIndexRoute =
   AuthenticatedPurchaseOrdersIndexRouteImport.update({
     id: '/purchase-orders/',
@@ -72,10 +80,22 @@ const AuthenticatedInvoicesIndexRoute =
     path: '/invoices/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPurchaseOrdersPdfImportHistoryRoute =
+  AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport.update({
+    id: '/purchase-orders/pdf-import-history',
+    path: '/purchase-orders/pdf-import-history',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPurchaseOrdersNewRoute =
   AuthenticatedPurchaseOrdersNewRouteImport.update({
     id: '/purchase-orders/new',
     path: '/purchase-orders/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPurchaseOrdersImportPdfRoute =
+  AuthenticatedPurchaseOrdersImportPdfRouteImport.update({
+    id: '/purchase-orders/import-pdf',
+    path: '/purchase-orders/import-pdf',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPurchaseOrdersImportHistoryRoute =
@@ -118,6 +138,7 @@ const AuthenticatedInvoicesIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/ai-learning': typeof AuthenticatedAiLearningRoute
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -126,7 +147,9 @@ export interface FileRoutesByFullPath {
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
   '/purchase-orders/import-history': typeof AuthenticatedPurchaseOrdersImportHistoryRoute
+  '/purchase-orders/import-pdf': typeof AuthenticatedPurchaseOrdersImportPdfRoute
   '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
@@ -135,6 +158,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/ai-learning': typeof AuthenticatedAiLearningRoute
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -143,7 +167,9 @@ export interface FileRoutesByTo {
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
   '/purchase-orders/import-history': typeof AuthenticatedPurchaseOrdersImportHistoryRoute
+  '/purchase-orders/import-pdf': typeof AuthenticatedPurchaseOrdersImportPdfRoute
   '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
@@ -154,6 +180,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/ai-learning': typeof AuthenticatedAiLearningRoute
   '/_authenticated/brands': typeof AuthenticatedBrandsRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -162,7 +189,9 @@ export interface FileRoutesById {
   '/_authenticated/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/_authenticated/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
   '/_authenticated/purchase-orders/import-history': typeof AuthenticatedPurchaseOrdersImportHistoryRoute
+  '/_authenticated/purchase-orders/import-pdf': typeof AuthenticatedPurchaseOrdersImportPdfRoute
   '/_authenticated/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
+  '/_authenticated/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/_authenticated/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
@@ -173,6 +202,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/ai-learning'
     | '/brands'
     | '/clients'
     | '/dashboard'
@@ -181,7 +211,9 @@ export interface FileRouteTypes {
     | '/invoices/new'
     | '/purchase-orders/import'
     | '/purchase-orders/import-history'
+    | '/purchase-orders/import-pdf'
     | '/purchase-orders/new'
+    | '/purchase-orders/pdf-import-history'
     | '/invoices/'
     | '/purchase-orders/'
     | '/invoices/$id/edit'
@@ -190,6 +222,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/ai-learning'
     | '/brands'
     | '/clients'
     | '/dashboard'
@@ -198,7 +231,9 @@ export interface FileRouteTypes {
     | '/invoices/new'
     | '/purchase-orders/import'
     | '/purchase-orders/import-history'
+    | '/purchase-orders/import-pdf'
     | '/purchase-orders/new'
+    | '/purchase-orders/pdf-import-history'
     | '/invoices'
     | '/purchase-orders'
     | '/invoices/$id/edit'
@@ -208,6 +243,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/ai-learning'
     | '/_authenticated/brands'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
@@ -216,7 +252,9 @@ export interface FileRouteTypes {
     | '/_authenticated/invoices/new'
     | '/_authenticated/purchase-orders/import'
     | '/_authenticated/purchase-orders/import-history'
+    | '/_authenticated/purchase-orders/import-pdf'
     | '/_authenticated/purchase-orders/new'
+    | '/_authenticated/purchase-orders/pdf-import-history'
     | '/_authenticated/invoices/'
     | '/_authenticated/purchase-orders/'
     | '/_authenticated/invoices/$id/edit'
@@ -281,6 +319,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrandsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ai-learning': {
+      id: '/_authenticated/ai-learning'
+      path: '/ai-learning'
+      fullPath: '/ai-learning'
+      preLoaderRoute: typeof AuthenticatedAiLearningRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/purchase-orders/': {
       id: '/_authenticated/purchase-orders/'
       path: '/purchase-orders'
@@ -295,11 +340,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvoicesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/purchase-orders/pdf-import-history': {
+      id: '/_authenticated/purchase-orders/pdf-import-history'
+      path: '/purchase-orders/pdf-import-history'
+      fullPath: '/purchase-orders/pdf-import-history'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/purchase-orders/new': {
       id: '/_authenticated/purchase-orders/new'
       path: '/purchase-orders/new'
       fullPath: '/purchase-orders/new'
       preLoaderRoute: typeof AuthenticatedPurchaseOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/purchase-orders/import-pdf': {
+      id: '/_authenticated/purchase-orders/import-pdf'
+      path: '/purchase-orders/import-pdf'
+      fullPath: '/purchase-orders/import-pdf'
+      preLoaderRoute: typeof AuthenticatedPurchaseOrdersImportPdfRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/purchase-orders/import-history': {
@@ -348,6 +407,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAiLearningRoute: typeof AuthenticatedAiLearningRoute
   AuthenticatedBrandsRoute: typeof AuthenticatedBrandsRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -355,7 +415,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInvoicesNewRoute: typeof AuthenticatedInvoicesNewRoute
   AuthenticatedPurchaseOrdersImportRoute: typeof AuthenticatedPurchaseOrdersImportRoute
   AuthenticatedPurchaseOrdersImportHistoryRoute: typeof AuthenticatedPurchaseOrdersImportHistoryRoute
+  AuthenticatedPurchaseOrdersImportPdfRoute: typeof AuthenticatedPurchaseOrdersImportPdfRoute
   AuthenticatedPurchaseOrdersNewRoute: typeof AuthenticatedPurchaseOrdersNewRoute
+  AuthenticatedPurchaseOrdersPdfImportHistoryRoute: typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   AuthenticatedInvoicesIndexRoute: typeof AuthenticatedInvoicesIndexRoute
   AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
   AuthenticatedInvoicesIdEditRoute: typeof AuthenticatedInvoicesIdEditRoute
@@ -363,6 +425,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAiLearningRoute: AuthenticatedAiLearningRoute,
   AuthenticatedBrandsRoute: AuthenticatedBrandsRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -372,7 +435,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedPurchaseOrdersImportRoute,
   AuthenticatedPurchaseOrdersImportHistoryRoute:
     AuthenticatedPurchaseOrdersImportHistoryRoute,
+  AuthenticatedPurchaseOrdersImportPdfRoute:
+    AuthenticatedPurchaseOrdersImportPdfRoute,
   AuthenticatedPurchaseOrdersNewRoute: AuthenticatedPurchaseOrdersNewRoute,
+  AuthenticatedPurchaseOrdersPdfImportHistoryRoute:
+    AuthenticatedPurchaseOrdersPdfImportHistoryRoute,
   AuthenticatedInvoicesIndexRoute: AuthenticatedInvoicesIndexRoute,
   AuthenticatedPurchaseOrdersIndexRoute: AuthenticatedPurchaseOrdersIndexRoute,
   AuthenticatedInvoicesIdEditRoute: AuthenticatedInvoicesIdEditRoute,
@@ -392,3 +459,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
