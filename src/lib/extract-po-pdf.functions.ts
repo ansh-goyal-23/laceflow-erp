@@ -110,16 +110,32 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
       },
     };
 
-    const upstream = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (upstream.status === 429) throw new Error("Rate limit exceeded. Try again shortly.");
-    if (!upstream.ok) {
-      const text = await upstream.text();
-      throw new Error(`Gemini API error (${upstream.status}): ${text.slice(0, 500)}`);
+    // Retry on transient 503/429/5xx with exponential backoff
+    const maxAttempts = 4;
+    let upstream!: Response;
+    let lastErrText = "";
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      upstream = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (upstream.ok) break;
+      lastErrText = await upstream.text();
+      const retriable = upstream.status === 503 || upstream.status === 429 || upstream.status >= 500;
+      if (!retriable || attempt === maxAttempts) {
+        if (upstream.status === 503) {
+          throw new Error(
+            "Gemini is temporarily overloaded (503). Please try again in a minute.",
+          );
+        }
+        if (upstream.status === 429) {
+          throw new Error("Rate limit exceeded. Try again shortly.");
+        }
+        throw new Error(`Gemini API error (${upstream.status}): ${lastErrText.slice(0, 500)}`);
+      }
+      const delay = 1000 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 500);
+      await new Promise((r) => setTimeout(r, delay));
     }
 
     const json = (await upstream.json()) as {
