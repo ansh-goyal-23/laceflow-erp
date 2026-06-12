@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { extractPoFromPdf } from "./extract-po-pdf.functions";
 
 export type Conf = "high" | "medium" | "low";
 export interface ConfVal<T = string> {
@@ -122,16 +123,9 @@ export async function extractFromPdf(opts: {
   hints: LearnedMapping[];
   clientHints: LearnedMapping[];
 }): Promise<Extraction> {
-  const res = await fetch("/api/extract-po-pdf", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts),
-  });
-  const json = (await res.json()) as { extraction?: Extraction; error?: string };
-  if (!res.ok || !json.extraction) {
-    throw new Error(json.error ?? `Extraction failed (${res.status})`);
-  }
-  return json.extraction;
+  const result = (await extractPoFromPdf({ data: opts })) as { extraction: Extraction };
+  if (!result?.extraction) throw new Error("Extraction failed");
+  return result.extraction;
 }
 
 export interface PdfImportRow {
