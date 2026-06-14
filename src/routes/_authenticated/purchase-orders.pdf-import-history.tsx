@@ -15,9 +15,14 @@ import { ChevronLeft, FileText, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { deletePdfImport, listPdfImports, type PdfImportRow } from "@/lib/pdf-import";
+import { PdfImportGuard } from "@/components/pdf-import-guard";
 
 export const Route = createFileRoute("/_authenticated/purchase-orders/pdf-import-history")({
-  component: PdfImportHistoryPage,
+  component: () => (
+    <PdfImportGuard>
+      <PdfImportHistoryPage />
+    </PdfImportGuard>
+  ),
 });
 
 function PdfImportHistoryPage() {

@@ -47,9 +47,14 @@ import {
   type ExtractionItem,
 } from "@/lib/pdf-import";
 import { supabase } from "@/integrations/supabase/client";
+import { PdfImportGuard } from "@/components/pdf-import-guard";
 
 export const Route = createFileRoute("/_authenticated/purchase-orders/import-pdf")({
-  component: ImportPdfPage,
+  component: () => (
+    <PdfImportGuard>
+      <ImportPdfPage />
+    </PdfImportGuard>
+  ),
 });
 
 const UOMS = ["Mtr", "Pcs", "Pair", "Kg", "Roll"];
