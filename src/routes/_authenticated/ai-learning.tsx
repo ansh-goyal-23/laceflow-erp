@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Brain, ChevronLeft, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { useAppSettings } from "@/lib/app-settings";
 import { useStore } from "@/lib/store";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -44,6 +45,7 @@ interface AuditRow {
 
 function AILearningPage() {
   const { user } = useAuth();
+  const { settings, setSetting } = useAppSettings();
   const clients = useStore((s) => s.clients);
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [audits, setAudits] = useState<AuditRow[]>([]);
