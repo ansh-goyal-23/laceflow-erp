@@ -66,7 +66,10 @@ function AILearningPage() {
           .select("*")
           .order("created_at", { ascending: false })
           .limit(100),
-        supabase.from("pdf_imports").select("id", { count: "exact", head: true }),
+        supabase
+          .from("pdf_imports")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "saved"),
         supabase
           .from("client_extraction_profiles")
           .select("id", { count: "exact", head: true }),
@@ -169,7 +172,7 @@ function AILearningPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: "PDFs Imported", value: imports },
+          { label: "POs Saved", value: imports },
           { label: "Corrections Learned", value: totalCorrections },
           { label: "Client Profiles", value: profiles },
           { label: "Extraction Accuracy", value: `${accuracy}%` },
