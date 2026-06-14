@@ -172,7 +172,7 @@ function AILearningPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: "PDFs Imported", value: imports },
+          { label: "POs Saved", value: imports },
           { label: "Corrections Learned", value: totalCorrections },
           { label: "Client Profiles", value: profiles },
           { label: "Extraction Accuracy", value: `${accuracy}%` },
