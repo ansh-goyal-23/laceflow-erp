@@ -190,6 +190,31 @@ function AILearningPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Access Controls</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="font-medium">Allow non-admin users to use PDF Import</div>
+              <div className="text-sm text-muted-foreground">
+                When enabled, all signed-in users can see and use the “Import PDF PO” and
+                “PDF Import History” tabs. When disabled, only admins can access them.
+              </div>
+            </div>
+            <Switch
+              checked={settings.allow_user_pdf_import}
+              onCheckedChange={async (v) => {
+                const res = await setSetting("allow_user_pdf_import", v);
+                if (!res.ok) toast.error(res.error ?? "Failed to update setting");
+                else toast.success(v ? "PDF Import enabled for all users" : "PDF Import restricted to admins");
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-primary" /> Most Common Corrections
           </CardTitle>
