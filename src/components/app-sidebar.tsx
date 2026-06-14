@@ -1,6 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -10,12 +11,12 @@ const nav = [
   { to: "/clients", label: "Client Master", icon: Users },
 ] as const;
 
-const poNav: { to: string; label: string; icon: typeof Plus; exact?: boolean }[] = [
+const poNavBase: { to: string; label: string; icon: typeof Plus; exact?: boolean; pdfOnly?: boolean }[] = [
   { to: "/purchase-orders/new", label: "Add PO", icon: Plus },
   { to: "/purchase-orders", label: "PO List", icon: List, exact: true },
   { to: "/purchase-orders/import", label: "Import Excel", icon: Upload },
-  { to: "/purchase-orders/import-pdf", label: "Import PDF PO", icon: FileScan },
-  { to: "/purchase-orders/pdf-import-history", label: "PDF Import History", icon: History },
+  { to: "/purchase-orders/import-pdf", label: "Import PDF PO", icon: FileScan, pdfOnly: true },
+  { to: "/purchase-orders/pdf-import-history", label: "PDF Import History", icon: History, pdfOnly: true },
   { to: "/purchase-orders/import-history", label: "Import History", icon: History },
 ];
 
@@ -28,7 +29,10 @@ const dispatchNav: { to: string; label: string; icon: typeof Plus; exact?: boole
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, logout } = useAuth();
+  const { settings } = useAppSettings();
   const navigate = useNavigate();
+  const canSeePdf = user?.role === "admin" || settings.allow_user_pdf_import;
+  const poNav = poNavBase.filter((i) => !i.pdfOnly || canSeePdf);
   const [poOpen, setPoOpen] = useState(true);
   const poActive = pathname === "/purchase-orders" || pathname.startsWith("/purchase-orders/");
   const [dispatchOpen, setDispatchOpen] = useState(true);
