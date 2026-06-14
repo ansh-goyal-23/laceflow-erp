@@ -66,7 +66,10 @@ function AILearningPage() {
           .select("*")
           .order("created_at", { ascending: false })
           .limit(100),
-        supabase.from("pdf_imports").select("id", { count: "exact", head: true }),
+        supabase
+          .from("pdf_imports")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "saved"),
         supabase
           .from("client_extraction_profiles")
           .select("id", { count: "exact", head: true }),
