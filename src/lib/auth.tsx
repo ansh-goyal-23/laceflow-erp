@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { store } from "@/lib/store";
+import { logActivity } from "@/lib/audit";
 import type { Session } from "@supabase/supabase-js";
 
 interface AuthUser {
@@ -65,10 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, error: error.message };
+    void logActivity("Auth", "LOGIN", "Session", email);
     return { ok: true };
   };
 
   const logout = async () => {
+    await logActivity("Auth", "LOGOUT", "Session", user?.email ?? null);
     await supabase.auth.signOut();
   };
 
