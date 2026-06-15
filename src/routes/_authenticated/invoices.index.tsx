@@ -86,9 +86,10 @@ function InvoiceList() {
     const t = q.toLowerCase();
     return enriched
       .filter(({ inv }) => clientFilter === "all" || inv.clientId === clientFilter)
-      .filter(({ inv, clientName: cn }) =>
-        [inv.invoiceNumber, cn].some((v) => v.toLowerCase().includes(t)),
-      )
+      .filter(({ inv, clientName: cn }) => {
+        const poNumbers = inv.items.map((i) => i.poNumber).filter(Boolean);
+        return [inv.invoiceNumber, cn, ...poNumbers].some((v) => v.toLowerCase().includes(t));
+      })
       .sort((a, b) => {
         const dir = sortDir === "asc" ? 1 : -1;
         if (sortKey === "invoiceNumber") return cmpInvoiceNum(a.inv.invoiceNumber, b.inv.invoiceNumber, dir);
@@ -126,7 +127,7 @@ function InvoiceList() {
         <div className="flex flex-col xl:flex-row gap-3 mb-4 items-start xl:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search by invoice # or client…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+            <Input className="pl-9" placeholder="Search by invoice #, client, or PO #…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <Select value={clientFilter} onValueChange={(v) => { setClientFilter(v); setPage(1); }}>
