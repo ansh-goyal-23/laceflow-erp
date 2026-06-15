@@ -231,8 +231,15 @@ function POList() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (confirm) { store.deletePO(confirm.id); toast.success("PO deleted"); }
+            <AlertDialogAction onClick={async () => {
+              if (confirm) {
+                try {
+                  await store.deletePO(confirm.id);
+                  toast.success("PO deleted");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Failed to delete PO");
+                }
+              }
               setConfirm(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
