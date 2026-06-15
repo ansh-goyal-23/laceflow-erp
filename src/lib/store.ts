@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logActivity } from "@/lib/audit";
 
 export interface Brand {
   id: string;
@@ -263,17 +264,21 @@ export const store = {
     if (error) throw error;
     const b = toBrand(data as BrandRow);
     set({ ...state, brands: [...state.brands, b] });
+    void logActivity("Brands", "CREATE", "Brand", b.name);
     return b;
   },
   async updateBrand(id: string, name: string) {
     const { error } = await supabase.from("brands").update({ name: name.trim() }).eq("id", id);
     if (error) throw error;
     set({ ...state, brands: state.brands.map((b) => (b.id === id ? { ...b, name: name.trim() } : b)) });
+    void logActivity("Brands", "EDIT", "Brand", name.trim());
   },
   async deleteBrand(id: string) {
+    const existing = state.brands.find((b) => b.id === id);
     const { error } = await supabase.from("brands").delete().eq("id", id);
     if (error) throw error;
     set({ ...state, brands: state.brands.filter((b) => b.id !== id) });
+    void logActivity("Brands", "DELETE", "Brand", existing?.name ?? id);
   },
 
   // ---- Clients ----
@@ -292,6 +297,7 @@ export const store = {
     if (error) throw error;
     const nc = toClient(data as ClientRow);
     set({ ...state, clients: [...state.clients, nc] });
+    void logActivity("Clients", "CREATE", "Client", nc.name);
     return nc;
   },
   async updateClient(id: string, c: Omit<Client, "id" | "createdAt" | "createdBy">) {
@@ -307,11 +313,14 @@ export const store = {
       .eq("id", id);
     if (error) throw error;
     set({ ...state, clients: state.clients.map((x) => (x.id === id ? { ...x, ...c } : x)) });
+    void logActivity("Clients", "EDIT", "Client", c.name);
   },
   async deleteClient(id: string) {
+    const existing = state.clients.find((c) => c.id === id);
     const { error } = await supabase.from("clients").delete().eq("id", id);
     if (error) throw error;
     set({ ...state, clients: state.clients.filter((c) => c.id !== id) });
+    void logActivity("Clients", "DELETE", "Client", existing?.name ?? id);
   },
 
   // ---- POs ----
@@ -334,6 +343,7 @@ export const store = {
     const poId = (data as PORow).id;
     await insertItems(poId, po.items);
     await refreshPO(poId);
+    void logActivity("Purchase Orders", "CREATE", "PO", po.poNumber);
     return state.purchaseOrders.find((p) => p.id === poId)!;
   },
   async updatePO(id: string, po: Omit<PurchaseOrder, "id" | "createdAt" | "createdBy">) {
@@ -354,11 +364,14 @@ export const store = {
     if (del.error) throw del.error;
     await insertItems(id, po.items);
     await refreshPO(id);
+    void logActivity("Purchase Orders", "EDIT", "PO", po.poNumber);
   },
   async deletePO(id: string) {
+    const existing = state.purchaseOrders.find((p) => p.id === id);
     const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
     if (error) throw error;
     set({ ...state, purchaseOrders: state.purchaseOrders.filter((p) => p.id !== id) });
+    void logActivity("Purchase Orders", "DELETE", "PO", existing?.poNumber ?? id);
   },
 
   // ---- Invoices ----
@@ -378,6 +391,7 @@ export const store = {
     const invId = (data as InvoiceRow).id;
     await insertInvoiceItems(invId, inv.items);
     await refreshInvoice(invId);
+    void logActivity("Invoices", "CREATE", "Invoice", inv.invoiceNumber);
     return state.invoices.find((i) => i.id === invId)!;
   },
   async updateInvoice(
@@ -397,11 +411,14 @@ export const store = {
     if (del.error) throw del.error;
     await insertInvoiceItems(id, inv.items);
     await refreshInvoice(id);
+    void logActivity("Invoices", "EDIT", "Invoice", inv.invoiceNumber);
   },
   async deleteInvoice(id: string) {
+    const existing = state.invoices.find((i) => i.id === id);
     const { error } = await supabase.from("invoices").delete().eq("id", id);
     if (error) throw error;
     set({ ...state, invoices: state.invoices.filter((i) => i.id !== id) });
+    void logActivity("Invoices", "DELETE", "Invoice", existing?.invoiceNumber ?? id);
   },
 };
 
