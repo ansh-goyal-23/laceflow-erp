@@ -86,9 +86,10 @@ function InvoiceList() {
     const t = q.toLowerCase();
     return enriched
       .filter(({ inv }) => clientFilter === "all" || inv.clientId === clientFilter)
-      .filter(({ inv, clientName: cn }) =>
-        [inv.invoiceNumber, cn].some((v) => v.toLowerCase().includes(t)),
-      )
+      .filter(({ inv, clientName: cn }) => {
+        const poNumbers = inv.items.map((i) => i.poNumber).filter(Boolean);
+        return [inv.invoiceNumber, cn, ...poNumbers].some((v) => v.toLowerCase().includes(t));
+      })
       .sort((a, b) => {
         const dir = sortDir === "asc" ? 1 : -1;
         if (sortKey === "invoiceNumber") return cmpInvoiceNum(a.inv.invoiceNumber, b.inv.invoiceNumber, dir);
