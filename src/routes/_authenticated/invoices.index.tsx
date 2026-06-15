@@ -237,6 +237,18 @@ function InvoiceList() {
                 <div><div className="text-xs text-muted-foreground">Dispatch Date</div><div className="font-medium">{viewing.dispatchDate}</div></div>
                 <div><div className="text-xs text-muted-foreground">Items</div><div className="font-medium">{viewing.items.length}</div></div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/40 border rounded-md p-3 text-center">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Qty</div>
+                  <div className="text-xl font-bold mt-1">{viewing.items.reduce((s, x) => s + (Number(x.dispatchQty) || 0), 0)}</div>
+                </div>
+                <div className="bg-muted/40 border rounded-md p-3 text-center">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Amount</div>
+                  <div className="text-xl font-bold mt-1">
+                    {viewing.items.reduce((s, x) => s + (Number(x.dispatchQty) || 0) * (Number(x.rate) || 0), 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
               <div className="overflow-x-auto border rounded-md">
                 <Table>
                   <TableHeader>
