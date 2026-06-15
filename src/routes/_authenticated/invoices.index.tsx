@@ -269,6 +269,18 @@ function InvoiceList() {
                       </TableRow>
                     ))}
                   </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={7}></TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {viewing.items.reduce((s, i) => s + (Number(i.dispatchQty) || 0), 0)}
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {viewing.items.reduce((s, i) => s + (Number(i.dispatchQty) || 0) * (Number(i.rate) || 0), 0).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </div>
             </div>
