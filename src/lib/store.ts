@@ -368,6 +368,19 @@ export const store = {
   },
   async deletePO(id: string) {
     const existing = state.purchaseOrders.find((p) => p.id === id);
+    if (existing) {
+      const blocking = state.invoices.filter((inv) =>
+        inv.items.some(
+          (it) => it.poId === id || (it.poNumber && it.poNumber === existing.poNumber),
+        ),
+      );
+      if (blocking.length > 0) {
+        const nums = Array.from(new Set(blocking.map((b) => b.invoiceNumber))).slice(0, 5).join(", ");
+        throw new Error(
+          `Cannot delete PO ${existing.poNumber}: it is used in invoice(s) ${nums}${blocking.length > 5 ? "…" : ""}. Delete those invoices first.`,
+        );
+      }
+    }
     const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
     if (error) throw error;
     set({ ...state, purchaseOrders: state.purchaseOrders.filter((p) => p.id !== id) });
