@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Search, Eye, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X, Download } from "lucide-react";
 import {
@@ -269,6 +269,18 @@ function InvoiceList() {
                       </TableRow>
                     ))}
                   </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={7}></TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {viewing.items.reduce((s, i) => s + (Number(i.dispatchQty) || 0), 0)}
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {viewing.items.reduce((s, i) => s + (Number(i.dispatchQty) || 0) * (Number(i.rate) || 0), 0).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </div>
             </div>
