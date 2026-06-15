@@ -580,6 +580,7 @@ export const bulkImport = {
       status: record.status,
       errors: record.errors ?? null,
     });
+    void logActivity("PO Imports", "IMPORT", "Excel", record.fileName);
   },
   async fetchImportHistory() {
     const { data, error } = await supabase
