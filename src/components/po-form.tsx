@@ -30,6 +30,28 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const suggestions = useMemo(() => {
+    const article = new Set<string>();
+    const lace = new Set<string>();
+    const material = new Set<string>();
+    const color = new Set<string>();
+    for (const p of pos) {
+      for (const it of p.items ?? []) {
+        if (it.articleCode?.trim()) article.add(it.articleCode.trim());
+        if (it.laceType?.trim()) lace.add(it.laceType.trim());
+        if (it.materialType?.trim()) material.add(it.materialType.trim());
+        if (it.color?.trim()) color.add(it.color.trim());
+      }
+    }
+    const sort = (s: Set<string>) => Array.from(s).sort((a, b) => a.localeCompare(b));
+    return {
+      article: sort(article),
+      lace: sort(lace),
+      material: sort(material),
+      color: sort(color),
+    };
+  }, [pos]);
+
   const [brandId, setBrandId] = useState(existing?.brandId ?? "");
   const [clientId, setClientId] = useState(existing?.clientId ?? "");
   const [poNumber, setPoNumber] = useState(existing?.poNumber ?? "");
@@ -171,13 +193,13 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
               <TableBody>
                 {items.map((it) => (
                   <TableRow key={it.id}>
-                    <TableCell><Input value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
-                    <TableCell><Input value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
-                    <TableCell><Input value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
+                    <TableCell><Input list="po-article-codes" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
+                    <TableCell><Input list="po-lace-types" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
+                    <TableCell><Input list="po-material-types" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
                     
                     <TableCell><Input value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
                     <TableCell><Input value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
-                    <TableCell><Input value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
+                    <TableCell><Input list="po-colors" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
                     <TableCell>
                       <Select value={it.uom} onValueChange={(v) => updateItem(it.id, { uom: v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -208,6 +230,19 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
           </div>
         </CardContent>
       </Card>
+
+      <datalist id="po-article-codes">
+        {suggestions.article.map((v) => <option key={v} value={v} />)}
+      </datalist>
+      <datalist id="po-lace-types">
+        {suggestions.lace.map((v) => <option key={v} value={v} />)}
+      </datalist>
+      <datalist id="po-material-types">
+        {suggestions.material.map((v) => <option key={v} value={v} />)}
+      </datalist>
+      <datalist id="po-colors">
+        {suggestions.color.map((v) => <option key={v} value={v} />)}
+      </datalist>
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={() => navigate({ to: "/purchase-orders" })}>Cancel</Button>
