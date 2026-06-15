@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Search, Eye, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Eye, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X, Download } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -15,6 +15,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { exportPOsToExcel } from "@/lib/excel-export";
 
 export const Route = createFileRoute("/_authenticated/purchase-orders/")({
   component: POList,
@@ -109,9 +110,21 @@ function POList() {
         title="Purchase Orders"
         subtitle="All POs across brands and clients"
         actions={
-          <Button onClick={() => navigate({ to: "/purchase-orders/new" })}>
-            <Plus className="h-4 w-4 mr-1" /> New PO
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (filtered.length === 0) { toast.error("No POs to export"); return; }
+                exportPOsToExcel(filtered.map((p) => p), brands, clients);
+                toast.success(`Exported ${filtered.length} PO(s)`);
+              }}
+            >
+              <Download className="h-4 w-4 mr-1" /> Export Excel
+            </Button>
+            <Button onClick={() => navigate({ to: "/purchase-orders/new" })}>
+              <Plus className="h-4 w-4 mr-1" /> New PO
+            </Button>
+          </div>
         }
       />
 
