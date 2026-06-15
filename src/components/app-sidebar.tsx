@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,12 @@ const dispatchNav: { to: string; label: string; icon: typeof Plus; exact?: boole
   { to: "/invoices/import", label: "Import Dispatch Excel", icon: Upload },
 ];
 
+const adminNav: { to: string; label: string; icon: typeof Plus }[] = [
+  { to: "/admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
+  { to: "/admin/user-activity", label: "User Activity", icon: Activity },
+  { to: "/admin/daily-report", label: "Daily Work Report", icon: CalendarDays },
+];
+
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, logout } = useAuth();
@@ -37,6 +43,9 @@ export function AppSidebar() {
   const poActive = pathname === "/purchase-orders" || pathname.startsWith("/purchase-orders/");
   const [dispatchOpen, setDispatchOpen] = useState(true);
   const dispatchActive = pathname === "/invoices" || pathname.startsWith("/invoices/");
+  const [adminOpen, setAdminOpen] = useState(true);
+  const adminActive = pathname.startsWith("/admin/");
+  const isAdmin = user?.role === "admin";
 
   return (
     <aside className="hidden md:flex md:w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
@@ -156,6 +165,46 @@ export function AppSidebar() {
           <Brain className="h-4 w-4" />
           AI Learning
         </Link>
+
+        {isAdmin && (
+          <>
+            <button
+              type="button"
+              onClick={() => setAdminOpen((o) => !o)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                adminActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span className="flex-1 text-left">Admin</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${adminOpen ? "" : "-rotate-90"}`} />
+            </button>
+            {adminOpen && (
+              <div className="ml-3 pl-3 border-l border-sidebar-border space-y-1">
+                {adminNav.map((item) => {
+                  const active = pathname === item.to || pathname.startsWith(item.to + "/");
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
       </nav>
       <div className="p-3 border-t border-sidebar-border">
         <div className="px-3 py-2 text-xs text-sidebar-foreground/70">
