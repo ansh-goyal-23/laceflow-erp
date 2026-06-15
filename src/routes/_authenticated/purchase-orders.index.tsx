@@ -284,7 +284,13 @@ function POList() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex justify-end text-sm">
+              <div className="flex justify-end text-sm gap-2">
+                <div className="bg-muted px-4 py-2 rounded-md">
+                  <span className="text-muted-foreground mr-2">Total Qty:</span>
+                  <span className="font-semibold">
+                    {viewing.items.reduce((s, i) => s + i.quantity, 0).toFixed(0)}
+                  </span>
+                </div>
                 <div className="bg-muted px-4 py-2 rounded-md">
                   <span className="text-muted-foreground mr-2">Total:</span>
                   <span className="font-semibold">

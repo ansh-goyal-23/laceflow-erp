@@ -71,6 +71,10 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
     return null;
   }, [poDate, deliveryDate]);
 
+  const totalQty = useMemo(
+    () => items.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0),
+    [items],
+  );
   const total = useMemo(
     () => items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.rate) || 0), 0),
     [items],
@@ -222,7 +226,11 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
               </TableBody>
             </Table>
           </div>
-          <div className="mt-4 flex justify-end text-sm">
+          <div className="mt-4 flex justify-end text-sm gap-2">
+            <div className="bg-muted px-4 py-2 rounded-md">
+              <span className="text-muted-foreground mr-2">Total Qty:</span>
+              <span className="font-semibold text-base">{totalQty.toFixed(0)}</span>
+            </div>
             <div className="bg-muted px-4 py-2 rounded-md">
               <span className="text-muted-foreground mr-2">Total:</span>
               <span className="font-semibold text-base">{total.toFixed(2)}</span>
