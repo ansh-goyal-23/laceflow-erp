@@ -71,6 +71,10 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
     return null;
   }, [poDate, deliveryDate]);
 
+  const totalQty = useMemo(
+    () => items.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0),
+    [items],
+  );
   const total = useMemo(
     () => items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.rate) || 0), 0),
     [items],
