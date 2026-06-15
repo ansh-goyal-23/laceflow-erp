@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { extractPoFromPdf } from "./extract-po-pdf.functions";
+import { logActivity } from "@/lib/audit";
 
 export type Conf = "high" | "medium" | "low";
 export interface ConfVal<T = string> {
@@ -171,6 +172,9 @@ export async function updatePdfImport(
 ) {
   const { error } = await supabase.from("pdf_imports").update(patch).eq("id", id);
   if (error) throw error;
+  if (patch.status === "saved") {
+    void logActivity("PDF PO Imports", "IMPORT", "PDF", patch.po_number ?? id);
+  }
 }
 
 export async function listPdfImports(): Promise<PdfImportRow[]> {
