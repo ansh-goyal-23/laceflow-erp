@@ -1,105 +1,78 @@
-# AI-Powered PO PDF Import Module
+# Admin Audit Logs & User Activity Tracking
 
-A new module that lets users upload a customer PO PDF (digital or scanned), runs it through Lovable AI for extraction, presents a Review screen, saves the PO, and continuously learns from user corrections — with per-client extraction profiles.
+A minimal-storage activity log system for Shree Lace ERP, with three Admin-only screens: Audit Logs, User Activity, and Daily Work Report.
 
-## What gets built
+## 1. Database
 
-### 1. Menu & route
-- Add **Import PDF PO** to the Purchase Orders section of the sidebar.
-- New route: `/purchase-orders/import-pdf` (uploader + review screen in one flow).
-- New route: `/purchase-orders/pdf-import-history` (list of past PDF imports).
-- New route: `/ai-learning` (admin dashboard + mapping management).
+New migration `supabase/migrations/<ts>_audit_logs.sql`:
 
-### 2. Upload & extraction flow
-- Single-PDF uploader (drag/drop + click). Accept digital + scanned PDFs (server passes raw PDF to a multimodal model, so scanned pages work via the model's OCR).
-- On upload:
-  1. PDF sent to a TanStack server function (`extractPoFromPdf`).
-  2. Server loads any existing **client extraction profile** + **learned description mappings** to inject as hints into the prompt.
-  3. Calls Lovable AI Gateway (`google/gemini-3-flash-preview`) with PDF as `file` part + a strict structured-output schema (header + line items + per-field confidence + detected brand/client guesses).
-  4. Returns extracted JSON to client.
+```sql
+create type public.audit_action as enum ('CREATE','EDIT','DELETE','IMPORT','LOGIN','LOGOUT');
 
-### 3. Review screen
-- Pre-filled PO form (header + editable item rows: article code, lace type, material type, width, length, color, UOM, quantity, rate).
-- Each field shows a confidence indicator:
-  - High → normal.
-  - Medium → amber highlight.
-  - Low → amber highlight + ⚠ "Verify this value" tooltip.
-- Brand: auto-selected if high confidence; otherwise a "Brand could not be confidently identified" notice + manual picker.
-- Client: if matched to existing client → selected. If not → "New Client Detected" card with extracted name/address/GSTIN/phone/email and buttons **Save as New Client** / **Pick Existing Client**.
-- Add/delete/edit rows freely before saving.
+create table public.audit_logs (
+  id bigserial primary key,
+  created_at timestamptz not null default now(),
+  user_id uuid references auth.users(id) on delete set null,
+  user_name text not null,
+  module text not null,            -- e.g. 'Purchase Orders'
+  action public.audit_action not null,
+  record_type text,                -- e.g. 'PO'
+  record_id text                   -- string to fit numeric/uuid identifiers
+);
 
-### 4. Saving & duplicate detection
-- On **Save PO**:
-  - If `po_number` already exists for that client → modal: **Cancel / Update Existing / Create New Revision** (revision appends `-R2`, `-R3`…).
-  - Otherwise create PO + items (reuses existing `store.addPO`).
-  - Diff each field against the original AI extraction; every changed field is logged to the learning DB (see §6).
+create index audit_logs_created_at_idx on public.audit_logs (created_at desc);
+create index audit_logs_user_idx       on public.audit_logs (user_id, created_at desc);
+create index audit_logs_module_idx     on public.audit_logs (module, created_at desc);
+create index audit_logs_action_idx     on public.audit_logs (action, created_at desc);
 
-### 5. PDF Import History
-- Table: Upload Date, Client, PO Number, File Name, Imported By, Status (extracted / saved / failed).
-- Row actions: **View** (reopens review with stored extraction JSON), **Reprocess** (re-runs extraction on the stored PDF), **Delete**.
-- File stored in Supabase Storage bucket `po-pdfs`.
+grant select on public.audit_logs to authenticated;       -- gated further by RLS
+grant all on public.audit_logs to service_role;
 
-### 6. Learning system
-- Two scopes of learnings:
-  - **Global description mappings** (`description_mappings`): raw description → structured fields, with `confirmations` counter.
-  - **Client-specific description mappings** + **client extraction profiles** (`client_extraction_profiles`): per-client overrides, known layouts, date formats, etc.
-- Every user correction on the Review screen:
-  - Increments confirmations for that mapping (creates if new).
-  - Recorded in `learning_audit_log` (client, original value, corrected value, field, user, date).
-- Confidence promotion: 1 → low, 5 → medium, 20 → high. High-confidence mappings auto-apply (server merges them into the AI output before returning to client, overriding low-confidence AI guesses).
+alter table public.audit_logs enable row level security;
 
-### 7. AI Learning Dashboard (admin-only)
-At `/ai-learning`:
-- KPIs: Total PDFs Imported, Total Corrections, Client Profiles, Extraction Accuracy %, Accuracy by Client.
-- Most Common Corrections table.
-- Client Profiles list → drill into a profile → manage learned rules: **Edit / Delete / Merge / Disable**.
-- Audit log viewer with filters.
-- Non-admin users see a "Admins only" gate.
-
-## Technical details
-
-### Backend (TanStack server functions in `src/lib/pdf-import.functions.ts`)
-- `extractPoFromPdf({ fileBase64, fileName })` — uploads PDF to storage, calls Lovable AI Gateway via AI SDK `generateText` + `Output.object` with a Zod schema covering header, items, confidences, brand/client guesses. Applies high-confidence learned mappings before returning.
-- `savePdfImportPO({ extraction, finalPO, importId, mode })` where `mode` is `new | update | revision`. Writes PO, updates import row, diffs fields, writes mappings + audit log.
-- `reprocessPdfImport({ importId })`.
-- `listPdfImports()` / `deletePdfImport(id)`.
-- `learningStats()` / `listMappings({ clientId? })` / `updateMapping` / `deleteMapping` / `mergeMappings` / `toggleMappingEnabled` — all gated by `has_role(_, 'admin')`.
-
-### Storage
-- New private bucket `po-pdfs` with RLS: authenticated users can insert/read their own uploads; admins read all.
-
-### Database (new migration)
+create policy "Admins read audit_logs"
+  on public.audit_logs for select to authenticated
+  using (public.has_role(auth.uid(),'admin'));
+-- No insert/update/delete policies → writes only via service_role (server fns).
 ```
-pdf_imports (id, file_path, file_name, client_id, po_id, po_number, status,
-             extraction_json, uploaded_by, uploaded_by_email, created_at)
-description_mappings (id, client_id NULL, original_text, field, mapped_value,
-                      confirmations, enabled, created_at, updated_at)
-client_extraction_profiles (id, client_id UNIQUE, layout_notes jsonb,
-                            date_formats text[], updated_at)
-learning_audit_log (id, client_id, pdf_import_id, field, original_value,
-                    corrected_value, user_id, user_email, created_at)
-```
-All with `GRANT`s + RLS: authenticated read on mappings/profiles, write via security-definer functions; audit log insert by service role inside server fns; admin policies via existing `has_role`.
 
-### AI
-- Model: `google/gemini-3-flash-preview` (multimodal, accepts PDF input). Uses AI SDK provider helper already established in `src/lib/ai-gateway.server.ts` (create if missing).
-- Structured output via `Output.object` with compact Zod schema; line-item array kept under Gemini's state limit by avoiding long enums.
-- Lovable AI requires `LOVABLE_API_KEY` (auto-provisioned).
+Storage stays minimal: no JSON snapshots, no diff rows, no IP/UA/geo. Indexed only on the columns the screens filter by.
 
-### Frontend
-- `src/routes/_authenticated/purchase-orders.import-pdf.tsx` — uploader + review flow (single page, two visual phases).
-- `src/components/pdf-po-review.tsx` — reusable review form with confidence highlighting.
-- `src/routes/_authenticated/purchase-orders.pdf-import-history.tsx`.
-- `src/routes/_authenticated/ai-learning.tsx` (admin-gated).
-- Sidebar updated (`src/components/app-sidebar.tsx`).
+The existing `created_by`, `created_at`, `updated_by`, `updated_at` columns on brands/clients/purchase_orders/po_items/dispatches/invoices remain the source of truth for "who created/edited this record"; we'll surface them on detail pages and not duplicate them in logs.
 
-### Out of scope (for this iteration)
-- Bulk multi-PDF upload.
-- Email-to-import.
-- Public sharing of mappings across workspaces.
+## 2. Server logging
 
-## Prerequisites you'll need to confirm
-1. **Lovable Cloud / Supabase** is required (new tables, storage bucket, AI key). It looks enabled already — I'll create the migration + bucket as part of the work.
-2. **Lovable AI** will be used for extraction (billed from workspace credits per request).
+New `src/lib/audit.functions.ts` (admin client, inside handler):
 
-Reply **go** to build it, or tell me anything to change (e.g. skip the AI Learning Dashboard for v1, or use a different model).
+- `logAudit({ module, action, recordType, recordId })` — `createServerFn` + `requireSupabaseAuth`, resolves the caller's display name from `profiles`, inserts one row via `supabaseAdmin`. Never throws to the caller; on failure it logs server-side only so user flows aren't broken.
+- `listAuditLogs({ search, userId, module, action, from, to, limit, offset })` — admin-only (verifies `has_role(..., 'admin')`), returns paginated rows + total.
+- `getUserActivity({ from, to, userId })` — admin-only; returns one row per user with counts per action plus `last_activity` (single aggregated SQL query).
+- `getDailyWorkReport({ date })` — admin-only; groups by user + module + action for that day.
+
+Call `logAudit` at the end of existing server actions for: brand/client/PO/PO item/dispatch/invoice create/edit/delete, PO import, PDF PO import (on save), AI-learning record changes, user role changes. Login/logout logged from the client (`onAuthStateChange` SIGNED_IN/SIGNED_OUT) via a thin `logAuthEvent` server fn.
+
+## 3. Routes (Admin-only)
+
+All under a new pathless gate `src/routes/_authenticated/_admin.tsx` that calls `has_role` and redirects non-admins to `/`.
+
+- `src/routes/_authenticated/_admin/audit-logs.tsx` — table with Search, User filter, Module filter, Action filter, Date range, pagination, Export (CSV + Excel).
+- `src/routes/_authenticated/_admin/user-activity.tsx` — productivity table (Created / Edited / Deleted / Imports / Logins / Last activity), Date range + User filter, Export.
+- `src/routes/_authenticated/_admin/daily-work-report.tsx` — date picker, per-user grouped summary, Export.
+
+Sidebar: add an "Admin" group containing the three items, rendered only when `user.role === 'admin'`.
+
+## 4. Record metadata UI
+
+On existing detail pages for Brands / Clients / Purchase Orders / Dispatches / Invoices, add a small "Record info" block showing Created By / Created At / Updated By / Updated At, resolved from `profiles`. No schema changes — columns already exist.
+
+## 5. Export
+
+Reuse the existing xlsx/csv helpers (or `papaparse` + `xlsx` if not present) in a single `src/lib/export-table.ts` used by all three screens.
+
+## Technical notes
+
+- Logs are append-only; no UI to edit/delete them.
+- Counts come from aggregate SQL (`count(*) filter (where action = ...)`), not by pulling rows into JS.
+- Pagination is server-side; default 50/page.
+- Every `logAudit` call is fire-and-forget from the caller's perspective (awaited inside the handler but wrapped in try/catch so a logging failure doesn't break the business action).
+- No daily-summary table — reports are computed on demand from `audit_logs`, as requested.
