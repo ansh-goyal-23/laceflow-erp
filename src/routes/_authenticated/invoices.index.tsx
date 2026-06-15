@@ -127,7 +127,7 @@ function InvoiceList() {
         <div className="flex flex-col xl:flex-row gap-3 mb-4 items-start xl:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search by invoice # or client…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+            <Input className="pl-9" placeholder="Search by invoice #, client, or PO #…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <Select value={clientFilter} onValueChange={(v) => { setClientFilter(v); setPage(1); }}>
