@@ -189,7 +189,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
                   <TableHead className="min-w-28">Color</TableHead>
                   <TableHead className="w-24">UOM</TableHead>
                   <TableHead className="w-28">Quantity</TableHead>
-                  <TableHead className="w-28">Rate</TableHead>
+                  <TableHead className="w-36">Rate</TableHead>
                   <TableHead className="w-28 text-right">Amount</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
