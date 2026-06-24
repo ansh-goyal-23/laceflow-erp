@@ -260,7 +260,7 @@ function POList() {
       </AlertDialog>
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{viewing?.poNumber}</DialogTitle>
           </DialogHeader>
@@ -280,7 +280,7 @@ function POList() {
                       <TableHead>Lace</TableHead>
                       <TableHead>Material</TableHead>
                       <TableHead>Color</TableHead>
-                      <TableHead>W×L</TableHead>
+                      <TableHead>W (mm) × L (cm)</TableHead>
                       <TableHead>UOM</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Rate</TableHead>

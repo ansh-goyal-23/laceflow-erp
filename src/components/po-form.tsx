@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useStore, store, nextPONumber, type PurchaseOrder, type POLineItem } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -62,9 +62,10 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
   const [brandOpen, setBrandOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
 
+  const poNumberTouched = useRef(!!existing);
   useEffect(() => {
-    if (!existing && !poNumber) setPoNumber(nextPONumber(pos));
-  }, [existing, poNumber, pos]);
+    if (!existing && !poNumberTouched.current) setPoNumber(nextPONumber(pos));
+  }, [existing, pos]);
 
   const dateError = useMemo(() => {
     if (poDate && deliveryDate && deliveryDate < poDate) return "Delivery Date cannot be earlier than PO Date";
@@ -154,7 +155,10 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
 
           <div className="space-y-2">
             <Label>PO Number</Label>
-            <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
+            <Input
+              value={poNumber}
+              onChange={(e) => { poNumberTouched.current = true; setPoNumber(e.target.value); }}
+            />
           </div>
           <div className="space-y-2">
             <Label>PO Date</Label>
@@ -180,16 +184,15 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-32">Article Code</TableHead>
-                  <TableHead className="min-w-32">Lace Type</TableHead>
-                  <TableHead className="min-w-32">Material Type</TableHead>
-                  
-                  <TableHead className="w-24">Width</TableHead>
-                  <TableHead className="w-24">Length</TableHead>
-                  <TableHead className="min-w-28">Color</TableHead>
+                  <TableHead className="w-24">Article Code</TableHead>
+                  <TableHead className="w-44">Lace Type</TableHead>
+                  <TableHead className="w-44">Material Type</TableHead>
+                  <TableHead className="w-24">Width (mm)</TableHead>
+                  <TableHead className="w-24">Length (cm)</TableHead>
+                  <TableHead className="w-44">Color</TableHead>
                   <TableHead className="w-24">UOM</TableHead>
-                  <TableHead className="w-28">Quantity</TableHead>
-                  <TableHead className="w-36">Rate</TableHead>
+                  <TableHead className="w-24">Quantity</TableHead>
+                  <TableHead className="w-24">Rate</TableHead>
                   <TableHead className="w-28 text-right">Amount</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
