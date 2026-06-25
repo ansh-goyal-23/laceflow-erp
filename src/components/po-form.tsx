@@ -180,46 +180,58 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="w-full">
+            <Table style={{ tableLayout: "fixed", width: "100%" }} className="text-xs">
+              <colgroup>
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "4%" }} />
+              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-60">Article Code</TableHead>
-                  <TableHead className="w-[28rem]">Lace Type</TableHead>
-                  <TableHead className="w-[28rem]">Material Type</TableHead>
-                  <TableHead className="w-60">Width (mm)</TableHead>
-                  <TableHead className="w-60">Length (cm)</TableHead>
-                  <TableHead className="w-[28rem]">Color</TableHead>
-                  <TableHead className="w-60">UOM</TableHead>
-                  <TableHead className="w-60">Quantity</TableHead>
-                  <TableHead className="w-60">Rate</TableHead>
-                  <TableHead className="w-72 text-right">Amount</TableHead>
-                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="px-1">Article</TableHead>
+                  <TableHead className="px-1">Lace Type</TableHead>
+                  <TableHead className="px-1">Material</TableHead>
+                  <TableHead className="px-1">W (mm)</TableHead>
+                  <TableHead className="px-1">L (cm)</TableHead>
+                  <TableHead className="px-1">Color</TableHead>
+                  <TableHead className="px-1">UOM</TableHead>
+                  <TableHead className="px-1">Qty</TableHead>
+                  <TableHead className="px-1">Rate</TableHead>
+                  <TableHead className="px-1 text-right">Amount</TableHead>
+                  <TableHead className="px-1"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((it) => (
                   <TableRow key={it.id}>
-                    <TableCell><Input list="po-article-codes" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
-                    <TableCell><Input list="po-lace-types" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
-                    <TableCell><Input list="po-material-types" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
-                    
-                    <TableCell><Input value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
-                    <TableCell><Input value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
-                    <TableCell><Input list="po-colors" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
-                    <TableCell>
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-article-codes" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-lace-types" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-material-types" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-colors" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
+                    <TableCell className="px-1">
                       <Select value={it.uom} onValueChange={(v) => updateItem(it.id, { uom: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 px-2 text-xs w-full"><SelectValue /></SelectTrigger>
                         <SelectContent>{UOMS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell><Input type="number" min="0" step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} /></TableCell>
-                    <TableCell><Input type="number" min="0" step="any" value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} /></TableCell>
+                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
+                    <TableCell className="px-1 text-right font-medium text-xs">
                       {((it.quantity || 0) * (it.rate || 0)).toFixed(2)}
                     </TableCell>
-                    <TableCell>
-                      <Button type="button" variant="ghost" size="icon" disabled={items.length === 1}
+                    <TableCell className="px-0">
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" disabled={items.length === 1}
                         onClick={() => setItems((a) => a.filter((x) => x.id !== it.id))}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
