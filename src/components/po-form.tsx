@@ -180,20 +180,20 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table style={{ tableLayout: "fixed", width: "1640px" }}>
+          <div className="w-full">
+            <Table style={{ tableLayout: "fixed", width: "100%" }} className="text-xs">
               <colgroup>
-                <col style={{ width: "140px" }} />
-                <col style={{ width: "220px" }} />
-                <col style={{ width: "220px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "200px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "140px" }} />
-                <col style={{ width: "56px" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "4%" }} />
               </colgroup>
               <TableHeader>
                 <TableRow>
