@@ -181,33 +181,20 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <Table style={{ tableLayout: "fixed", width: "1640px" }}>
-              <colgroup>
-                <col style={{ width: "140px" }} />
-                <col style={{ width: "220px" }} />
-                <col style={{ width: "220px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "200px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "140px" }} />
-                <col style={{ width: "56px" }} />
-              </colgroup>
+            <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Lace Type</TableHead>
-                  <TableHead>Material Type</TableHead>
-                  <TableHead>Width (mm)</TableHead>
-                  <TableHead>Length (cm)</TableHead>
-                  <TableHead>Color</TableHead>
-                  <TableHead>UOM</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Rate</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="w-60">Article Code</TableHead>
+                  <TableHead className="w-[28rem]">Lace Type</TableHead>
+                  <TableHead className="w-[28rem]">Material Type</TableHead>
+                  <TableHead className="w-60">Width (mm)</TableHead>
+                  <TableHead className="w-60">Length (cm)</TableHead>
+                  <TableHead className="w-[28rem]">Color</TableHead>
+                  <TableHead className="w-60">UOM</TableHead>
+                  <TableHead className="w-60">Quantity</TableHead>
+                  <TableHead className="w-60">Rate</TableHead>
+                  <TableHead className="w-72 text-right">Amount</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
