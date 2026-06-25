@@ -258,12 +258,12 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
               <TableBody>
                 {items.map((it) => (
                   <TableRow key={it.id} className="align-top">
-                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
-                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
-                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.articleCode} onChange={(v) => updateItem(it.id, { articleCode: v })} suggestions={suggestions.article} /></TableCell>
+                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.laceType} onChange={(v) => updateItem(it.id, { laceType: v })} suggestions={suggestions.lace} /></TableCell>
+                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.materialType} onChange={(v) => updateItem(it.id, { materialType: v })} suggestions={suggestions.material} /></TableCell>
                     <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
                     <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
-                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.color} onChange={(v) => updateItem(it.id, { color: v })} suggestions={suggestions.color} /></TableCell>
                     <TableCell className="px-1">
                       <Select value={it.uom} onValueChange={(v) => updateItem(it.id, { uom: v })}>
                         <SelectTrigger className="h-8 px-2 text-xs w-full"><SelectValue /></SelectTrigger>
