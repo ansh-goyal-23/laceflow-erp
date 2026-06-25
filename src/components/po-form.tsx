@@ -184,16 +184,16 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-24">Article Code</TableHead>
-                  <TableHead className="w-44">Lace Type</TableHead>
-                  <TableHead className="w-44">Material Type</TableHead>
-                  <TableHead className="w-24">Width (mm)</TableHead>
-                  <TableHead className="w-24">Length (cm)</TableHead>
-                  <TableHead className="w-44">Color</TableHead>
-                  <TableHead className="w-24">UOM</TableHead>
-                  <TableHead className="w-24">Quantity</TableHead>
-                  <TableHead className="w-24">Rate</TableHead>
-                  <TableHead className="w-28 text-right">Amount</TableHead>
+                  <TableHead className="w-60">Article Code</TableHead>
+                  <TableHead className="w-[28rem]">Lace Type</TableHead>
+                  <TableHead className="w-[28rem]">Material Type</TableHead>
+                  <TableHead className="w-60">Width (mm)</TableHead>
+                  <TableHead className="w-60">Length (cm)</TableHead>
+                  <TableHead className="w-[28rem]">Color</TableHead>
+                  <TableHead className="w-60">UOM</TableHead>
+                  <TableHead className="w-60">Quantity</TableHead>
+                  <TableHead className="w-60">Rate</TableHead>
+                  <TableHead className="w-72 text-right">Amount</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
