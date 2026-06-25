@@ -200,22 +200,22 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
               <TableBody>
                 {items.map((it) => (
                   <TableRow key={it.id}>
-                    <TableCell><Input list="po-article-codes" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
-                    <TableCell><Input list="po-lace-types" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
-                    <TableCell><Input list="po-material-types" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
-                    
-                    <TableCell><Input value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
-                    <TableCell><Input value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
-                    <TableCell><Input list="po-colors" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
+                    <TableCell><Input className="text-xs md:text-xs" list="po-article-codes" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
+                    <TableCell><Input className="text-xs md:text-xs" list="po-lace-types" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
+                    <TableCell><Input className="text-xs md:text-xs" list="po-material-types" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
+
+                    <TableCell><Input className="text-xs md:text-xs" value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
+                    <TableCell><Input className="text-xs md:text-xs" value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
+                    <TableCell><Input className="text-xs md:text-xs" list="po-colors" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
                     <TableCell>
                       <Select value={it.uom} onValueChange={(v) => updateItem(it.id, { uom: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>{UOMS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell><Input type="number" min="0" step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} /></TableCell>
-                    <TableCell><Input type="number" min="0" step="any" value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell><Input className="text-xs md:text-xs" type="number" min="0" step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} /></TableCell>
+                    <TableCell><Input className="text-xs md:text-xs" type="number" min="0" step="any" value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
+                    <TableCell className="text-right font-medium text-xs">
                       {((it.quantity || 0) * (it.rate || 0)).toFixed(2)}
                     </TableCell>
                     <TableCell>
