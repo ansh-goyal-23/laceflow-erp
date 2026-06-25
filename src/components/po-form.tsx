@@ -23,6 +23,50 @@ function emptyItem(): POLineItem {
 
 const UOMS = ["Mtr", "Pcs", "Pair", "Kg", "Roll"];
 
+function SuggestTextarea({
+  value, onChange, suggestions, className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  suggestions: string[];
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const matches = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    const list = q
+      ? suggestions.filter((s) => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+      : suggestions;
+    return list.slice(0, 8);
+  }, [value, suggestions]);
+  return (
+    <div className="relative">
+      <Textarea
+        rows={1}
+        className={className}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute z-20 left-0 right-0 top-full mt-1 max-h-44 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md text-xs">
+          {matches.map((m) => (
+            <button
+              key={m}
+              type="button"
+              className="block w-full text-left px-2 py-1 hover:bg-accent hover:text-accent-foreground break-words"
+              onMouseDown={(e) => { e.preventDefault(); onChange(m); setOpen(false); }}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function POForm({ existing }: { existing?: PurchaseOrder }) {
   const navigate = useNavigate();
   const brands = useStore((s) => s.brands);
