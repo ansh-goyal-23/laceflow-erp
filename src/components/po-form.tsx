@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useStore, store, nextPONumber, type PurchaseOrder, type POLineItem } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -212,25 +213,25 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
               </TableHeader>
               <TableBody>
                 {items.map((it) => (
-                  <TableRow key={it.id}>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-article-codes" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-lace-types" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-material-types" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" list="po-colors" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
+                  <TableRow key={it.id} className="align-top">
+                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" list="po-article-codes" value={it.articleCode} onChange={(e) => updateItem(it.id, { articleCode: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" list="po-lace-types" value={it.laceType} onChange={(e) => updateItem(it.id, { laceType: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" list="po-material-types" value={it.materialType} onChange={(e) => updateItem(it.id, { materialType: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" list="po-colors" value={it.color} onChange={(e) => updateItem(it.id, { color: e.target.value })} /></TableCell>
                     <TableCell className="px-1">
                       <Select value={it.uom} onValueChange={(v) => updateItem(it.id, { uom: v })}>
                         <SelectTrigger className="h-8 px-2 text-xs w-full"><SelectValue /></SelectTrigger>
                         <SelectContent>{UOMS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} /></TableCell>
-                    <TableCell className="px-1"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
-                    <TableCell className="px-1 text-right font-medium text-xs">
+                    <TableCell className="px-1 align-top"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} /></TableCell>
+                    <TableCell className="px-1 align-top"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
+                    <TableCell className="px-1 align-top text-right font-medium text-xs pt-3">
                       {((it.quantity || 0) * (it.rate || 0)).toFixed(2)}
                     </TableCell>
-                    <TableCell className="px-0">
+                    <TableCell className="px-0 align-top">
                       <Button type="button" variant="ghost" size="icon" className="h-8 w-8" disabled={items.length === 1}
                         onClick={() => setItems((a) => a.filter((x) => x.id !== it.id))}>
                         <Trash2 className="h-4 w-4 text-destructive" />
