@@ -141,17 +141,24 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
     return null;
   }
 
-  async function save(status: "draft" | "submitted") {
-    const err = validate(status === "submitted");
+  async function save(action: "draft" | "submit") {
+    const err = validate(action === "submit");
     if (err) { toast.error(err); return; }
-    const payload = { poNumber: poNumber.trim(), brandId, clientId, poDate, deliveryDate, items, status };
+    // Preserve non-draft statuses on edit; new/draft POs move to Open on submit.
+    const finalStatus: "draft" | "open" | "completed" =
+      existing && existing.status !== "draft"
+        ? existing.status
+        : action === "submit"
+          ? "open"
+          : "draft";
+    const payload = { poNumber: poNumber.trim(), brandId, clientId, poDate, deliveryDate, items, status: finalStatus };
     try {
       if (existing) {
         await store.updatePO(existing.id, payload);
-        toast.success(status === "draft" ? "Draft saved" : "PO updated");
+        toast.success(action === "draft" ? "Draft saved" : "PO updated");
       } else {
         await store.addPO(payload);
-        toast.success(status === "draft" ? "Draft saved" : "PO submitted");
+        toast.success(action === "draft" ? "Draft saved" : "PO submitted");
       }
       navigate({ to: "/purchase-orders" });
     } catch (e: unknown) {
