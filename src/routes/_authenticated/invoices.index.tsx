@@ -226,7 +226,7 @@ function InvoiceList() {
       </AlertDialog>
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{viewing?.invoiceNumber}</DialogTitle>
           </DialogHeader>
