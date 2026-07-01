@@ -365,3 +365,23 @@ function Field({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function StatusBadge({ po, onClickOpen }: { po: PurchaseOrder; onClickOpen: () => void }) {
+  const base = "inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full";
+  if (po.status === "draft") {
+    return <span className={`${base} bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200`}>Draft</span>;
+  }
+  if (po.status === "completed") {
+    return <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>Completed</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClickOpen}
+      title="Click to mark Completed"
+      className={`${base} bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors cursor-pointer`}
+    >
+      Open
+    </button>
+  );
+}
