@@ -324,7 +324,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
         <Button type="button" variant="secondary" onClick={() => save("draft")}>
           <Save className="h-4 w-4 mr-1" /> Save Draft
         </Button>
-        <Button type="button" onClick={() => save("submitted")}>
+        <Button type="button" onClick={() => save("submit")}>
           <Send className="h-4 w-4 mr-1" /> Submit PO
         </Button>
       </div>

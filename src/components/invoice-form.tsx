@@ -46,7 +46,7 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
   const clientPOs = useMemo(() => {
     if (!clientId) return [];
     return pos
-      .filter((p) => p.clientId === clientId && p.status === "submitted")
+      .filter((p) => p.clientId === clientId && p.status === "open")
       .map((p) => ({ po: p, status: poFulfillmentStatus(p, dispByItem, dispByPo) }))
       .filter(({ status }) => status !== "Completed")
       .sort((a, b) => a.po.poNumber.localeCompare(b.po.poNumber));
