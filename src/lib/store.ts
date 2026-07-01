@@ -43,7 +43,7 @@ export interface PurchaseOrder {
   deliveryDate: string;
   items: POLineItem[];
   status: "draft" | "open" | "completed";
-  productionStatus: string | null;
+  productionStatus?: string | null;
   createdAt: string;
   createdBy: string | null;
 }
