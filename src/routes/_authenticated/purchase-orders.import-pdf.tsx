@@ -425,7 +425,7 @@ function ImportPdfPage() {
           quantity: Number(it.quantity.value) || 0,
           rate: Number(it.rate.value) || 0,
         })),
-        status: "submitted" as const,
+        status: "open" as const,
       };
 
       let poId: string;

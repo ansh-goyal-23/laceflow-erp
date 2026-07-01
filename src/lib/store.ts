@@ -42,7 +42,7 @@ export interface PurchaseOrder {
   poDate: string;
   deliveryDate: string;
   items: POLineItem[];
-  status: "draft" | "submitted";
+  status: "draft" | "open" | "completed";
   createdAt: string;
   createdBy: string | null;
 }
@@ -128,7 +128,7 @@ type PORow = {
   client_id: string;
   po_date: string;
   delivery_date: string;
-  status: "draft" | "submitted";
+  status: "draft" | "open" | "completed";
   created_at: string;
   created_by: string | null;
   purchase_order_items: POItemRow[];
@@ -387,6 +387,20 @@ export const store = {
     void logActivity("Purchase Orders", "DELETE", "PO", existing?.poNumber ?? id);
   },
 
+  async updatePOStatus(id: string, status: "draft" | "open" | "completed") {
+    const { error } = await supabase
+      .from("purchase_orders")
+      .update({ status })
+      .eq("id", id);
+    if (error) throw error;
+    set({
+      ...state,
+      purchaseOrders: state.purchaseOrders.map((p) => (p.id === id ? { ...p, status } : p)),
+    });
+    const po = state.purchaseOrders.find((p) => p.id === id);
+    void logActivity("Purchase Orders", "EDIT", "PO Status", `${po?.poNumber ?? id} → ${status}`);
+  },
+
   // ---- Invoices ----
   async addInvoice(inv: Omit<Invoice, "id" | "createdAt" | "createdBy" | "items"> & { items: Omit<InvoiceItem, "id" | "invoiceId">[] }): Promise<Invoice> {
     const uid = (await supabase.auth.getUser()).data.user?.id;
@@ -527,7 +541,7 @@ export const bulkImport = {
         client_id: input.clientId,
         po_date: input.poDate,
         delivery_date: input.deliveryDate,
-        status: "submitted",
+        status: "open",
         created_by: uid,
       })
       .select()
@@ -553,7 +567,7 @@ export const bulkImport = {
         client_id: input.clientId,
         po_date: input.poDate,
         delivery_date: input.deliveryDate,
-        status: "submitted",
+        status: "open",
       })
       .eq("id", poId);
     if (error) throw error;

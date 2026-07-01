@@ -59,7 +59,8 @@ function POList() {
   const canModify = (p: PurchaseOrder) => !!user && (user.role === "admin" || p.createdBy === user.id);
 
   const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  // Default: show active POs (Draft + Open); hide Completed unless user picks it.
+  const [statusFilter, setStatusFilter] = useState<string>("active");
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
@@ -67,6 +68,7 @@ function POList() {
   const [page, setPage] = useState(1);
   const [confirm, setConfirm] = useState<PurchaseOrder | null>(null);
   const [viewing, setViewing] = useState<PurchaseOrder | null>(null);
+  const [completeConfirm, setCompleteConfirm] = useState<PurchaseOrder | null>(null);
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
@@ -80,7 +82,11 @@ function POList() {
   const filtered = useMemo(() => {
     const t = q.toLowerCase();
     return pos
-      .filter((p) => statusFilter === "all" || p.status === statusFilter)
+      .filter((p) => {
+        if (statusFilter === "all") return true;
+        if (statusFilter === "active") return p.status === "draft" || p.status === "open";
+        return p.status === statusFilter;
+      })
       .filter((p) => brandFilter === "all" || p.brandId === brandFilter)
       .filter((p) => clientFilter === "all" || p.clientId === clientFilter)
       .filter((p) =>
@@ -136,11 +142,13 @@ function POList() {
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="active">Active (Draft + Open)</SelectItem>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
             <Select value={brandFilter} onValueChange={(v) => { setBrandFilter(v); setPage(1); }}>
@@ -161,9 +169,9 @@ function POList() {
                 ))}
               </SelectContent>
             </Select>
-            {(q || statusFilter !== "all" || brandFilter !== "all" || clientFilter !== "all") && (
+            {(q || statusFilter !== "active" || brandFilter !== "all" || clientFilter !== "all") && (
               <Button variant="ghost" size="sm" onClick={() => {
-                setQ(""); setStatusFilter("all"); setBrandFilter("all"); setClientFilter("all"); setSortKey("createdAt"); setSortDir("desc"); setPage(1);
+                setQ(""); setStatusFilter("active"); setBrandFilter("all"); setClientFilter("all"); setSortKey("createdAt"); setSortDir("desc"); setPage(1);
               }}>
                 <X className="h-4 w-4 mr-1" /> Clear
               </Button>
@@ -195,9 +203,7 @@ function POList() {
                   <TableCell>{p.poDate}</TableCell>
                   <TableCell>{p.deliveryDate}</TableCell>
                   <TableCell>
-                    <span className={`text-xs px-2 py-1 rounded-full ${p.status === "draft" ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
-                      {p.status}
-                    </span>
+                    <StatusBadge po={p} onClickOpen={() => setCompleteConfirm(p)} />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => setViewing(p)} title="View"><Eye className="h-4 w-4" /></Button>
@@ -255,6 +261,31 @@ function POList() {
               }
               setConfirm(null);
             }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!completeConfirm} onOpenChange={(o) => !o && setCompleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark this Purchase Order as Completed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              After marking <span className="font-medium">{completeConfirm?.poNumber}</span> as Completed, it will no longer appear as an active working PO.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              if (completeConfirm) {
+                try {
+                  await store.updatePOStatus(completeConfirm.id, "completed");
+                  toast.success(`${completeConfirm.poNumber} marked Completed`);
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Failed to update status");
+                }
+              }
+              setCompleteConfirm(null);
+            }}>Yes, Mark Completed</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -332,5 +363,25 @@ function Field({ label, value }: { label: string; value: string }) {
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="font-medium">{value}</div>
     </div>
+  );
+}
+
+function StatusBadge({ po, onClickOpen }: { po: PurchaseOrder; onClickOpen: () => void }) {
+  const base = "inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full";
+  if (po.status === "draft") {
+    return <span className={`${base} bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200`}>Draft</span>;
+  }
+  if (po.status === "completed") {
+    return <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>Completed</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClickOpen}
+      title="Click to mark Completed"
+      className={`${base} bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors cursor-pointer`}
+    >
+      Open
+    </button>
   );
 }
