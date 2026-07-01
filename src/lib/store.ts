@@ -42,7 +42,7 @@ export interface PurchaseOrder {
   poDate: string;
   deliveryDate: string;
   items: POLineItem[];
-  status: "draft" | "submitted";
+  status: "draft" | "open" | "completed";
   createdAt: string;
   createdBy: string | null;
 }
@@ -128,7 +128,7 @@ type PORow = {
   client_id: string;
   po_date: string;
   delivery_date: string;
-  status: "draft" | "submitted";
+  status: "draft" | "open" | "completed";
   created_at: string;
   created_by: string | null;
   purchase_order_items: POItemRow[];
@@ -527,7 +527,7 @@ export const bulkImport = {
         client_id: input.clientId,
         po_date: input.poDate,
         delivery_date: input.deliveryDate,
-        status: "submitted",
+        status: "open",
         created_by: uid,
       })
       .select()
@@ -553,7 +553,7 @@ export const bulkImport = {
         client_id: input.clientId,
         po_date: input.poDate,
         delivery_date: input.deliveryDate,
-        status: "submitted",
+        status: "open",
       })
       .eq("id", poId);
     if (error) throw error;
