@@ -387,6 +387,20 @@ export const store = {
     void logActivity("Purchase Orders", "DELETE", "PO", existing?.poNumber ?? id);
   },
 
+  async updatePOStatus(id: string, status: "draft" | "open" | "completed") {
+    const { error } = await supabase
+      .from("purchase_orders")
+      .update({ status })
+      .eq("id", id);
+    if (error) throw error;
+    set({
+      ...state,
+      purchaseOrders: state.purchaseOrders.map((p) => (p.id === id ? { ...p, status } : p)),
+    });
+    const po = state.purchaseOrders.find((p) => p.id === id);
+    void logActivity("Purchase Orders", "EDIT", "PO Status", `${po?.poNumber ?? id} → ${status}`);
+  },
+
   // ---- Invoices ----
   async addInvoice(inv: Omit<Invoice, "id" | "createdAt" | "createdBy" | "items"> & { items: Omit<InvoiceItem, "id" | "invoiceId">[] }): Promise<Invoice> {
     const uid = (await supabase.auth.getUser()).data.user?.id;
