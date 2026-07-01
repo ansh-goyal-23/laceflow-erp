@@ -19,6 +19,7 @@ import { Route as AuthenticatedAiLearningRouteImport } from './routes/_authentic
 import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_authenticated/purchase-orders.index'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
 import { Route as AuthenticatedReportsPendencyPoRouteImport } from './routes/_authenticated/reports.pendency-po'
+import { Route as AuthenticatedReportsPendencyItemRouteImport } from './routes/_authenticated/reports.pendency-item'
 import { Route as AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.pdf-import-history'
 import { Route as AuthenticatedPurchaseOrdersNewRouteImport } from './routes/_authenticated/purchase-orders.new'
 import { Route as AuthenticatedPurchaseOrdersImportPdfRouteImport } from './routes/_authenticated/purchase-orders.import-pdf'
@@ -82,6 +83,12 @@ const AuthenticatedReportsPendencyPoRoute =
   AuthenticatedReportsPendencyPoRouteImport.update({
     id: '/reports/pendency-po',
     path: '/reports/pendency-po',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedReportsPendencyItemRoute =
+  AuthenticatedReportsPendencyItemRouteImport.update({
+    id: '/reports/pendency-item',
+    path: '/reports/pendency-item',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPurchaseOrdersPdfImportHistoryRoute =
@@ -174,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/purchase-orders/import-pdf': typeof AuthenticatedPurchaseOrdersImportPdfRoute
   '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
+  '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -197,6 +205,7 @@ export interface FileRoutesByTo {
   '/purchase-orders/import-pdf': typeof AuthenticatedPurchaseOrdersImportPdfRoute
   '/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
+  '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -222,6 +231,7 @@ export interface FileRoutesById {
   '/_authenticated/purchase-orders/import-pdf': typeof AuthenticatedPurchaseOrdersImportPdfRoute
   '/_authenticated/purchase-orders/new': typeof AuthenticatedPurchaseOrdersNewRoute
   '/_authenticated/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
+  '/_authenticated/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/_authenticated/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/import-pdf'
     | '/purchase-orders/new'
     | '/purchase-orders/pdf-import-history'
+    | '/reports/pendency-item'
     | '/reports/pendency-po'
     | '/invoices/'
     | '/purchase-orders/'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/import-pdf'
     | '/purchase-orders/new'
     | '/purchase-orders/pdf-import-history'
+    | '/reports/pendency-item'
     | '/reports/pendency-po'
     | '/invoices'
     | '/purchase-orders'
@@ -294,6 +306,7 @@ export interface FileRouteTypes {
     | '/_authenticated/purchase-orders/import-pdf'
     | '/_authenticated/purchase-orders/new'
     | '/_authenticated/purchase-orders/pdf-import-history'
+    | '/_authenticated/reports/pendency-item'
     | '/_authenticated/reports/pendency-po'
     | '/_authenticated/invoices/'
     | '/_authenticated/purchase-orders/'
@@ -377,6 +390,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/pendency-po'
       fullPath: '/reports/pendency-po'
       preLoaderRoute: typeof AuthenticatedReportsPendencyPoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports/pendency-item': {
+      id: '/_authenticated/reports/pendency-item'
+      path: '/reports/pendency-item'
+      fullPath: '/reports/pendency-item'
+      preLoaderRoute: typeof AuthenticatedReportsPendencyItemRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/purchase-orders/pdf-import-history': {
@@ -481,6 +501,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchaseOrdersImportPdfRoute: typeof AuthenticatedPurchaseOrdersImportPdfRoute
   AuthenticatedPurchaseOrdersNewRoute: typeof AuthenticatedPurchaseOrdersNewRoute
   AuthenticatedPurchaseOrdersPdfImportHistoryRoute: typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
+  AuthenticatedReportsPendencyItemRoute: typeof AuthenticatedReportsPendencyItemRoute
   AuthenticatedReportsPendencyPoRoute: typeof AuthenticatedReportsPendencyPoRoute
   AuthenticatedInvoicesIndexRoute: typeof AuthenticatedInvoicesIndexRoute
   AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -507,6 +528,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPurchaseOrdersNewRoute: AuthenticatedPurchaseOrdersNewRoute,
   AuthenticatedPurchaseOrdersPdfImportHistoryRoute:
     AuthenticatedPurchaseOrdersPdfImportHistoryRoute,
+  AuthenticatedReportsPendencyItemRoute: AuthenticatedReportsPendencyItemRoute,
   AuthenticatedReportsPendencyPoRoute: AuthenticatedReportsPendencyPoRoute,
   AuthenticatedInvoicesIndexRoute: AuthenticatedInvoicesIndexRoute,
   AuthenticatedPurchaseOrdersIndexRoute: AuthenticatedPurchaseOrdersIndexRoute,
