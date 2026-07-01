@@ -43,6 +43,7 @@ export interface PurchaseOrder {
   deliveryDate: string;
   items: POLineItem[];
   status: "draft" | "open" | "completed";
+  productionStatus: string | null;
   createdAt: string;
   createdBy: string | null;
 }
@@ -129,6 +130,7 @@ type PORow = {
   po_date: string;
   delivery_date: string;
   status: "draft" | "open" | "completed";
+  production_status: string | null;
   created_at: string;
   created_by: string | null;
   purchase_order_items: POItemRow[];
@@ -165,6 +167,7 @@ const toPO = (r: PORow): PurchaseOrder => ({
   poDate: r.po_date,
   deliveryDate: r.delivery_date,
   status: r.status,
+  productionStatus: r.production_status ?? null,
   createdAt: r.created_at,
   createdBy: r.created_by ?? null,
   items: (r.purchase_order_items ?? []).map(toItem),
@@ -399,6 +402,20 @@ export const store = {
     });
     const po = state.purchaseOrders.find((p) => p.id === id);
     void logActivity("Purchase Orders", "EDIT", "PO Status", `${po?.poNumber ?? id} → ${status}`);
+  },
+
+  async updateProductionStatus(id: string, productionStatus: string | null) {
+    const { error } = await supabase
+      .from("purchase_orders")
+      .update({ production_status: productionStatus })
+      .eq("id", id);
+    if (error) throw error;
+    set({
+      ...state,
+      purchaseOrders: state.purchaseOrders.map((p) => (p.id === id ? { ...p, productionStatus } : p)),
+    });
+    const po = state.purchaseOrders.find((p) => p.id === id);
+    void logActivity("Purchase Orders", "EDIT", "Production Status", `${po?.poNumber ?? id} → ${productionStatus ?? "—"}`);
   },
 
   // ---- Invoices ----
