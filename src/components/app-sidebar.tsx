@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,11 @@ const dispatchNav: { to: string; label: string; icon: typeof Plus; exact?: boole
   { to: "/invoices/import", label: "Import Dispatch Excel", icon: Upload },
 ];
 
+const reportsNav: { to: string; label: string; icon: typeof Plus }[] = [
+  { to: "/reports/pendency-po", label: "Pendency (PO Wise)", icon: ClipboardList },
+  { to: "/reports/pendency-item", label: "Pendency (Item Wise)", icon: Package },
+];
+
 const adminNav: { to: string; label: string; icon: typeof Plus }[] = [
   { to: "/admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
   { to: "/admin/user-activity", label: "User Activity", icon: Activity },
@@ -43,6 +48,8 @@ export function AppSidebar() {
   const poActive = pathname === "/purchase-orders" || pathname.startsWith("/purchase-orders/");
   const [dispatchOpen, setDispatchOpen] = useState(true);
   const dispatchActive = pathname === "/invoices" || pathname.startsWith("/invoices/");
+  const [reportsOpen, setReportsOpen] = useState(true);
+  const reportsActive = pathname.startsWith("/reports/");
   const [adminOpen, setAdminOpen] = useState(true);
   const adminActive = pathname.startsWith("/admin/");
   const isAdmin = user?.role === "admin";
@@ -135,6 +142,42 @@ export function AppSidebar() {
               const active = item.exact
                 ? pathname === item.to
                 : pathname === item.to || pathname.startsWith(item.to + "/");
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setReportsOpen((o) => !o)}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+            reportsActive
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          }`}
+        >
+          <BarChart3 className="h-4 w-4" />
+          <span className="flex-1 text-left">Reports</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${reportsOpen ? "" : "-rotate-90"}`} />
+        </button>
+        {reportsOpen && (
+          <div className="ml-3 pl-3 border-l border-sidebar-border space-y-1">
+            {reportsNav.map((item) => {
+              const active = pathname === item.to;
               const Icon = item.icon;
               return (
                 <Link
