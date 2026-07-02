@@ -24,6 +24,7 @@ export function exportPOsToExcel(
       Color: i?.color ?? "",
       UOM: i?.uom ?? "",
       "Actual Qty": i?.quantity ?? 0,
+      Rate: i?.rate ?? 0,
     })),
   );
   const ws = XLSX.utils.json_to_sheet(data);
