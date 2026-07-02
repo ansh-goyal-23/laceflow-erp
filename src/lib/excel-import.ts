@@ -15,6 +15,7 @@ export interface ImportRow {
   color: string;
   uom: string;
   quantity: number;
+  rate: number;
   errors: string[];
 }
 
@@ -51,6 +52,8 @@ const HEADER_MAP: Record<string, keyof Omit<ImportRow, "rowNumber" | "errors">> 
   actualqty: "quantity",
   qty: "quantity",
   quantity: "quantity",
+  rate: "rate",
+  price: "rate",
 };
 
 function normHeader(s: string) {
@@ -138,6 +141,10 @@ export async function parseExcel(file: File): Promise<ParseResult> {
         const n = num(get("quantity"));
         return isNaN(n) ? 0 : n;
       })(),
+      rate: (() => {
+        const n = num(get("rate"));
+        return isNaN(n) ? 0 : n;
+      })(),
       errors: [],
     };
     if (!row.client) row.errors.push("Missing Client");
@@ -176,6 +183,7 @@ export function downloadFailedRows(rows: ImportRow[], fileName = "failed_rows.xl
     Color: r.color,
     UOM: r.uom,
     "Actual Qty": r.quantity,
+    Rate: r.rate,
     Errors: r.errors.join("; "),
   }));
   const ws = XLSX.utils.json_to_sheet(data);
