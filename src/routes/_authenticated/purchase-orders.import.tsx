@@ -129,7 +129,7 @@ function ImportExcelPage() {
             color: i.color,
             uom: i.uom,
             quantity: i.quantity,
-            rate: 0,
+            rate: i.rate ?? 0,
           }));
 
           const existing = bulkImport.findPOByNumber(sample.poNumber, clientId);
@@ -237,7 +237,7 @@ function ImportExcelPage() {
             <div className="mt-6 text-sm text-muted-foreground">
               <div className="font-medium text-foreground mb-2">Expected columns:</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
-                {["Brand","Client","P.O Order","P.O Date","Delivery date","Article Code","Lace Type","Material Type","Width","Length","Color","UOM","Actual Qty"].map((c) => (
+                {["Brand","Client","P.O Order","P.O Date","Delivery date","Article Code","Lace Type","Material Type","Width","Length","Color","UOM","Actual Qty","Rate"].map((c) => (
                   <div key={c}>• {c}</div>
                 ))}
               </div>
@@ -347,6 +347,7 @@ function ImportExcelPage() {
                       <TableHead>Color</TableHead>
                       <TableHead>UOM</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -362,6 +363,7 @@ function ImportExcelPage() {
                         <TableCell>{r.color || "—"}</TableCell>
                         <TableCell>{r.uom}</TableCell>
                         <TableCell className="text-right">{r.quantity || "—"}</TableCell>
+                        <TableCell className="text-right">{r.rate || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
