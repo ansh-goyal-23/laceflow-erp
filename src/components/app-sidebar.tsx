@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,14 @@ const reportsNav: { to: string; label: string; icon: typeof Plus }[] = [
   { to: "/reports/pendency-item", label: "Pendency (Item Wise)", icon: Package },
 ];
 
+const yarnNav: { to: string; label: string; icon: typeof Plus }[] = [
+  { to: "/yarn/suppliers", label: "Supplier Master", icon: Users },
+  { to: "/yarn/shades", label: "Shade Library", icon: Palette },
+  { to: "/yarn/sample-orders", label: "Sample Yarn Orders", icon: Beaker },
+  { to: "/yarn/production-orders", label: "Production Yarn Orders", icon: Boxes },
+  { to: "/yarn/receipts", label: "Yarn Receipts", icon: PackageCheck },
+];
+
 const adminNav: { to: string; label: string; icon: typeof Plus }[] = [
   { to: "/admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
   { to: "/admin/user-activity", label: "User Activity", icon: Activity },
@@ -50,6 +58,8 @@ export function AppSidebar() {
   const dispatchActive = pathname === "/invoices" || pathname.startsWith("/invoices/");
   const [reportsOpen, setReportsOpen] = useState(true);
   const reportsActive = pathname.startsWith("/reports/");
+  const [yarnOpen, setYarnOpen] = useState(true);
+  const yarnActive = pathname.startsWith("/yarn/");
   const [adminOpen, setAdminOpen] = useState(true);
   const adminActive = pathname.startsWith("/admin/");
   const isAdmin = user?.role === "admin";
@@ -178,6 +188,42 @@ export function AppSidebar() {
           <div className="ml-3 pl-3 border-l border-sidebar-border space-y-1">
             {reportsNav.map((item) => {
               const active = pathname === item.to;
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setYarnOpen((o) => !o)}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+            yarnActive
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          }`}
+        >
+          <Palette className="h-4 w-4" />
+          <span className="flex-1 text-left">Yarn Management</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${yarnOpen ? "" : "-rotate-90"}`} />
+        </button>
+        {yarnOpen && (
+          <div className="ml-3 pl-3 border-l border-sidebar-border space-y-1">
+            {yarnNav.map((item) => {
+              const active = pathname === item.to || pathname.startsWith(item.to + "/");
               const Icon = item.icon;
               return (
                 <Link

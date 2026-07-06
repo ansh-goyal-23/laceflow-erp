@@ -18,6 +18,8 @@ import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAiLearningRouteImport } from './routes/_authenticated/ai-learning'
 import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_authenticated/purchase-orders.index'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
+import { Route as AuthenticatedYarnSuppliersRouteImport } from './routes/_authenticated/yarn.suppliers'
+import { Route as AuthenticatedYarnShadesRouteImport } from './routes/_authenticated/yarn.shades'
 import { Route as AuthenticatedReportsPendencyPoRouteImport } from './routes/_authenticated/reports.pendency-po'
 import { Route as AuthenticatedReportsPendencyItemRouteImport } from './routes/_authenticated/reports.pendency-item'
 import { Route as AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.pdf-import-history'
@@ -30,6 +32,14 @@ import { Route as AuthenticatedInvoicesImportRouteImport } from './routes/_authe
 import { Route as AuthenticatedAdminUserActivityRouteImport } from './routes/_authenticated/admin.user-activity'
 import { Route as AuthenticatedAdminDailyReportRouteImport } from './routes/_authenticated/admin.daily-report'
 import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin.audit-logs'
+import { Route as AuthenticatedYarnSampleOrdersIndexRouteImport } from './routes/_authenticated/yarn.sample-orders.index'
+import { Route as AuthenticatedYarnReceiptsIndexRouteImport } from './routes/_authenticated/yarn.receipts.index'
+import { Route as AuthenticatedYarnProductionOrdersIndexRouteImport } from './routes/_authenticated/yarn.production-orders.index'
+import { Route as AuthenticatedYarnSampleOrdersNewRouteImport } from './routes/_authenticated/yarn.sample-orders.new'
+import { Route as AuthenticatedYarnSampleOrdersIdRouteImport } from './routes/_authenticated/yarn.sample-orders.$id'
+import { Route as AuthenticatedYarnReceiptsNewRouteImport } from './routes/_authenticated/yarn.receipts.new'
+import { Route as AuthenticatedYarnProductionOrdersNewRouteImport } from './routes/_authenticated/yarn.production-orders.new'
+import { Route as AuthenticatedYarnProductionOrdersIdRouteImport } from './routes/_authenticated/yarn.production-orders.$id'
 import { Route as AuthenticatedPurchaseOrdersIdEditRouteImport } from './routes/_authenticated/purchase-orders.$id.edit'
 import { Route as AuthenticatedInvoicesIdEditRouteImport } from './routes/_authenticated/invoices.$id.edit'
 
@@ -79,6 +89,17 @@ const AuthenticatedInvoicesIndexRoute =
     path: '/invoices/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedYarnSuppliersRoute =
+  AuthenticatedYarnSuppliersRouteImport.update({
+    id: '/yarn/suppliers',
+    path: '/yarn/suppliers',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnShadesRoute = AuthenticatedYarnShadesRouteImport.update({
+  id: '/yarn/shades',
+  path: '/yarn/shades',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsPendencyPoRoute =
   AuthenticatedReportsPendencyPoRouteImport.update({
     id: '/reports/pendency-po',
@@ -151,6 +172,54 @@ const AuthenticatedAdminAuditLogsRoute =
     path: '/admin/audit-logs',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedYarnSampleOrdersIndexRoute =
+  AuthenticatedYarnSampleOrdersIndexRouteImport.update({
+    id: '/yarn/sample-orders/',
+    path: '/yarn/sample-orders/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnReceiptsIndexRoute =
+  AuthenticatedYarnReceiptsIndexRouteImport.update({
+    id: '/yarn/receipts/',
+    path: '/yarn/receipts/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnProductionOrdersIndexRoute =
+  AuthenticatedYarnProductionOrdersIndexRouteImport.update({
+    id: '/yarn/production-orders/',
+    path: '/yarn/production-orders/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnSampleOrdersNewRoute =
+  AuthenticatedYarnSampleOrdersNewRouteImport.update({
+    id: '/yarn/sample-orders/new',
+    path: '/yarn/sample-orders/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnSampleOrdersIdRoute =
+  AuthenticatedYarnSampleOrdersIdRouteImport.update({
+    id: '/yarn/sample-orders/$id',
+    path: '/yarn/sample-orders/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnReceiptsNewRoute =
+  AuthenticatedYarnReceiptsNewRouteImport.update({
+    id: '/yarn/receipts/new',
+    path: '/yarn/receipts/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnProductionOrdersNewRoute =
+  AuthenticatedYarnProductionOrdersNewRouteImport.update({
+    id: '/yarn/production-orders/new',
+    path: '/yarn/production-orders/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedYarnProductionOrdersIdRoute =
+  AuthenticatedYarnProductionOrdersIdRouteImport.update({
+    id: '/yarn/production-orders/$id',
+    path: '/yarn/production-orders/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPurchaseOrdersIdEditRoute =
   AuthenticatedPurchaseOrdersIdEditRouteImport.update({
     id: '/purchase-orders/$id/edit',
@@ -183,10 +252,20 @@ export interface FileRoutesByFullPath {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/yarn/shades': typeof AuthenticatedYarnShadesRoute
+  '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
+  '/yarn/production-orders/$id': typeof AuthenticatedYarnProductionOrdersIdRoute
+  '/yarn/production-orders/new': typeof AuthenticatedYarnProductionOrdersNewRoute
+  '/yarn/receipts/new': typeof AuthenticatedYarnReceiptsNewRoute
+  '/yarn/sample-orders/$id': typeof AuthenticatedYarnSampleOrdersIdRoute
+  '/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
+  '/yarn/production-orders/': typeof AuthenticatedYarnProductionOrdersIndexRoute
+  '/yarn/receipts/': typeof AuthenticatedYarnReceiptsIndexRoute
+  '/yarn/sample-orders/': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -207,10 +286,20 @@ export interface FileRoutesByTo {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/yarn/shades': typeof AuthenticatedYarnShadesRoute
+  '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
+  '/yarn/production-orders/$id': typeof AuthenticatedYarnProductionOrdersIdRoute
+  '/yarn/production-orders/new': typeof AuthenticatedYarnProductionOrdersNewRoute
+  '/yarn/receipts/new': typeof AuthenticatedYarnReceiptsNewRoute
+  '/yarn/sample-orders/$id': typeof AuthenticatedYarnSampleOrdersIdRoute
+  '/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
+  '/yarn/production-orders': typeof AuthenticatedYarnProductionOrdersIndexRoute
+  '/yarn/receipts': typeof AuthenticatedYarnReceiptsIndexRoute
+  '/yarn/sample-orders': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -233,10 +322,20 @@ export interface FileRoutesById {
   '/_authenticated/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/_authenticated/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/_authenticated/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/_authenticated/yarn/shades': typeof AuthenticatedYarnShadesRoute
+  '/_authenticated/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/_authenticated/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/_authenticated/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
+  '/_authenticated/yarn/production-orders/$id': typeof AuthenticatedYarnProductionOrdersIdRoute
+  '/_authenticated/yarn/production-orders/new': typeof AuthenticatedYarnProductionOrdersNewRoute
+  '/_authenticated/yarn/receipts/new': typeof AuthenticatedYarnReceiptsNewRoute
+  '/_authenticated/yarn/sample-orders/$id': typeof AuthenticatedYarnSampleOrdersIdRoute
+  '/_authenticated/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
+  '/_authenticated/yarn/production-orders/': typeof AuthenticatedYarnProductionOrdersIndexRoute
+  '/_authenticated/yarn/receipts/': typeof AuthenticatedYarnReceiptsIndexRoute
+  '/_authenticated/yarn/sample-orders/': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -259,10 +358,20 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/yarn/shades'
+    | '/yarn/suppliers'
     | '/invoices/'
     | '/purchase-orders/'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
+    | '/yarn/production-orders/$id'
+    | '/yarn/production-orders/new'
+    | '/yarn/receipts/new'
+    | '/yarn/sample-orders/$id'
+    | '/yarn/sample-orders/new'
+    | '/yarn/production-orders/'
+    | '/yarn/receipts/'
+    | '/yarn/sample-orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -283,10 +392,20 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/yarn/shades'
+    | '/yarn/suppliers'
     | '/invoices'
     | '/purchase-orders'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
+    | '/yarn/production-orders/$id'
+    | '/yarn/production-orders/new'
+    | '/yarn/receipts/new'
+    | '/yarn/sample-orders/$id'
+    | '/yarn/sample-orders/new'
+    | '/yarn/production-orders'
+    | '/yarn/receipts'
+    | '/yarn/sample-orders'
   id:
     | '__root__'
     | '/'
@@ -308,10 +427,20 @@ export interface FileRouteTypes {
     | '/_authenticated/purchase-orders/pdf-import-history'
     | '/_authenticated/reports/pendency-item'
     | '/_authenticated/reports/pendency-po'
+    | '/_authenticated/yarn/shades'
+    | '/_authenticated/yarn/suppliers'
     | '/_authenticated/invoices/'
     | '/_authenticated/purchase-orders/'
     | '/_authenticated/invoices/$id/edit'
     | '/_authenticated/purchase-orders/$id/edit'
+    | '/_authenticated/yarn/production-orders/$id'
+    | '/_authenticated/yarn/production-orders/new'
+    | '/_authenticated/yarn/receipts/new'
+    | '/_authenticated/yarn/sample-orders/$id'
+    | '/_authenticated/yarn/sample-orders/new'
+    | '/_authenticated/yarn/production-orders/'
+    | '/_authenticated/yarn/receipts/'
+    | '/_authenticated/yarn/sample-orders/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -383,6 +512,20 @@ declare module '@tanstack/react-router' {
       path: '/invoices'
       fullPath: '/invoices/'
       preLoaderRoute: typeof AuthenticatedInvoicesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/suppliers': {
+      id: '/_authenticated/yarn/suppliers'
+      path: '/yarn/suppliers'
+      fullPath: '/yarn/suppliers'
+      preLoaderRoute: typeof AuthenticatedYarnSuppliersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/shades': {
+      id: '/_authenticated/yarn/shades'
+      path: '/yarn/shades'
+      fullPath: '/yarn/shades'
+      preLoaderRoute: typeof AuthenticatedYarnShadesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports/pendency-po': {
@@ -469,6 +612,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAuditLogsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/yarn/sample-orders/': {
+      id: '/_authenticated/yarn/sample-orders/'
+      path: '/yarn/sample-orders'
+      fullPath: '/yarn/sample-orders/'
+      preLoaderRoute: typeof AuthenticatedYarnSampleOrdersIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/receipts/': {
+      id: '/_authenticated/yarn/receipts/'
+      path: '/yarn/receipts'
+      fullPath: '/yarn/receipts/'
+      preLoaderRoute: typeof AuthenticatedYarnReceiptsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/production-orders/': {
+      id: '/_authenticated/yarn/production-orders/'
+      path: '/yarn/production-orders'
+      fullPath: '/yarn/production-orders/'
+      preLoaderRoute: typeof AuthenticatedYarnProductionOrdersIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/sample-orders/new': {
+      id: '/_authenticated/yarn/sample-orders/new'
+      path: '/yarn/sample-orders/new'
+      fullPath: '/yarn/sample-orders/new'
+      preLoaderRoute: typeof AuthenticatedYarnSampleOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/sample-orders/$id': {
+      id: '/_authenticated/yarn/sample-orders/$id'
+      path: '/yarn/sample-orders/$id'
+      fullPath: '/yarn/sample-orders/$id'
+      preLoaderRoute: typeof AuthenticatedYarnSampleOrdersIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/receipts/new': {
+      id: '/_authenticated/yarn/receipts/new'
+      path: '/yarn/receipts/new'
+      fullPath: '/yarn/receipts/new'
+      preLoaderRoute: typeof AuthenticatedYarnReceiptsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/production-orders/new': {
+      id: '/_authenticated/yarn/production-orders/new'
+      path: '/yarn/production-orders/new'
+      fullPath: '/yarn/production-orders/new'
+      preLoaderRoute: typeof AuthenticatedYarnProductionOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/production-orders/$id': {
+      id: '/_authenticated/yarn/production-orders/$id'
+      path: '/yarn/production-orders/$id'
+      fullPath: '/yarn/production-orders/$id'
+      preLoaderRoute: typeof AuthenticatedYarnProductionOrdersIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/purchase-orders/$id/edit': {
       id: '/_authenticated/purchase-orders/$id/edit'
       path: '/purchase-orders/$id/edit'
@@ -503,10 +702,20 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchaseOrdersPdfImportHistoryRoute: typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   AuthenticatedReportsPendencyItemRoute: typeof AuthenticatedReportsPendencyItemRoute
   AuthenticatedReportsPendencyPoRoute: typeof AuthenticatedReportsPendencyPoRoute
+  AuthenticatedYarnShadesRoute: typeof AuthenticatedYarnShadesRoute
+  AuthenticatedYarnSuppliersRoute: typeof AuthenticatedYarnSuppliersRoute
   AuthenticatedInvoicesIndexRoute: typeof AuthenticatedInvoicesIndexRoute
   AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
   AuthenticatedInvoicesIdEditRoute: typeof AuthenticatedInvoicesIdEditRoute
   AuthenticatedPurchaseOrdersIdEditRoute: typeof AuthenticatedPurchaseOrdersIdEditRoute
+  AuthenticatedYarnProductionOrdersIdRoute: typeof AuthenticatedYarnProductionOrdersIdRoute
+  AuthenticatedYarnProductionOrdersNewRoute: typeof AuthenticatedYarnProductionOrdersNewRoute
+  AuthenticatedYarnReceiptsNewRoute: typeof AuthenticatedYarnReceiptsNewRoute
+  AuthenticatedYarnSampleOrdersIdRoute: typeof AuthenticatedYarnSampleOrdersIdRoute
+  AuthenticatedYarnSampleOrdersNewRoute: typeof AuthenticatedYarnSampleOrdersNewRoute
+  AuthenticatedYarnProductionOrdersIndexRoute: typeof AuthenticatedYarnProductionOrdersIndexRoute
+  AuthenticatedYarnReceiptsIndexRoute: typeof AuthenticatedYarnReceiptsIndexRoute
+  AuthenticatedYarnSampleOrdersIndexRoute: typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -530,11 +739,25 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedPurchaseOrdersPdfImportHistoryRoute,
   AuthenticatedReportsPendencyItemRoute: AuthenticatedReportsPendencyItemRoute,
   AuthenticatedReportsPendencyPoRoute: AuthenticatedReportsPendencyPoRoute,
+  AuthenticatedYarnShadesRoute: AuthenticatedYarnShadesRoute,
+  AuthenticatedYarnSuppliersRoute: AuthenticatedYarnSuppliersRoute,
   AuthenticatedInvoicesIndexRoute: AuthenticatedInvoicesIndexRoute,
   AuthenticatedPurchaseOrdersIndexRoute: AuthenticatedPurchaseOrdersIndexRoute,
   AuthenticatedInvoicesIdEditRoute: AuthenticatedInvoicesIdEditRoute,
   AuthenticatedPurchaseOrdersIdEditRoute:
     AuthenticatedPurchaseOrdersIdEditRoute,
+  AuthenticatedYarnProductionOrdersIdRoute:
+    AuthenticatedYarnProductionOrdersIdRoute,
+  AuthenticatedYarnProductionOrdersNewRoute:
+    AuthenticatedYarnProductionOrdersNewRoute,
+  AuthenticatedYarnReceiptsNewRoute: AuthenticatedYarnReceiptsNewRoute,
+  AuthenticatedYarnSampleOrdersIdRoute: AuthenticatedYarnSampleOrdersIdRoute,
+  AuthenticatedYarnSampleOrdersNewRoute: AuthenticatedYarnSampleOrdersNewRoute,
+  AuthenticatedYarnProductionOrdersIndexRoute:
+    AuthenticatedYarnProductionOrdersIndexRoute,
+  AuthenticatedYarnReceiptsIndexRoute: AuthenticatedYarnReceiptsIndexRoute,
+  AuthenticatedYarnSampleOrdersIndexRoute:
+    AuthenticatedYarnSampleOrdersIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
