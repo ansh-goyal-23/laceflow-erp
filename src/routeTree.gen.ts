@@ -33,6 +33,7 @@ import { Route as AuthenticatedAdminUserActivityRouteImport } from './routes/_au
 import { Route as AuthenticatedAdminDailyReportRouteImport } from './routes/_authenticated/admin.daily-report'
 import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin.audit-logs'
 import { Route as AuthenticatedYarnSampleOrdersIndexRouteImport } from './routes/_authenticated/yarn.sample-orders.index'
+import { Route as AuthenticatedYarnSampleOrdersNewRouteImport } from './routes/_authenticated/yarn.sample-orders.new'
 import { Route as AuthenticatedPurchaseOrdersIdEditRouteImport } from './routes/_authenticated/purchase-orders.$id.edit'
 import { Route as AuthenticatedInvoicesIdEditRouteImport } from './routes/_authenticated/invoices.$id.edit'
 
@@ -171,6 +172,12 @@ const AuthenticatedYarnSampleOrdersIndexRoute =
     path: '/yarn/sample-orders/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedYarnSampleOrdersNewRoute =
+  AuthenticatedYarnSampleOrdersNewRouteImport.update({
+    id: '/yarn/sample-orders/new',
+    path: '/yarn/sample-orders/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPurchaseOrdersIdEditRoute =
   AuthenticatedPurchaseOrdersIdEditRouteImport.update({
     id: '/purchase-orders/$id/edit',
@@ -209,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
+  '/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
   '/yarn/sample-orders/': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -236,6 +244,7 @@ export interface FileRoutesByTo {
   '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
+  '/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
   '/yarn/sample-orders': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRoutesById {
@@ -265,6 +274,7 @@ export interface FileRoutesById {
   '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/_authenticated/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/_authenticated/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
+  '/_authenticated/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
   '/_authenticated/yarn/sample-orders/': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRouteTypes {
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
+    | '/yarn/sample-orders/new'
     | '/yarn/sample-orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -321,6 +332,7 @@ export interface FileRouteTypes {
     | '/purchase-orders'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
+    | '/yarn/sample-orders/new'
     | '/yarn/sample-orders'
   id:
     | '__root__'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
     | '/_authenticated/purchase-orders/'
     | '/_authenticated/invoices/$id/edit'
     | '/_authenticated/purchase-orders/$id/edit'
+    | '/_authenticated/yarn/sample-orders/new'
     | '/_authenticated/yarn/sample-orders/'
   fileRoutesById: FileRoutesById
 }
@@ -528,6 +541,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedYarnSampleOrdersIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/yarn/sample-orders/new': {
+      id: '/_authenticated/yarn/sample-orders/new'
+      path: '/yarn/sample-orders/new'
+      fullPath: '/yarn/sample-orders/new'
+      preLoaderRoute: typeof AuthenticatedYarnSampleOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/purchase-orders/$id/edit': {
       id: '/_authenticated/purchase-orders/$id/edit'
       path: '/purchase-orders/$id/edit'
@@ -568,6 +588,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
   AuthenticatedInvoicesIdEditRoute: typeof AuthenticatedInvoicesIdEditRoute
   AuthenticatedPurchaseOrdersIdEditRoute: typeof AuthenticatedPurchaseOrdersIdEditRoute
+  AuthenticatedYarnSampleOrdersNewRoute: typeof AuthenticatedYarnSampleOrdersNewRoute
   AuthenticatedYarnSampleOrdersIndexRoute: typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 
@@ -599,6 +620,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInvoicesIdEditRoute: AuthenticatedInvoicesIdEditRoute,
   AuthenticatedPurchaseOrdersIdEditRoute:
     AuthenticatedPurchaseOrdersIdEditRoute,
+  AuthenticatedYarnSampleOrdersNewRoute: AuthenticatedYarnSampleOrdersNewRoute,
   AuthenticatedYarnSampleOrdersIndexRoute:
     AuthenticatedYarnSampleOrdersIndexRoute,
 }
