@@ -304,36 +304,7 @@ function POList() {
                 <Field label="Delivery Date" value={viewing.deliveryDate} />
               </div>
               <div className="overflow-x-auto border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Lace</TableHead>
-                      <TableHead>Material</TableHead>
-                      <TableHead>Color</TableHead>
-                      <TableHead>W (mm) × L (cm)</TableHead>
-                      <TableHead>UOM</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {viewing.items.map((i) => (
-                      <TableRow key={i.id}>
-                        <TableCell>{i.articleCode || "—"}</TableCell>
-                        <TableCell>{i.laceType || "—"}</TableCell>
-                        <TableCell>{i.materialType || "—"}</TableCell>
-                        <TableCell>{i.color || "—"}</TableCell>
-                        <TableCell>{[i.width, i.length].filter(Boolean).join(" × ") || "—"}</TableCell>
-                        <TableCell>{i.uom}</TableCell>
-                        <TableCell className="text-right">{i.quantity}</TableCell>
-                        <TableCell className="text-right">{i.rate}</TableCell>
-                        <TableCell className="text-right font-medium">{(i.quantity * i.rate).toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <POItemsView items={viewing.items} />
               </div>
               <div className="flex justify-end text-sm gap-2">
                 <div className="bg-muted px-4 py-2 rounded-md">
