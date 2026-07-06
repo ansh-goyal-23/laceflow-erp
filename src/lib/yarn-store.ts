@@ -1,5 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import type { PurchaseOrder, POLineItem } from "@/lib/store";
+import { supabase } from "@/integrations/supabase/client";
 
 // ============================================================================
 // Types
@@ -141,10 +142,8 @@ export interface StoreShape {
 }
 
 // ============================================================================
-// Persistence
+// Persistence (Supabase-backed with in-memory cache)
 // ============================================================================
-
-const LS_KEY = "shreelace.yarn.v1";
 
 const empty: StoreShape = {
   suppliers: [],
@@ -155,45 +154,17 @@ const empty: StoreShape = {
   overrides: {},
 };
 
-function loadInitial(): StoreShape {
-  if (typeof window === "undefined") return empty;
-  try {
-    const raw = window.localStorage.getItem(LS_KEY);
-    if (!raw) return empty;
-    const parsed = JSON.parse(raw) as Partial<StoreShape>;
-    return { ...empty, ...parsed };
-  } catch {
-    return empty;
-  }
-}
-
-let state: StoreShape = loadInitial();
+let state: StoreShape = empty;
 const listeners = new Set<() => void>();
-
-function persist() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LS_KEY, JSON.stringify(state));
-  } catch {
-    /* ignore */
-  }
-}
 
 function set(next: StoreShape) {
   state = next;
-  persist();
   listeners.forEach((l) => l());
 }
 
 function subscribe(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
-}
-
-function uid() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 function todayISO() {
@@ -214,90 +185,310 @@ function nextNumberInternal(prefix: string, existing: { number: string }[]): str
 }
 
 // ============================================================================
+// Row → domain mappers (snake_case DB ↔ camelCase TS)
+// ============================================================================
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+function mapSupplier(r: any): YarnSupplier {
+  return {
+    id: r.id,
+    name: r.name,
+    contactPerson: r.contact_person ?? "",
+    mobile: r.mobile ?? "",
+    email: r.email ?? "",
+    address: r.address ?? "",
+    gst: r.gst ?? "",
+    remarks: r.remarks ?? "",
+    active: !!r.active,
+    createdAt: r.created_at,
+  };
+}
+
+function mapShade(r: any): YarnShade {
+  return {
+    id: r.id,
+    clientId: r.client_id,
+    brandId: r.brand_id,
+    colorName: r.color_name,
+    material: r.material,
+    supplierId: r.supplier_id,
+    supplierShadeNumber: r.supplier_shade_number,
+    approvalDate: r.approval_date,
+    status: r.status,
+    remarks: r.remarks ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+function mapSampleItem(r: any): SampleYarnOrderItem {
+  return {
+    id: r.id,
+    clientId: r.client_id,
+    brandId: r.brand_id,
+    colorName: r.color_name,
+    material: r.material,
+    approxQty: Number(r.approx_qty) || 0,
+    swatchUrl: r.swatch_url ?? undefined,
+    pantone: r.pantone ?? undefined,
+    remarks: r.remarks ?? undefined,
+    approvalStatus: r.approval_status,
+    approvedShadeId: r.approved_shade_id ?? null,
+    approvedAt: r.approved_at ?? null,
+  };
+}
+
+function mapSampleReceipt(r: any): SampleYarnReceipt {
+  return {
+    id: r.id,
+    receiptDate: r.receipt_date,
+    supplierShadeNumber: r.supplier_shade_number ?? "",
+    lotNumber: r.lot_number ?? undefined,
+    grossWeight: Number(r.gross_weight) || 0,
+    cones: Number(r.cones) || 0,
+    remarks: r.remarks ?? undefined,
+  };
+}
+
+function mapProdItem(r: any): ProductionYarnOrderItem {
+  return {
+    id: r.id,
+    poId: r.po_id,
+    poItemId: r.po_item_id ?? null,
+    clientId: r.client_id,
+    brandId: r.brand_id,
+    material: r.material,
+    colorName: r.color_name,
+    orderedQty: Number(r.ordered_qty) || 0,
+    receivedQty: Number(r.received_qty) || 0,
+    approvedShadeId: r.approved_shade_id ?? null,
+    supplierShadeNumber: r.supplier_shade_number ?? "",
+  };
+}
+
+function mapAllocation(r: any): YarnReceiptAllocation {
+  return { id: r.id, prodOrderItemId: r.prod_order_item_id, qty: Number(r.qty) || 0 };
+}
+
+function computeProdStatus(o: ProductionYarnOrder): ProductionOrderStatus {
+  if (o.status === "cancelled") return "cancelled";
+  const total = o.items.reduce((s, i) => s + i.orderedQty, 0);
+  const recv = o.items.reduce((s, i) => s + i.receivedQty, 0);
+  if (recv <= 0.0001) return "ordered";
+  if (recv + 0.0001 >= total) return "received";
+  return "partially_received";
+}
+
+// ============================================================================
+// Hydration
+// ============================================================================
+
+let hydrated = false;
+let hydrating: Promise<void> | null = null;
+
+async function hydrate(): Promise<void> {
+  if (hydrating) return hydrating;
+  hydrating = (async () => {
+    const [sup, sh, so, soi, sr, po, poi, rc, ra, ov] = await Promise.all([
+      supabase.from("yarn_suppliers").select("*").order("name"),
+      supabase.from("yarn_shades").select("*").order("created_at", { ascending: false }),
+      supabase.from("yarn_sample_orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("yarn_sample_order_items").select("*"),
+      supabase.from("yarn_sample_receipts").select("*"),
+      supabase.from("yarn_production_orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("yarn_production_order_items").select("*"),
+      supabase.from("yarn_receipts").select("*").order("created_at", { ascending: false }),
+      supabase.from("yarn_receipt_allocations").select("*"),
+      supabase.from("yarn_po_item_overrides").select("*"),
+    ]);
+
+    const errs = [sup, sh, so, soi, sr, po, poi, rc, ra, ov]
+      .map((r) => r.error).filter(Boolean);
+    if (errs.length) {
+      console.error("[yarn-store] hydrate errors:", errs);
+    }
+
+    const itemsByOrder = new Map<string, SampleYarnOrderItem[]>();
+    for (const r of soi.data ?? []) {
+      const it = mapSampleItem(r);
+      const arr = itemsByOrder.get(r.order_id) ?? [];
+      arr.push(it); itemsByOrder.set(r.order_id, arr);
+    }
+    const recByOrder = new Map<string, SampleYarnReceipt[]>();
+    for (const r of sr.data ?? []) {
+      const it = mapSampleReceipt(r);
+      const arr = recByOrder.get(r.order_id) ?? [];
+      arr.push(it); recByOrder.set(r.order_id, arr);
+    }
+    const sampleOrders: SampleYarnOrder[] = (so.data ?? []).map((r: any) => ({
+      id: r.id,
+      number: r.number,
+      orderDate: r.order_date,
+      supplierId: r.supplier_id,
+      linkedPoId: r.linked_po_id ?? null,
+      remarks: r.remarks ?? undefined,
+      status: r.status,
+      items: itemsByOrder.get(r.id) ?? [],
+      receipts: recByOrder.get(r.id) ?? [],
+      createdAt: r.created_at,
+    }));
+
+    const prodItemsByOrder = new Map<string, ProductionYarnOrderItem[]>();
+    for (const r of poi.data ?? []) {
+      const it = mapProdItem(r);
+      const arr = prodItemsByOrder.get(r.order_id) ?? [];
+      arr.push(it); prodItemsByOrder.set(r.order_id, arr);
+    }
+    const productionOrders: ProductionYarnOrder[] = (po.data ?? []).map((r: any) => {
+      const items = prodItemsByOrder.get(r.id) ?? [];
+      const base: ProductionYarnOrder = {
+        id: r.id,
+        number: r.number,
+        orderDate: r.order_date,
+        supplierId: r.supplier_id,
+        remarks: r.remarks ?? undefined,
+        status: r.status,
+        items,
+        createdAt: r.created_at,
+      };
+      return { ...base, status: computeProdStatus(base) };
+    });
+
+    const allocByReceipt = new Map<string, YarnReceiptAllocation[]>();
+    for (const r of ra.data ?? []) {
+      const it = mapAllocation(r);
+      const arr = allocByReceipt.get(r.receipt_id) ?? [];
+      arr.push(it); allocByReceipt.set(r.receipt_id, arr);
+    }
+    const receipts: YarnReceipt[] = (rc.data ?? []).map((r: any) => ({
+      id: r.id,
+      receiptDate: r.receipt_date,
+      supplierId: r.supplier_id,
+      supplierShadeNumber: r.supplier_shade_number,
+      lotNumber: r.lot_number ?? undefined,
+      grossWeight: Number(r.gross_weight) || 0,
+      cones: Number(r.cones) || 0,
+      unallocatedQty: Number(r.unallocated_qty) || 0,
+      remarks: r.remarks ?? undefined,
+      allocations: allocByReceipt.get(r.id) ?? [],
+      createdAt: r.created_at,
+    }));
+
+    const overrides: Record<string, PoItemOverride> = {};
+    for (const r of ov.data ?? []) overrides[r.po_item_id] = r.override;
+
+    set({
+      suppliers: (sup.data ?? []).map(mapSupplier),
+      shades: (sh.data ?? []).map(mapShade),
+      sampleOrders,
+      productionOrders,
+      receipts,
+      overrides,
+    });
+    hydrated = true;
+  })().finally(() => { hydrating = null; });
+  return hydrating!;
+}
+
+function throwIfError<T>(res: { data: T | null; error: { message: string } | null }): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data as T;
+}
+
+// ============================================================================
 // Store API
 // ============================================================================
 
-function refreshProdOrderStatus(orderId: string) {
-  const o = state.productionOrders.find((x) => x.id === orderId);
-  if (!o) return;
-  const total = o.items.reduce((s, i) => s + i.orderedQty, 0);
-  const recv = o.items.reduce((s, i) => s + i.receivedQty, 0);
-  let status: ProductionOrderStatus = o.status;
-  if (o.status === "cancelled") return;
-  if (recv <= 0.0001) status = "ordered";
-  else if (recv + 0.0001 >= total) status = "received";
-  else status = "partially_received";
-  if (status !== o.status) {
-    state = {
-      ...state,
-      productionOrders: state.productionOrders.map((x) => (x.id === orderId ? { ...x, status } : x)),
-    };
-  }
+async function refresh() {
+  hydrated = false;
+  await hydrate();
 }
 
-function applyReceipt(receipt: YarnReceipt) {
-  const patchMap = new Map<string, number>();
-  for (const a of receipt.allocations) {
-    patchMap.set(a.prodOrderItemId, (patchMap.get(a.prodOrderItemId) ?? 0) + a.qty);
-  }
-  state = {
-    ...state,
-    receipts: [receipt, ...state.receipts],
-    productionOrders: state.productionOrders.map((o) => ({
-      ...o,
-      items: o.items.map((i) =>
-        patchMap.has(i.id) ? { ...i, receivedQty: (i.receivedQty || 0) + (patchMap.get(i.id) ?? 0) } : i,
-      ),
-    })),
-  };
-  for (const [itemId] of patchMap) {
-    const order = state.productionOrders.find((o) => o.items.some((i) => i.id === itemId));
-    if (order) refreshProdOrderStatus(order.id);
-  }
-  persist();
-  listeners.forEach((l) => l());
+async function persistProdReceivedQty(prodOrderItemId: string, delta: number) {
+  const row = throwIfError(
+    await supabase
+      .from("yarn_production_order_items")
+      .select("received_qty")
+      .eq("id", prodOrderItemId)
+      .single(),
+  ) as { received_qty: number };
+  const next = Math.max(0, Number(row.received_qty || 0) + delta);
+  throwIfError(
+    await supabase
+      .from("yarn_production_order_items")
+      .update({ received_qty: next })
+      .eq("id", prodOrderItemId),
+  );
 }
 
 export const yarnStore = {
   getSnapshot: () => state,
   subscribe,
-  reset() { set(empty); },
+  hydrate,
+  refresh,
 
   // ---------- Suppliers ----------
-  addSupplier(s: Omit<YarnSupplier, "id" | "createdAt" | "active">): YarnSupplier {
-    const ns: YarnSupplier = { ...s, id: uid(), active: true, createdAt: new Date().toISOString() };
-    set({ ...state, suppliers: [...state.suppliers, ns] });
-    return ns;
+  async addSupplier(s: Omit<YarnSupplier, "id" | "createdAt" | "active">): Promise<YarnSupplier> {
+    const row = throwIfError(await supabase.from("yarn_suppliers").insert({
+      name: s.name, contact_person: s.contactPerson, mobile: s.mobile,
+      email: s.email, address: s.address, gst: s.gst, remarks: s.remarks,
+    }).select().single());
+    await refresh();
+    return mapSupplier(row);
   },
-  updateSupplier(id: string, patch: Partial<Omit<YarnSupplier, "id" | "createdAt">>) {
-    set({ ...state, suppliers: state.suppliers.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
+  async updateSupplier(id: string, patch: Partial<Omit<YarnSupplier, "id" | "createdAt">>) {
+    const p: Record<string, unknown> = {};
+    if (patch.name !== undefined) p.name = patch.name;
+    if (patch.contactPerson !== undefined) p.contact_person = patch.contactPerson;
+    if (patch.mobile !== undefined) p.mobile = patch.mobile;
+    if (patch.email !== undefined) p.email = patch.email;
+    if (patch.address !== undefined) p.address = patch.address;
+    if (patch.gst !== undefined) p.gst = patch.gst;
+    if (patch.remarks !== undefined) p.remarks = patch.remarks;
+    if (patch.active !== undefined) p.active = patch.active;
+    throwIfError(await supabase.from("yarn_suppliers").update(p).eq("id", id));
+    await refresh();
   },
-  deleteSupplier(id: string) {
-    set({ ...state, suppliers: state.suppliers.filter((s) => s.id !== id) });
+  async deleteSupplier(id: string) {
+    throwIfError(await supabase.from("yarn_suppliers").delete().eq("id", id));
+    await refresh();
   },
 
   // ---------- Shades ----------
-  addShade(s: Omit<YarnShade, "id" | "createdAt" | "status" | "approvalDate"> & { approvalDate?: string; status?: ShadeStatus }): YarnShade {
-    const ns: YarnShade = {
-      ...s,
-      id: uid(),
+  async addShade(s: Omit<YarnShade, "id" | "createdAt" | "status" | "approvalDate"> & { approvalDate?: string; status?: ShadeStatus }): Promise<YarnShade> {
+    const row = throwIfError(await supabase.from("yarn_shades").insert({
+      client_id: s.clientId, brand_id: s.brandId,
+      color_name: s.colorName, material: s.material,
+      supplier_id: s.supplierId, supplier_shade_number: s.supplierShadeNumber,
+      approval_date: s.approvalDate ?? todayISO(),
       status: s.status ?? "approved",
-      approvalDate: s.approvalDate ?? todayISO(),
-      createdAt: new Date().toISOString(),
-    };
-    set({ ...state, shades: [...state.shades, ns] });
-    return ns;
+      remarks: s.remarks,
+    }).select().single());
+    await refresh();
+    return mapShade(row);
   },
-  updateShade(id: string, patch: Partial<Omit<YarnShade, "id" | "createdAt">>) {
-    set({ ...state, shades: state.shades.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
+  async updateShade(id: string, patch: Partial<Omit<YarnShade, "id" | "createdAt">>) {
+    const p: Record<string, unknown> = {};
+    if (patch.clientId !== undefined) p.client_id = patch.clientId;
+    if (patch.brandId !== undefined) p.brand_id = patch.brandId;
+    if (patch.colorName !== undefined) p.color_name = patch.colorName;
+    if (patch.material !== undefined) p.material = patch.material;
+    if (patch.supplierId !== undefined) p.supplier_id = patch.supplierId;
+    if (patch.supplierShadeNumber !== undefined) p.supplier_shade_number = patch.supplierShadeNumber;
+    if (patch.approvalDate !== undefined) p.approval_date = patch.approvalDate;
+    if (patch.status !== undefined) p.status = patch.status;
+    if (patch.remarks !== undefined) p.remarks = patch.remarks;
+    throwIfError(await supabase.from("yarn_shades").update(p).eq("id", id));
+    await refresh();
   },
-  deleteShade(id: string) {
-    set({ ...state, shades: state.shades.filter((s) => s.id !== id) });
+  async deleteShade(id: string) {
+    throwIfError(await supabase.from("yarn_shades").delete().eq("id", id));
+    await refresh();
   },
-  ensureShade(input: {
+  async ensureShade(input: {
     clientId: string; brandId: string; colorName: string; material: string;
     supplierId: string; supplierShadeNumber: string;
-  }): YarnShade {
+  }): Promise<YarnShade> {
     const found = state.shades.find((s) =>
       s.clientId === input.clientId &&
       s.brandId === input.brandId &&
@@ -307,212 +498,218 @@ export const yarnStore = {
       s.supplierShadeNumber.trim().toLowerCase() === input.supplierShadeNumber.trim().toLowerCase(),
     );
     if (found) {
-      if (found.status !== "approved") this.updateShade(found.id, { status: "approved" });
+      if (found.status !== "approved") await this.updateShade(found.id, { status: "approved" });
       return found;
     }
     return this.addShade({ ...input });
   },
 
   // ---------- Sample Yarn Orders ----------
-  addSampleOrder(input: {
+  async addSampleOrder(input: {
     supplierId: string; orderDate?: string; linkedPoId?: string | null; remarks?: string;
     items: Omit<SampleYarnOrderItem, "id" | "approvalStatus" | "approvedShadeId" | "approvedAt">[];
-  }): SampleYarnOrder {
-    const order: SampleYarnOrder = {
-      id: uid(),
-      number: nextNumberInternal("SYO", state.sampleOrders),
-      orderDate: input.orderDate ?? todayISO(),
-      supplierId: input.supplierId,
-      linkedPoId: input.linkedPoId ?? null,
+  }): Promise<SampleYarnOrder> {
+    const number = nextNumberInternal("SYO", state.sampleOrders);
+    const orderRow = throwIfError(await supabase.from("yarn_sample_orders").insert({
+      number,
+      order_date: input.orderDate ?? todayISO(),
+      supplier_id: input.supplierId,
+      linked_po_id: input.linkedPoId ?? null,
       remarks: input.remarks,
       status: "ordered",
-      items: input.items.map((i) => ({
-        ...i, id: uid(), approvalStatus: "pending" as const,
-        approvedShadeId: null, approvedAt: null,
-      })),
-      receipts: [],
-      createdAt: new Date().toISOString(),
-    };
-    set({ ...state, sampleOrders: [order, ...state.sampleOrders] });
-    return order;
+    }).select().single()) as { id: string };
+    if (input.items.length > 0) {
+      throwIfError(await supabase.from("yarn_sample_order_items").insert(
+        input.items.map((i, idx) => ({
+          order_id: orderRow.id,
+          client_id: i.clientId, brand_id: i.brandId,
+          color_name: i.colorName, material: i.material,
+          approx_qty: i.approxQty,
+          swatch_url: i.swatchUrl, pantone: i.pantone, remarks: i.remarks,
+          approval_status: "pending",
+          sort_order: idx,
+        })),
+      ));
+    }
+    await refresh();
+    return state.sampleOrders.find((o) => o.id === orderRow.id)!;
   },
-  updateSampleOrder(id: string, patch: Partial<Omit<SampleYarnOrder, "id" | "createdAt" | "number">>) {
-    set({ ...state, sampleOrders: state.sampleOrders.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
+  async updateSampleOrder(id: string, patch: Partial<Omit<SampleYarnOrder, "id" | "createdAt" | "number">>) {
+    const p: Record<string, unknown> = {};
+    if (patch.orderDate !== undefined) p.order_date = patch.orderDate;
+    if (patch.supplierId !== undefined) p.supplier_id = patch.supplierId;
+    if (patch.linkedPoId !== undefined) p.linked_po_id = patch.linkedPoId;
+    if (patch.remarks !== undefined) p.remarks = patch.remarks;
+    if (patch.status !== undefined) p.status = patch.status;
+    if (Object.keys(p).length) {
+      throwIfError(await supabase.from("yarn_sample_orders").update(p).eq("id", id));
+    }
+    await refresh();
   },
-  deleteSampleOrder(id: string) {
-    set({ ...state, sampleOrders: state.sampleOrders.filter((o) => o.id !== id) });
+  async deleteSampleOrder(id: string) {
+    throwIfError(await supabase.from("yarn_sample_orders").delete().eq("id", id));
+    await refresh();
   },
-  addSampleReceipt(orderId: string, r: Omit<SampleYarnReceipt, "id">) {
-    const rec: SampleYarnReceipt = { ...r, id: uid() };
-    set({
-      ...state,
-      sampleOrders: state.sampleOrders.map((o) =>
-        o.id === orderId ? { ...o, receipts: [...o.receipts, rec], status: "received" } : o,
-      ),
-    });
+  async addSampleReceipt(orderId: string, r: Omit<SampleYarnReceipt, "id">) {
+    throwIfError(await supabase.from("yarn_sample_receipts").insert({
+      order_id: orderId,
+      receipt_date: r.receiptDate,
+      supplier_shade_number: r.supplierShadeNumber,
+      lot_number: r.lotNumber,
+      gross_weight: r.grossWeight,
+      cones: r.cones,
+      remarks: r.remarks,
+    }));
+    throwIfError(await supabase.from("yarn_sample_orders").update({ status: "received" }).eq("id", orderId));
+    await refresh();
   },
-  approveSampleItem(orderId: string, itemId: string, supplierShadeNumber: string): YarnShade | null {
+  async approveSampleItem(orderId: string, itemId: string, supplierShadeNumber: string): Promise<YarnShade | null> {
     const order = state.sampleOrders.find((o) => o.id === orderId);
     if (!order) return null;
     const item = order.items.find((i) => i.id === itemId);
     if (!item) return null;
-    const shade = this.ensureShade({
+    const shade = await this.ensureShade({
       clientId: item.clientId, brandId: item.brandId,
       colorName: item.colorName, material: item.material,
       supplierId: order.supplierId, supplierShadeNumber,
     });
-    set({
-      ...state,
-      sampleOrders: state.sampleOrders.map((o) =>
-        o.id !== orderId ? o : {
-          ...o,
-          items: o.items.map((i) =>
-            i.id === itemId
-              ? { ...i, approvalStatus: "approved" as const, approvedShadeId: shade.id, approvedAt: new Date().toISOString() }
-              : i,
-          ),
-        },
-      ),
-    });
+    throwIfError(await supabase.from("yarn_sample_order_items").update({
+      approval_status: "approved",
+      approved_shade_id: shade.id,
+      approved_at: new Date().toISOString(),
+    }).eq("id", itemId));
+    await refresh();
     return shade;
   },
-  redyeSampleItem(orderId: string, itemId: string) {
-    set({
-      ...state,
-      sampleOrders: state.sampleOrders.map((o) =>
-        o.id !== orderId ? o : {
-          ...o,
-          items: o.items.map((i) => (i.id === itemId ? { ...i, approvalStatus: "redye" as const } : i)),
-        },
-      ),
-    });
+  async redyeSampleItem(_orderId: string, itemId: string) {
+    throwIfError(await supabase.from("yarn_sample_order_items")
+      .update({ approval_status: "redye" }).eq("id", itemId));
+    await refresh();
   },
 
   // ---------- Production Yarn Orders ----------
-  addProductionOrder(input: {
+  async addProductionOrder(input: {
     supplierId: string; orderDate?: string; remarks?: string;
     items: Omit<ProductionYarnOrderItem, "id" | "receivedQty">[];
-  }): ProductionYarnOrder {
-    const order: ProductionYarnOrder = {
-      id: uid(),
-      number: nextNumberInternal("PYO", state.productionOrders),
-      orderDate: input.orderDate ?? todayISO(),
-      supplierId: input.supplierId,
+  }): Promise<ProductionYarnOrder> {
+    const number = nextNumberInternal("PYO", state.productionOrders);
+    const row = throwIfError(await supabase.from("yarn_production_orders").insert({
+      number,
+      order_date: input.orderDate ?? todayISO(),
+      supplier_id: input.supplierId,
       remarks: input.remarks,
       status: "ordered",
-      items: input.items.map((i) => ({ ...i, id: uid(), receivedQty: 0 })),
-      createdAt: new Date().toISOString(),
-    };
-    set({ ...state, productionOrders: [order, ...state.productionOrders] });
-    return order;
+    }).select().single()) as { id: string };
+    if (input.items.length > 0) {
+      throwIfError(await supabase.from("yarn_production_order_items").insert(
+        input.items.map((i, idx) => ({
+          order_id: row.id,
+          po_id: i.poId,
+          po_item_id: i.poItemId ?? null,
+          client_id: i.clientId, brand_id: i.brandId,
+          material: i.material, color_name: i.colorName,
+          ordered_qty: i.orderedQty, received_qty: 0,
+          approved_shade_id: i.approvedShadeId ?? null,
+          supplier_shade_number: i.supplierShadeNumber,
+          sort_order: idx,
+        })),
+      ));
+    }
+    await refresh();
+    return state.productionOrders.find((o) => o.id === row.id)!;
   },
-  updateProductionOrder(id: string, patch: Partial<Omit<ProductionYarnOrder, "id" | "createdAt" | "number">>) {
-    set({ ...state, productionOrders: state.productionOrders.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
+  async updateProductionOrder(id: string, patch: Partial<Omit<ProductionYarnOrder, "id" | "createdAt" | "number">>) {
+    const p: Record<string, unknown> = {};
+    if (patch.orderDate !== undefined) p.order_date = patch.orderDate;
+    if (patch.supplierId !== undefined) p.supplier_id = patch.supplierId;
+    if (patch.remarks !== undefined) p.remarks = patch.remarks;
+    if (patch.status !== undefined) p.status = patch.status;
+    if (Object.keys(p).length) {
+      throwIfError(await supabase.from("yarn_production_orders").update(p).eq("id", id));
+    }
+    await refresh();
   },
-  deleteProductionOrder(id: string) {
-    set({ ...state, productionOrders: state.productionOrders.filter((o) => o.id !== id) });
+  async deleteProductionOrder(id: string) {
+    throwIfError(await supabase.from("yarn_production_orders").delete().eq("id", id));
+    await refresh();
   },
 
   // ---------- Yarn Receipts ----------
-  planYarnReceipt(input: {
+  async planYarnReceipt(input: {
     receiptDate: string; supplierId: string; supplierShadeNumber: string;
     lotNumber?: string; grossWeight: number; cones: number; remarks?: string;
-  }):
+  }): Promise<
     | { needsManual: true; pendingRows: PendingProdRow[]; draft: typeof input }
     | { needsManual: false; receipt: YarnReceipt }
-  {
+  > {
+    if (!hydrated) await hydrate();
     const pending = getPendingRowsForShade(state, input.supplierId, input.supplierShadeNumber);
     const totalPending = pending.reduce((s, r) => s + r.pending, 0);
     if (input.grossWeight + 0.0001 >= totalPending && totalPending > 0) {
-      const allocations: YarnReceiptAllocation[] = pending.map((r) => ({
-        id: uid(), prodOrderItemId: r.prodOrderItemId, qty: r.pending,
-      }));
-      const receipt: YarnReceipt = {
-        id: uid(),
-        receiptDate: input.receiptDate,
-        supplierId: input.supplierId,
-        supplierShadeNumber: input.supplierShadeNumber,
-        lotNumber: input.lotNumber,
-        grossWeight: input.grossWeight,
-        cones: input.cones,
-        remarks: input.remarks,
-        allocations,
-        unallocatedQty: Math.max(0, input.grossWeight - totalPending),
-        createdAt: new Date().toISOString(),
-      };
-      applyReceipt(receipt);
+      const receipt = await this.commitYarnReceipt({
+        ...input,
+        allocations: pending.map((r) => ({ prodOrderItemId: r.prodOrderItemId, qty: r.pending })),
+      });
       return { needsManual: false, receipt };
     }
     if (totalPending <= 0) {
-      // Nothing to allocate — save whole qty as unallocated.
-      const receipt: YarnReceipt = {
-        id: uid(),
-        receiptDate: input.receiptDate,
-        supplierId: input.supplierId,
-        supplierShadeNumber: input.supplierShadeNumber,
-        lotNumber: input.lotNumber,
-        grossWeight: input.grossWeight,
-        cones: input.cones,
-        remarks: input.remarks,
-        allocations: [],
-        unallocatedQty: input.grossWeight,
-        createdAt: new Date().toISOString(),
-      };
-      applyReceipt(receipt);
+      const receipt = await this.commitYarnReceipt({ ...input, allocations: [] });
       return { needsManual: false, receipt };
     }
     return { needsManual: true, pendingRows: pending, draft: input };
   },
-  commitYarnReceipt(input: {
+  async commitYarnReceipt(input: {
     receiptDate: string; supplierId: string; supplierShadeNumber: string;
     lotNumber?: string; grossWeight: number; cones: number; remarks?: string;
     allocations: { prodOrderItemId: string; qty: number }[];
-  }): YarnReceipt {
-    const totalAlloc = input.allocations.reduce((s, a) => s + (Number(a.qty) || 0), 0);
-    const receipt: YarnReceipt = {
-      id: uid(),
-      receiptDate: input.receiptDate,
-      supplierId: input.supplierId,
-      supplierShadeNumber: input.supplierShadeNumber,
-      lotNumber: input.lotNumber,
-      grossWeight: input.grossWeight,
+  }): Promise<YarnReceipt> {
+    const filtered = input.allocations.filter((a) => (Number(a.qty) || 0) > 0);
+    const totalAlloc = filtered.reduce((s, a) => s + (Number(a.qty) || 0), 0);
+    const receiptRow = throwIfError(await supabase.from("yarn_receipts").insert({
+      receipt_date: input.receiptDate,
+      supplier_id: input.supplierId,
+      supplier_shade_number: input.supplierShadeNumber,
+      lot_number: input.lotNumber,
+      gross_weight: input.grossWeight,
       cones: input.cones,
+      unallocated_qty: Math.max(0, input.grossWeight - totalAlloc),
       remarks: input.remarks,
-      allocations: input.allocations
-        .filter((a) => (Number(a.qty) || 0) > 0)
-        .map((a) => ({ id: uid(), prodOrderItemId: a.prodOrderItemId, qty: Number(a.qty) || 0 })),
-      unallocatedQty: Math.max(0, input.grossWeight - totalAlloc),
-      createdAt: new Date().toISOString(),
-    };
-    applyReceipt(receipt);
-    return receipt;
+    }).select().single()) as { id: string };
+    if (filtered.length > 0) {
+      throwIfError(await supabase.from("yarn_receipt_allocations").insert(
+        filtered.map((a) => ({
+          receipt_id: receiptRow.id,
+          prod_order_item_id: a.prodOrderItemId,
+          qty: Number(a.qty) || 0,
+        })),
+      ));
+      for (const a of filtered) {
+        await persistProdReceivedQty(a.prodOrderItemId, Number(a.qty) || 0);
+      }
+    }
+    await refresh();
+    return state.receipts.find((r) => r.id === receiptRow.id)!;
   },
-  deleteReceipt(id: string) {
+  async deleteReceipt(id: string) {
     const rec = state.receipts.find((r) => r.id === id);
     if (!rec) return;
-    const patchMap = new Map<string, number>();
     for (const a of rec.allocations) {
-      patchMap.set(a.prodOrderItemId, (patchMap.get(a.prodOrderItemId) ?? 0) + a.qty);
+      await persistProdReceivedQty(a.prodOrderItemId, -a.qty);
     }
-    set({
-      ...state,
-      receipts: state.receipts.filter((r) => r.id !== id),
-      productionOrders: state.productionOrders.map((o) => ({
-        ...o,
-        items: o.items.map((i) =>
-          patchMap.has(i.id) ? { ...i, receivedQty: Math.max(0, i.receivedQty - (patchMap.get(i.id) ?? 0)) } : i,
-        ),
-      })),
-    });
-    for (const o of state.productionOrders) refreshProdOrderStatus(o.id);
+    throwIfError(await supabase.from("yarn_receipts").delete().eq("id", id));
+    await refresh();
   },
 
   // ---------- Overrides ----------
-  setOverride(poItemId: string, override: PoItemOverride | null) {
-    const next = { ...state.overrides };
-    if (override === null) delete next[poItemId];
-    else next[poItemId] = override;
-    set({ ...state, overrides: next });
+  async setOverride(poItemId: string, override: PoItemOverride | null) {
+    if (override === null) {
+      throwIfError(await supabase.from("yarn_po_item_overrides").delete().eq("po_item_id", poItemId));
+    } else {
+      throwIfError(await supabase.from("yarn_po_item_overrides").upsert({
+        po_item_id: poItemId, override,
+      }, { onConflict: "po_item_id" }));
+    }
+    await refresh();
   },
 };
 
@@ -558,6 +755,9 @@ function getPendingRowsForShade(
 }
 
 export function useYarnStore<T>(sel: (s: StoreShape) => T): T {
+  useEffect(() => {
+    if (!hydrated) void hydrate();
+  }, []);
   return useSyncExternalStore(
     yarnStore.subscribe,
     () => sel(yarnStore.getSnapshot()),
