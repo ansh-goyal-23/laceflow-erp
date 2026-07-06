@@ -19,6 +19,7 @@ import { Route as AuthenticatedAiLearningRouteImport } from './routes/_authentic
 import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_authenticated/purchase-orders.index'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
 import { Route as AuthenticatedYarnSuppliersRouteImport } from './routes/_authenticated/yarn.suppliers'
+import { Route as AuthenticatedYarnShadesRouteImport } from './routes/_authenticated/yarn.shades'
 import { Route as AuthenticatedReportsPendencyPoRouteImport } from './routes/_authenticated/reports.pendency-po'
 import { Route as AuthenticatedReportsPendencyItemRouteImport } from './routes/_authenticated/reports.pendency-item'
 import { Route as AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.pdf-import-history'
@@ -86,6 +87,11 @@ const AuthenticatedYarnSuppliersRoute =
     path: '/yarn/suppliers',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedYarnShadesRoute = AuthenticatedYarnShadesRouteImport.update({
+  id: '/yarn/shades',
+  path: '/yarn/shades',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsPendencyPoRoute =
   AuthenticatedReportsPendencyPoRouteImport.update({
     id: '/reports/pendency-po',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
   '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -242,6 +250,7 @@ export interface FileRoutesById {
   '/_authenticated/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/_authenticated/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/_authenticated/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/_authenticated/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/_authenticated/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/yarn/shades'
     | '/yarn/suppliers'
     | '/invoices/'
     | '/purchase-orders/'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/yarn/shades'
     | '/yarn/suppliers'
     | '/invoices'
     | '/purchase-orders'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/_authenticated/purchase-orders/pdf-import-history'
     | '/_authenticated/reports/pendency-item'
     | '/_authenticated/reports/pendency-po'
+    | '/_authenticated/yarn/shades'
     | '/_authenticated/yarn/suppliers'
     | '/_authenticated/invoices/'
     | '/_authenticated/purchase-orders/'
@@ -403,6 +415,13 @@ declare module '@tanstack/react-router' {
       path: '/yarn/suppliers'
       fullPath: '/yarn/suppliers'
       preLoaderRoute: typeof AuthenticatedYarnSuppliersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/shades': {
+      id: '/_authenticated/yarn/shades'
+      path: '/yarn/shades'
+      fullPath: '/yarn/shades'
+      preLoaderRoute: typeof AuthenticatedYarnShadesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports/pendency-po': {
@@ -523,6 +542,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchaseOrdersPdfImportHistoryRoute: typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   AuthenticatedReportsPendencyItemRoute: typeof AuthenticatedReportsPendencyItemRoute
   AuthenticatedReportsPendencyPoRoute: typeof AuthenticatedReportsPendencyPoRoute
+  AuthenticatedYarnShadesRoute: typeof AuthenticatedYarnShadesRoute
   AuthenticatedYarnSuppliersRoute: typeof AuthenticatedYarnSuppliersRoute
   AuthenticatedInvoicesIndexRoute: typeof AuthenticatedInvoicesIndexRoute
   AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
@@ -551,6 +571,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedPurchaseOrdersPdfImportHistoryRoute,
   AuthenticatedReportsPendencyItemRoute: AuthenticatedReportsPendencyItemRoute,
   AuthenticatedReportsPendencyPoRoute: AuthenticatedReportsPendencyPoRoute,
+  AuthenticatedYarnShadesRoute: AuthenticatedYarnShadesRoute,
   AuthenticatedYarnSuppliersRoute: AuthenticatedYarnSuppliersRoute,
   AuthenticatedInvoicesIndexRoute: AuthenticatedInvoicesIndexRoute,
   AuthenticatedPurchaseOrdersIndexRoute: AuthenticatedPurchaseOrdersIndexRoute,
