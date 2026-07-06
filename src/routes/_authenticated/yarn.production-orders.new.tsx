@@ -110,22 +110,24 @@ function NewProdOrder() {
     });
   };
 
-  const doAddShade = () => {
+  const doAddShade = async () => {
     if (addShadeOpen === null) return;
     const line = lines[addShadeOpen];
     if (!supplierId) { toast.error("Select a supplier first"); return; }
     if (!newShadeNo.trim()) { toast.error("Enter supplier shade #"); return; }
-    const shade = yarnStore.ensureShade({
-      clientId: line.clientId, brandId: line.brandId,
-      colorName: line.colorName, material: line.material,
-      supplierId, supplierShadeNumber: newShadeNo.trim(),
-    });
-    patchLine(addShadeOpen, { approvedShadeId: shade.id, supplierShadeNumber: shade.supplierShadeNumber });
-    setAddShadeOpen(null); setNewShadeNo("");
-    toast.success("Shade added to library");
+    try {
+      const shade = await yarnStore.ensureShade({
+        clientId: line.clientId, brandId: line.brandId,
+        colorName: line.colorName, material: line.material,
+        supplierId, supplierShadeNumber: newShadeNo.trim(),
+      });
+      patchLine(addShadeOpen, { approvedShadeId: shade.id, supplierShadeNumber: shade.supplierShadeNumber });
+      setAddShadeOpen(null); setNewShadeNo("");
+      toast.success("Shade added to library");
+    } catch (e) { toast.error((e as Error).message); }
   };
 
-  const save = () => {
+  const save = async () => {
     if (!supplierId) { toast.error("Select supplier"); return; }
     const nonSampling = lines.filter((l) => !l.sampling);
     const samplingLines = lines.filter((l) => l.sampling);
@@ -139,45 +141,46 @@ function NewProdOrder() {
       if (!l.material || !l.colorName) { toast.error("Sampling lines need material and color"); return; }
     }
 
-    // Create sample orders for sampling lines (grouped per PO)
-    const samplingByPo = new Map<string, Line[]>();
-    for (const l of samplingLines) {
-      const arr = samplingByPo.get(l.poId) ?? [];
-      arr.push(l); samplingByPo.set(l.poId, arr);
-    }
-    for (const [poId, arr] of samplingByPo) {
-      yarnStore.addSampleOrder({
-        supplierId,
-        linkedPoId: poId,
-        items: arr.map((l) => ({
-          clientId: l.clientId, brandId: l.brandId,
-          colorName: l.colorName, material: l.material,
-          approxQty: Number(l.orderedQty) || 0,
-        })),
-      });
-    }
+    try {
+      const samplingByPo = new Map<string, Line[]>();
+      for (const l of samplingLines) {
+        const arr = samplingByPo.get(l.poId) ?? [];
+        arr.push(l); samplingByPo.set(l.poId, arr);
+      }
+      for (const [poId, arr] of samplingByPo) {
+        await yarnStore.addSampleOrder({
+          supplierId,
+          linkedPoId: poId,
+          items: arr.map((l) => ({
+            clientId: l.clientId, brandId: l.brandId,
+            colorName: l.colorName, material: l.material,
+            approxQty: Number(l.orderedQty) || 0,
+          })),
+        });
+      }
 
-    if (nonSampling.length > 0) {
-      const order = yarnStore.addProductionOrder({
-        supplierId, orderDate, remarks,
-        items: nonSampling.map((l) => ({
-          poId: l.poId,
-          poItemId: l.poItemId ?? null,
-          clientId: l.clientId, brandId: l.brandId,
-          material: l.material, colorName: l.colorName,
-          orderedQty: Number(l.orderedQty) || 0,
-          approvedShadeId: l.approvedShadeId || null,
-          supplierShadeNumber: l.supplierShadeNumber,
-        })),
-      });
-      toast.success(`Production order ${order.number} created`);
-      nav({ to: "/yarn/production-orders/$id", params: { id: order.id } });
-    } else if (samplingByPo.size > 0) {
-      toast.success("Sample yarn orders created");
-      nav({ to: "/yarn/sample-orders" });
-    } else {
-      toast.error("Add at least one line");
-    }
+      if (nonSampling.length > 0) {
+        const order = await yarnStore.addProductionOrder({
+          supplierId, orderDate, remarks,
+          items: nonSampling.map((l) => ({
+            poId: l.poId,
+            poItemId: l.poItemId ?? null,
+            clientId: l.clientId, brandId: l.brandId,
+            material: l.material, colorName: l.colorName,
+            orderedQty: Number(l.orderedQty) || 0,
+            approvedShadeId: l.approvedShadeId || null,
+            supplierShadeNumber: l.supplierShadeNumber,
+          })),
+        });
+        toast.success(`Production order ${order.number} created`);
+        nav({ to: "/yarn/production-orders/$id", params: { id: order.id } });
+      } else if (samplingByPo.size > 0) {
+        toast.success("Sample yarn orders created");
+        nav({ to: "/yarn/sample-orders" });
+      } else {
+        toast.error("Add at least one line");
+      }
+    } catch (e) { toast.error((e as Error).message); }
   };
 
   return (
@@ -397,7 +400,10 @@ function OverrideToggle({ poItemId, current }: { poItemId: string; current: Proc
   return (
     <button
       className="text-xs text-muted-foreground underline hover:text-foreground text-left"
-      onClick={() => yarnStore.setOverride(poItemId, isYNR ? null : "yarn_not_required")}
+      onClick={async () => {
+        try { await yarnStore.setOverride(poItemId, isYNR ? null : "yarn_not_required"); }
+        catch (e) { toast.error((e as Error).message); }
+      }}
     >
       {isYNR ? "Clear override" : "Mark Yarn Not Required"}
     </button>

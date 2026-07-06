@@ -42,7 +42,7 @@ function NewReceipt() {
   const poNum = (id: string) => pos.find((p) => p.id === id)?.poNumber ?? "—";
   const cName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
 
-  const submit = () => {
+  const submit = async () => {
     if (!d.supplierId || !d.supplierShadeNumber.trim() || !d.grossWeight) { toast.error("Fill supplier, shade # and gross weight"); return; }
     const payload = {
       receiptDate: d.receiptDate,
@@ -53,19 +53,21 @@ function NewReceipt() {
       cones: Number(d.cones) || 0,
       remarks: d.remarks || undefined,
     };
-    const res = yarnStore.planYarnReceipt(payload);
-    if (!res.needsManual) {
-      toast.success("Receipt saved & allocated");
-      nav({ to: "/yarn/receipts" });
-      return;
-    }
-    setManual({
-      rows: res.pendingRows,
-      alloc: Object.fromEntries(res.pendingRows.map((r) => [r.prodOrderItemId, ""])),
-    });
+    try {
+      const res = await yarnStore.planYarnReceipt(payload);
+      if (!res.needsManual) {
+        toast.success("Receipt saved & allocated");
+        nav({ to: "/yarn/receipts" });
+        return;
+      }
+      setManual({
+        rows: res.pendingRows,
+        alloc: Object.fromEntries(res.pendingRows.map((r) => [r.prodOrderItemId, ""])),
+      });
+    } catch (e) { toast.error((e as Error).message); }
   };
 
-  const commitManual = () => {
+  const commitManual = async () => {
     if (!manual) return;
     const allocations = manual.rows.map((r) => ({
       prodOrderItemId: r.prodOrderItemId,
@@ -80,19 +82,21 @@ function NewReceipt() {
     if (Math.abs(sum - Number(d.grossWeight)) > 0.0001) {
       toast.error(`Total allocated (${sum.toFixed(2)}) must equal received (${Number(d.grossWeight).toFixed(2)})`); return;
     }
-    yarnStore.commitYarnReceipt({
-      receiptDate: d.receiptDate,
-      supplierId: d.supplierId,
-      supplierShadeNumber: d.supplierShadeNumber.trim(),
-      lotNumber: d.lotNumber || undefined,
-      grossWeight: Number(d.grossWeight) || 0,
-      cones: Number(d.cones) || 0,
-      remarks: d.remarks || undefined,
-      allocations,
-    });
-    toast.success("Receipt saved with allocations");
-    setManual(null);
-    nav({ to: "/yarn/receipts" });
+    try {
+      await yarnStore.commitYarnReceipt({
+        receiptDate: d.receiptDate,
+        supplierId: d.supplierId,
+        supplierShadeNumber: d.supplierShadeNumber.trim(),
+        lotNumber: d.lotNumber || undefined,
+        grossWeight: Number(d.grossWeight) || 0,
+        cones: Number(d.cones) || 0,
+        remarks: d.remarks || undefined,
+        allocations,
+      });
+      toast.success("Receipt saved with allocations");
+      setManual(null);
+      nav({ to: "/yarn/receipts" });
+    } catch (e) { toast.error((e as Error).message); }
   };
 
   return (
