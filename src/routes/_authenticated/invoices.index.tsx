@@ -238,55 +238,77 @@ function InvoiceList() {
                 <div><div className="text-xs text-muted-foreground">Items</div><div className="font-medium">{viewing.items.length}</div></div>
               </div>
               <div className="overflow-x-auto border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>PO #</TableHead>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Lace</TableHead>
-                      <TableHead>Material</TableHead>
-                      <TableHead>W×L</TableHead>
-                      <TableHead>Color</TableHead>
-                      <TableHead>UOM</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {viewing.items.map((i) => (
-                      <TableRow key={i.id}>
-                        <TableCell>{i.poNumber || "—"}</TableCell>
-                        <TableCell>{i.articleCode || "—"}</TableCell>
-                        <TableCell>{i.laceType || "—"}</TableCell>
-                        <TableCell>{i.materialType || "—"}</TableCell>
-                        <TableCell>{[i.width, i.length].filter(Boolean).join(" × ") || "—"}</TableCell>
-                        <TableCell>{i.color || "—"}</TableCell>
-                        <TableCell>{i.uom}</TableCell>
-                        <TableCell className="text-right">{i.dispatchQty}</TableCell>
-                        <TableCell className="text-right">{i.rate}</TableCell>
-                        <TableCell className="text-right font-medium">{(i.dispatchQty * i.rate).toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={7}></TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {viewing.items.reduce((s, i) => s + (Number(i.dispatchQty) || 0), 0)}
-                      </TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {viewing.items.reduce((s, i) => s + (Number(i.dispatchQty) || 0) * (Number(i.rate) || 0), 0).toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
+                <InvoiceItemsView items={viewing.items} />
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+type InvItem = Invoice["items"][number];
+type InvItemSortKey = "poNumber" | "articleCode" | "laceType" | "materialType" | "color" | "uom" | "dispatchQty" | "rate" | "amount";
+
+function InvoiceItemsView({ items }: { items: InvItem[] }) {
+  const [key, setKey] = useState<InvItemSortKey>("poNumber");
+  const [dir, setDir] = useState<"asc" | "desc">("asc");
+  const toggle = (k: InvItemSortKey) => {
+    if (k === key) setDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setKey(k); setDir("asc"); }
+  };
+  const sorted = useMemo(() => {
+    const d = dir === "asc" ? 1 : -1;
+    return [...items].sort((a, b) => {
+      if (key === "dispatchQty") return ((a.dispatchQty || 0) - (b.dispatchQty || 0)) * d;
+      if (key === "rate") return ((a.rate || 0) - (b.rate || 0)) * d;
+      if (key === "amount") return ((a.dispatchQty || 0) * (a.rate || 0) - (b.dispatchQty || 0) * (b.rate || 0)) * d;
+      return String(a[key] ?? "").localeCompare(String(b[key] ?? "")) * d;
+    });
+  }, [items, key, dir]);
+  const totalQty = items.reduce((s, i) => s + (Number(i.dispatchQty) || 0), 0);
+  const totalAmt = items.reduce((s, i) => s + (Number(i.dispatchQty) || 0) * (Number(i.rate) || 0), 0);
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead><SortHeader label="PO #" active={key === "poNumber"} dir={dir} onClick={() => toggle("poNumber")} /></TableHead>
+          <TableHead><SortHeader label="Article" active={key === "articleCode"} dir={dir} onClick={() => toggle("articleCode")} /></TableHead>
+          <TableHead><SortHeader label="Lace" active={key === "laceType"} dir={dir} onClick={() => toggle("laceType")} /></TableHead>
+          <TableHead><SortHeader label="Material" active={key === "materialType"} dir={dir} onClick={() => toggle("materialType")} /></TableHead>
+          <TableHead>W×L</TableHead>
+          <TableHead><SortHeader label="Color" active={key === "color"} dir={dir} onClick={() => toggle("color")} /></TableHead>
+          <TableHead><SortHeader label="UOM" active={key === "uom"} dir={dir} onClick={() => toggle("uom")} /></TableHead>
+          <TableHead className="text-right"><SortHeader label="Qty" align="right" active={key === "dispatchQty"} dir={dir} onClick={() => toggle("dispatchQty")} /></TableHead>
+          <TableHead className="text-right"><SortHeader label="Rate" align="right" active={key === "rate"} dir={dir} onClick={() => toggle("rate")} /></TableHead>
+          <TableHead className="text-right"><SortHeader label="Amount" align="right" active={key === "amount"} dir={dir} onClick={() => toggle("amount")} /></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sorted.map((i) => (
+          <TableRow key={i.id}>
+            <TableCell>{i.poNumber || "—"}</TableCell>
+            <TableCell>{i.articleCode || "—"}</TableCell>
+            <TableCell>{i.laceType || "—"}</TableCell>
+            <TableCell>{i.materialType || "—"}</TableCell>
+            <TableCell>{[i.width, i.length].filter(Boolean).join(" × ") || "—"}</TableCell>
+            <TableCell>{i.color || "—"}</TableCell>
+            <TableCell>{i.uom}</TableCell>
+            <TableCell className="text-right">{i.dispatchQty}</TableCell>
+            <TableCell className="text-right">{i.rate}</TableCell>
+            <TableCell className="text-right font-medium">{(i.dispatchQty * i.rate).toFixed(2)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+      <TableFooter>
+        <TableRow>
+          <TableCell colSpan={7}></TableCell>
+          <TableCell className="text-right font-semibold">{totalQty}</TableCell>
+          <TableCell></TableCell>
+          <TableCell className="text-right font-semibold">{totalAmt.toFixed(2)}</TableCell>
+        </TableRow>
+      </TableFooter>
+    </Table>
   );
 }
