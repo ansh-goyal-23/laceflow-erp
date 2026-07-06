@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useStore, store, type Invoice, type InvoiceItem, type PurchaseOrder, type POLineItem } from "@/lib/store";
-import { dispatchedByPOItem, dispatchedByPO, poFulfillmentStatus } from "@/lib/dispatch";
+import { dispatchedByPOItem } from "@/lib/dispatch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,19 +38,17 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
   const [selectedPoId, setSelectedPoId] = useState<string>("");
   const [poRows, setPoRows] = useState<Record<string, number>>({}); // poItemId -> qty input
 
-  // Dispatched maps exclude current invoice when editing so balances reflect "other invoices"
+  // Dispatched map excludes current invoice when editing so balances reflect "other invoices"
   const dispByItem = useMemo(() => dispatchedByPOItem(invoices, existing?.id), [invoices, existing?.id]);
-  const dispByPo = useMemo(() => dispatchedByPO(invoices, existing?.id), [invoices, existing?.id]);
 
-  // Open POs for the chosen client (submitted, not fully completed)
+  // Open POs for the chosen client (status Open only; do not hide based on dispatched quantity)
   const clientPOs = useMemo(() => {
     if (!clientId) return [];
     return pos
       .filter((p) => p.clientId === clientId && p.status === "open")
-      .map((p) => ({ po: p, status: poFulfillmentStatus(p, dispByItem, dispByPo) }))
-      .filter(({ status }) => status !== "Completed")
-      .sort((a, b) => a.po.poNumber.localeCompare(b.po.poNumber));
-  }, [pos, clientId, dispByItem, dispByPo]);
+      .sort((a, b) => a.poNumber.localeCompare(b.poNumber));
+  }, [pos, clientId]);
+
 
   const selectedPO = pos.find((p) => p.id === selectedPoId);
 
