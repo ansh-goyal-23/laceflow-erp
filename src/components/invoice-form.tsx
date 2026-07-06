@@ -197,7 +197,7 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
                     <CommandList>
                       <CommandEmpty>No open PO found.</CommandEmpty>
                       <CommandGroup>
-                        {clientPOs.map(({ po }) => (
+                        {clientPOs.map((po) => (
                           <CommandItem
                             key={po.id}
                             value={po.poNumber}
