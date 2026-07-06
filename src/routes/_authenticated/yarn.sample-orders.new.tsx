@@ -46,22 +46,24 @@ function NewSampleOrder() {
   const patch = (idx: number, k: keyof Draft, v: string) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [k]: v } : it)));
 
-  const save = () => {
+  const save = async () => {
     if (!supplierId) { toast.error("Select supplier"); return; }
     const cleaned = items.filter((i) => i.clientId && i.brandId && i.colorName.trim() && i.material.trim());
     if (cleaned.length === 0) { toast.error("Add at least one valid item"); return; }
-    const order = yarnStore.addSampleOrder({
-      supplierId, orderDate, linkedPoId: linkedPoId || null, remarks,
-      items: cleaned.map((i) => ({
-        clientId: i.clientId, brandId: i.brandId,
-        colorName: i.colorName.trim(), material: i.material.trim(),
-        approxQty: Number(i.approxQty) || 0,
-        pantone: i.pantone || undefined,
-        remarks: i.remarks || undefined,
-      })),
-    });
-    toast.success(`Sample order ${order.number} created`);
-    nav({ to: "/yarn/sample-orders/$id", params: { id: order.id } });
+    try {
+      const order = await yarnStore.addSampleOrder({
+        supplierId, orderDate, linkedPoId: linkedPoId || null, remarks,
+        items: cleaned.map((i) => ({
+          clientId: i.clientId, brandId: i.brandId,
+          colorName: i.colorName.trim(), material: i.material.trim(),
+          approxQty: Number(i.approxQty) || 0,
+          pantone: i.pantone || undefined,
+          remarks: i.remarks || undefined,
+        })),
+      });
+      toast.success(`Sample order ${order.number} created`);
+      nav({ to: "/yarn/sample-orders/$id", params: { id: order.id } });
+    } catch (e) { toast.error((e as Error).message); }
   };
 
   return (
