@@ -8,7 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { useYarnStore } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 
-export const Route = createFileRoute("/_authenticated/yarn/production-orders/$id")({
+export const Route = createFileRoute("/_authenticated/yarn/production-orders/")({
   component: ProdOrderDetail,
 });
 
