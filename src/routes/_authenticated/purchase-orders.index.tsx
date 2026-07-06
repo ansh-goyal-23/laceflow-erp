@@ -356,3 +356,56 @@ function StatusBadge({ po, onClickOpen }: { po: PurchaseOrder; onClickOpen: () =
     </button>
   );
 }
+
+type POItem = PurchaseOrder["items"][number];
+type POItemSortKey = "articleCode" | "laceType" | "materialType" | "color" | "uom" | "quantity" | "rate" | "amount";
+
+function POItemsView({ items }: { items: POItem[] }) {
+  const [key, setKey] = useState<POItemSortKey>("articleCode");
+  const [dir, setDir] = useState<"asc" | "desc">("asc");
+  const toggle = (k: POItemSortKey) => {
+    if (k === key) setDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setKey(k); setDir("asc"); }
+  };
+  const sorted = useMemo(() => {
+    const d = dir === "asc" ? 1 : -1;
+    return [...items].sort((a, b) => {
+      if (key === "quantity") return (a.quantity - b.quantity) * d;
+      if (key === "rate") return (a.rate - b.rate) * d;
+      if (key === "amount") return (a.quantity * a.rate - b.quantity * b.rate) * d;
+      return String(a[key] ?? "").localeCompare(String(b[key] ?? "")) * d;
+    });
+  }, [items, key, dir]);
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead><SortHeader label="Article" active={key === "articleCode"} dir={dir} onClick={() => toggle("articleCode")} /></TableHead>
+          <TableHead><SortHeader label="Lace" active={key === "laceType"} dir={dir} onClick={() => toggle("laceType")} /></TableHead>
+          <TableHead><SortHeader label="Material" active={key === "materialType"} dir={dir} onClick={() => toggle("materialType")} /></TableHead>
+          <TableHead><SortHeader label="Color" active={key === "color"} dir={dir} onClick={() => toggle("color")} /></TableHead>
+          <TableHead>W (mm) × L (cm)</TableHead>
+          <TableHead><SortHeader label="UOM" active={key === "uom"} dir={dir} onClick={() => toggle("uom")} /></TableHead>
+          <TableHead className="text-right"><SortHeader label="Qty" align="right" active={key === "quantity"} dir={dir} onClick={() => toggle("quantity")} /></TableHead>
+          <TableHead className="text-right"><SortHeader label="Rate" align="right" active={key === "rate"} dir={dir} onClick={() => toggle("rate")} /></TableHead>
+          <TableHead className="text-right"><SortHeader label="Amount" align="right" active={key === "amount"} dir={dir} onClick={() => toggle("amount")} /></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sorted.map((i) => (
+          <TableRow key={i.id}>
+            <TableCell>{i.articleCode || "—"}</TableCell>
+            <TableCell>{i.laceType || "—"}</TableCell>
+            <TableCell>{i.materialType || "—"}</TableCell>
+            <TableCell>{i.color || "—"}</TableCell>
+            <TableCell>{[i.width, i.length].filter(Boolean).join(" × ") || "—"}</TableCell>
+            <TableCell>{i.uom}</TableCell>
+            <TableCell className="text-right">{i.quantity}</TableCell>
+            <TableCell className="text-right">{i.rate}</TableCell>
+            <TableCell className="text-right font-medium">{(i.quantity * i.rate).toFixed(2)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
