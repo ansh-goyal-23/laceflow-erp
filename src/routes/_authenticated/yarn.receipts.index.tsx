@@ -65,10 +65,10 @@ function ReceiptsList() {
                     <TableCell>{allocated.toFixed(2)}</TableCell>
                     <TableCell className="font-medium">{r.unallocatedQty.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        if (confirm("Delete this receipt? Allocations will be reversed.")) {
-                          yarnStore.deleteReceipt(r.id); toast.success("Deleted");
-                        }
+                      <Button variant="ghost" size="icon" onClick={async () => {
+                        if (!confirm("Delete this receipt? Allocations will be reversed.")) return;
+                        try { await yarnStore.deleteReceipt(r.id); toast.success("Deleted"); }
+                        catch (e) { toast.error((e as Error).message); }
                       }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </TableCell>
                   </TableRow>

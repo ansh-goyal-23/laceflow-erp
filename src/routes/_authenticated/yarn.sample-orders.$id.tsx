@@ -38,26 +38,30 @@ function SampleOrderDetail() {
   const cName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
   const bName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
 
-  const doApprove = () => {
+  const doApprove = async () => {
     if (!approveFor || !shadeNo.trim()) { toast.error("Enter supplier shade #"); return; }
-    yarnStore.approveSampleItem(order.id, approveFor, shadeNo.trim());
-    toast.success("Approved — shade added to library");
-    setApproveFor(null); setShadeNo("");
+    try {
+      await yarnStore.approveSampleItem(order.id, approveFor, shadeNo.trim());
+      toast.success("Approved — shade added to library");
+      setApproveFor(null); setShadeNo("");
+    } catch (e) { toast.error((e as Error).message); }
   };
 
-  const saveReceipt = () => {
+  const saveReceipt = async () => {
     if (!rcp.grossWeight) { toast.error("Enter gross weight"); return; }
-    yarnStore.addSampleReceipt(order.id, {
-      receiptDate: rcp.receiptDate,
-      supplierShadeNumber: rcp.supplierShadeNumber,
-      lotNumber: rcp.lotNumber || undefined,
-      grossWeight: Number(rcp.grossWeight) || 0,
-      cones: Number(rcp.cones) || 0,
-      remarks: rcp.remarks || undefined,
-    });
-    toast.success("Receipt saved");
-    setRcpOpen(false);
-    setRcp({ receiptDate: new Date().toISOString().slice(0, 10), supplierShadeNumber: "", lotNumber: "", grossWeight: "", cones: "", remarks: "" });
+    try {
+      await yarnStore.addSampleReceipt(order.id, {
+        receiptDate: rcp.receiptDate,
+        supplierShadeNumber: rcp.supplierShadeNumber,
+        lotNumber: rcp.lotNumber || undefined,
+        grossWeight: Number(rcp.grossWeight) || 0,
+        cones: Number(rcp.cones) || 0,
+        remarks: rcp.remarks || undefined,
+      });
+      toast.success("Receipt saved");
+      setRcpOpen(false);
+      setRcp({ receiptDate: new Date().toISOString().slice(0, 10), supplierShadeNumber: "", lotNumber: "", grossWeight: "", cones: "", remarks: "" });
+    } catch (e) { toast.error((e as Error).message); }
   };
 
   return (
@@ -118,8 +122,9 @@ function SampleOrderDetail() {
                         <Button size="sm" variant="outline" onClick={() => { setApproveFor(it.id); setShadeNo(""); }}>
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => {
-                          yarnStore.redyeSampleItem(order.id, it.id); toast.success("Marked for re-dye");
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          try { await yarnStore.redyeSampleItem(order.id, it.id); toast.success("Marked for re-dye"); }
+                          catch (e) { toast.error((e as Error).message); }
                         }}>
                           <RefreshCw className="h-3.5 w-3.5 mr-1" /> Redye
                         </Button>

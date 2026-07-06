@@ -43,11 +43,15 @@ function SuppliersPage() {
     setOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.name.trim()) { toast.error("Supplier name is required"); return; }
-    if (editing) { yarnStore.updateSupplier(editing.id, form); toast.success("Supplier updated"); }
-    else { yarnStore.addSupplier(form); toast.success("Supplier added"); }
-    setOpen(false);
+    try {
+      if (editing) { await yarnStore.updateSupplier(editing.id, form); toast.success("Supplier updated"); }
+      else { await yarnStore.addSupplier(form); toast.success("Supplier added"); }
+      setOpen(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   return (
@@ -89,8 +93,10 @@ function SuppliersPage() {
                   <TableCell>
                     <div className="flex gap-1 justify-end">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        if (confirm(`Delete supplier "${s.name}"?`)) { yarnStore.deleteSupplier(s.id); toast.success("Deleted"); }
+                      <Button variant="ghost" size="icon" onClick={async () => {
+                        if (!confirm(`Delete supplier "${s.name}"?`)) return;
+                        try { await yarnStore.deleteSupplier(s.id); toast.success("Deleted"); }
+                        catch (e) { toast.error((e as Error).message); }
                       }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </TableCell>

@@ -113,11 +113,14 @@ function ShadesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
-                      <Button variant="ghost" size="icon" title="Toggle status" onClick={() => {
-                        yarnStore.updateShade(s.id, { status: s.status === "approved" ? "inactive" : "approved" });
+                      <Button variant="ghost" size="icon" title="Toggle status" onClick={async () => {
+                        try { await yarnStore.updateShade(s.id, { status: s.status === "approved" ? "inactive" : "approved" }); }
+                        catch (e) { toast.error((e as Error).message); }
                       }}><Power className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        if (confirm("Delete this shade?")) { yarnStore.deleteShade(s.id); toast.success("Deleted"); }
+                      <Button variant="ghost" size="icon" onClick={async () => {
+                        if (!confirm("Delete this shade?")) return;
+                        try { await yarnStore.deleteShade(s.id); toast.success("Deleted"); }
+                        catch (e) { toast.error((e as Error).message); }
                       }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </TableCell>
@@ -143,14 +146,16 @@ function AddShadeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
   const [material, setMaterial] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [supplierShadeNumber, setSupplierShadeNumber] = useState("");
-  const save = () => {
+  const save = async () => {
     if (!clientId || !brandId || !colorName.trim() || !material.trim() || !supplierId || !supplierShadeNumber.trim()) {
       toast.error("Fill all required fields"); return;
     }
-    yarnStore.ensureShade({ clientId, brandId, colorName: colorName.trim(), material: material.trim(), supplierId, supplierShadeNumber: supplierShadeNumber.trim() });
-    toast.success("Shade added");
-    onOpenChange(false);
-    setClientId(""); setBrandId(""); setColorName(""); setMaterial(""); setSupplierId(""); setSupplierShadeNumber("");
+    try {
+      await yarnStore.ensureShade({ clientId, brandId, colorName: colorName.trim(), material: material.trim(), supplierId, supplierShadeNumber: supplierShadeNumber.trim() });
+      toast.success("Shade added");
+      onOpenChange(false);
+      setClientId(""); setBrandId(""); setColorName(""); setMaterial(""); setSupplierId(""); setSupplierShadeNumber("");
+    } catch (e) { toast.error((e as Error).message); }
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
