@@ -388,23 +388,26 @@ async function hydrate(): Promise<void> {
       return { ...base, status: computeProdStatus(base) };
     });
 
-    const allocByReceipt = new Map<string, YarnReceiptAllocation[]>();
-    for (const r of ra.data ?? []) {
+    const allocByItem = new Map<string, YarnInwardAllocation[]>();
+    for (const r of ia.data ?? []) {
       const it = mapAllocation(r);
-      const arr = allocByReceipt.get(r.receipt_id) ?? [];
-      arr.push(it); allocByReceipt.set(r.receipt_id, arr);
+      const arr = allocByItem.get(r.inward_item_id) ?? [];
+      arr.push(it); allocByItem.set(r.inward_item_id, arr);
     }
-    const receipts: YarnReceipt[] = (rc.data ?? []).map((r: any) => ({
+    const itemsByInward = new Map<string, YarnInwardItem[]>();
+    for (const r of iwi.data ?? []) {
+      const it = mapInwardItem(r, allocByItem.get(r.id) ?? []);
+      const arr = itemsByInward.get(r.inward_id) ?? [];
+      arr.push(it); itemsByInward.set(r.inward_id, arr);
+    }
+    const inwards: YarnInward[] = (iw.data ?? []).map((r: any) => ({
       id: r.id,
-      receiptDate: r.receipt_date,
+      number: r.number,
+      inwardDate: r.inward_date,
       supplierId: r.supplier_id,
-      supplierShadeNumber: r.supplier_shade_number,
-      lotNumber: r.lot_number ?? undefined,
-      grossWeight: Number(r.gross_weight) || 0,
-      cones: Number(r.cones) || 0,
-      unallocatedQty: Number(r.unallocated_qty) || 0,
+      supplierChallanNumber: r.supplier_challan_number ?? "",
       remarks: r.remarks ?? undefined,
-      allocations: allocByReceipt.get(r.id) ?? [],
+      items: itemsByInward.get(r.id) ?? [],
       createdAt: r.created_at,
     }));
 
@@ -416,7 +419,7 @@ async function hydrate(): Promise<void> {
       shades: (sh.data ?? []).map(mapShade),
       sampleOrders,
       productionOrders,
-      receipts,
+      inwards,
       overrides,
     });
     hydrated = true;
