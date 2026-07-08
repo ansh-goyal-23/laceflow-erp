@@ -50,6 +50,7 @@ function NewProdOrder() {
   const [lines, setLines] = useState<Line[]>([]);
   const [pickPOOpen, setPickPOOpen] = useState(false);
   const [activePOId, setActivePOId] = useState<string | null>(null);
+  const [poSearch, setPoSearch] = useState("");
   const [addShadeOpen, setAddShadeOpen] = useState<number | null>(null);
   const [newShadeNo, setNewShadeNo] = useState("");
 
@@ -70,6 +71,20 @@ function NewProdOrder() {
     });
     return rows;
   }, [pos, yarn]);
+
+  const filteredEligiblePOs = useMemo(() => {
+    const q = poSearch.trim().toLowerCase();
+    if (!q) return eligiblePOs;
+    return eligiblePOs.filter(({ po }) => {
+      const client = cName(po.clientId).toLowerCase();
+      return (
+        po.poNumber.toLowerCase().includes(q) ||
+        client.includes(q) ||
+        (po.poDate ?? "").toLowerCase().includes(q) ||
+        (po.deliveryDate ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [eligiblePOs, poSearch, clients]);
 
   const addLine = (po: PurchaseOrder, color: string, material: string, poItemId?: string) => {
     setLines((prev) => [...prev, {
@@ -347,20 +362,27 @@ function NewProdOrder() {
       <Dialog open={pickPOOpen} onOpenChange={setPickPOOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>Add PO — eligible POs</DialogTitle></DialogHeader>
+          <Input
+            placeholder="Search by PO #, client, or date..."
+            value={poSearch}
+            onChange={(e) => setPoSearch(e.target.value)}
+            className="mb-2"
+          />
           <div className="max-h-[500px] overflow-y-auto rounded-md border">
             <Table>
               <TableHeader className="sticky top-0 bg-background"><TableRow>
-                <TableHead>Client</TableHead><TableHead>PO</TableHead>
+                <TableHead>Client</TableHead><TableHead>PO</TableHead><TableHead>PO Date</TableHead>
                 <TableHead>Delivery</TableHead><TableHead>Days</TableHead>
                 <TableHead>Stage</TableHead><TableHead></TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {eligiblePOs.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No eligible POs.</TableCell></TableRow>
-                ) : eligiblePOs.map(({ po, stage, days }) => (
+                {filteredEligiblePOs.length === 0 ? (
+                  <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">No eligible POs.</TableCell></TableRow>
+                ) : filteredEligiblePOs.map(({ po, stage, days }) => (
                   <TableRow key={po.id} className={days < 0 ? "bg-red-50 dark:bg-red-950/20" : days <= 10 ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
                     <TableCell>{cName(po.clientId)}</TableCell>
                     <TableCell className="font-mono">{po.poNumber}</TableCell>
+                    <TableCell>{po.poDate}</TableCell>
                     <TableCell>{po.deliveryDate}</TableCell>
                     <TableCell>{daysRemainingLabel(days)}</TableCell>
                     <TableCell><Badge className={STAGE_BADGE[stage]} variant="secondary">{STAGE_LABEL[stage]}</Badge></TableCell>
