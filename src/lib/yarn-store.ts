@@ -16,6 +16,7 @@ export interface YarnSupplier {
   gst: string;
   remarks: string;
   active: boolean;
+  defaultPaperTubeWeight: number;
   createdAt: string;
 }
 
