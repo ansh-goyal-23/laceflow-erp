@@ -20,6 +20,7 @@ import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
 import { Route as AuthenticatedYarnSuppliersRouteImport } from './routes/_authenticated/yarn.suppliers'
 import { Route as AuthenticatedYarnShadesRouteImport } from './routes/_authenticated/yarn.shades'
+import { Route as AuthenticatedYarnPendingAllocationsRouteImport } from './routes/_authenticated/yarn.pending-allocations'
 import { Route as AuthenticatedReportsPendencyPoRouteImport } from './routes/_authenticated/reports.pendency-po'
 import { Route as AuthenticatedReportsPendencyItemRouteImport } from './routes/_authenticated/reports.pendency-item'
 import { Route as AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.pdf-import-history'
@@ -101,6 +102,12 @@ const AuthenticatedYarnShadesRoute = AuthenticatedYarnShadesRouteImport.update({
   path: '/yarn/shades',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedYarnPendingAllocationsRoute =
+  AuthenticatedYarnPendingAllocationsRouteImport.update({
+    id: '/yarn/pending-allocations',
+    path: '/yarn/pending-allocations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedReportsPendencyPoRoute =
   AuthenticatedReportsPendencyPoRouteImport.update({
     id: '/reports/pendency-po',
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/yarn/pending-allocations': typeof AuthenticatedYarnPendingAllocationsRoute
   '/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
@@ -294,6 +302,7 @@ export interface FileRoutesByTo {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/yarn/pending-allocations': typeof AuthenticatedYarnPendingAllocationsRoute
   '/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
@@ -331,6 +340,7 @@ export interface FileRoutesById {
   '/_authenticated/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/_authenticated/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/_authenticated/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/_authenticated/yarn/pending-allocations': typeof AuthenticatedYarnPendingAllocationsRoute
   '/_authenticated/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/_authenticated/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/yarn/pending-allocations'
     | '/yarn/shades'
     | '/yarn/suppliers'
     | '/invoices/'
@@ -403,6 +414,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/yarn/pending-allocations'
     | '/yarn/shades'
     | '/yarn/suppliers'
     | '/invoices'
@@ -439,6 +451,7 @@ export interface FileRouteTypes {
     | '/_authenticated/purchase-orders/pdf-import-history'
     | '/_authenticated/reports/pendency-item'
     | '/_authenticated/reports/pendency-po'
+    | '/_authenticated/yarn/pending-allocations'
     | '/_authenticated/yarn/shades'
     | '/_authenticated/yarn/suppliers'
     | '/_authenticated/invoices/'
@@ -539,6 +552,13 @@ declare module '@tanstack/react-router' {
       path: '/yarn/shades'
       fullPath: '/yarn/shades'
       preLoaderRoute: typeof AuthenticatedYarnShadesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/yarn/pending-allocations': {
+      id: '/_authenticated/yarn/pending-allocations'
+      path: '/yarn/pending-allocations'
+      fullPath: '/yarn/pending-allocations'
+      preLoaderRoute: typeof AuthenticatedYarnPendingAllocationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports/pendency-po': {
@@ -722,6 +742,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchaseOrdersPdfImportHistoryRoute: typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   AuthenticatedReportsPendencyItemRoute: typeof AuthenticatedReportsPendencyItemRoute
   AuthenticatedReportsPendencyPoRoute: typeof AuthenticatedReportsPendencyPoRoute
+  AuthenticatedYarnPendingAllocationsRoute: typeof AuthenticatedYarnPendingAllocationsRoute
   AuthenticatedYarnShadesRoute: typeof AuthenticatedYarnShadesRoute
   AuthenticatedYarnSuppliersRoute: typeof AuthenticatedYarnSuppliersRoute
   AuthenticatedInvoicesIndexRoute: typeof AuthenticatedInvoicesIndexRoute
@@ -760,6 +781,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedPurchaseOrdersPdfImportHistoryRoute,
   AuthenticatedReportsPendencyItemRoute: AuthenticatedReportsPendencyItemRoute,
   AuthenticatedReportsPendencyPoRoute: AuthenticatedReportsPendencyPoRoute,
+  AuthenticatedYarnPendingAllocationsRoute:
+    AuthenticatedYarnPendingAllocationsRoute,
   AuthenticatedYarnShadesRoute: AuthenticatedYarnShadesRoute,
   AuthenticatedYarnSuppliersRoute: AuthenticatedYarnSuppliersRoute,
   AuthenticatedInvoicesIndexRoute: AuthenticatedInvoicesIndexRoute,
