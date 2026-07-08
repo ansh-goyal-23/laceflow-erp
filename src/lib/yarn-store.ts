@@ -322,7 +322,7 @@ let hydrating: Promise<void> | null = null;
 async function hydrate(): Promise<void> {
   if (hydrating) return hydrating;
   hydrating = (async () => {
-    const [sup, sh, so, soi, sr, po, poi, rc, ra, ov] = await Promise.all([
+    const [sup, sh, so, soi, sr, po, poi, iw, iwi, ia, ov] = await Promise.all([
       supabase.from("yarn_suppliers").select("*").order("name"),
       supabase.from("yarn_shades").select("*").order("created_at", { ascending: false }),
       supabase.from("yarn_sample_orders").select("*").order("created_at", { ascending: false }),
@@ -330,12 +330,13 @@ async function hydrate(): Promise<void> {
       supabase.from("yarn_sample_receipts").select("*"),
       supabase.from("yarn_production_orders").select("*").order("created_at", { ascending: false }),
       supabase.from("yarn_production_order_items").select("*"),
-      supabase.from("yarn_receipts").select("*").order("created_at", { ascending: false }),
-      supabase.from("yarn_receipt_allocations").select("*"),
+      supabase.from("yarn_inwards").select("*").order("created_at", { ascending: false }),
+      supabase.from("yarn_inward_items").select("*").order("sort_order"),
+      supabase.from("yarn_inward_allocations").select("*"),
       supabase.from("yarn_po_item_overrides").select("*"),
     ]);
 
-    const errs = [sup, sh, so, soi, sr, po, poi, rc, ra, ov]
+    const errs = [sup, sh, so, soi, sr, po, poi, iw, iwi, ia, ov]
       .map((r) => r.error).filter(Boolean);
     if (errs.length) {
       console.error("[yarn-store] hydrate errors:", errs);
