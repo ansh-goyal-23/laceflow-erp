@@ -795,6 +795,40 @@ export interface PendingProdRow {
   pending: number;
 }
 
+export function inwardItemAllocatedQty(it: YarnInwardItem): number {
+  return it.allocations.reduce((s, a) => s + a.qty, 0);
+}
+
+export function inwardItemUnallocatedQty(it: YarnInwardItem): number {
+  return Math.max(0, it.netWeight - inwardItemAllocatedQty(it));
+}
+
+function findInwardItem(s: StoreShape, id: string): { item?: YarnInwardItem; inward?: YarnInward } {
+  for (const inw of s.inwards) {
+    const it = inw.items.find((i) => i.id === id);
+    if (it) return { item: it, inward: inw };
+  }
+  return {};
+}
+
+async function commitInwardAllocations(
+  inwardItemId: string,
+  allocations: { prodOrderItemId: string; qty: number }[],
+): Promise<void> {
+  const filtered = allocations.filter((a) => (Number(a.qty) || 0) > 0);
+  if (!filtered.length) return;
+  throwIfError(await supabase.from("yarn_inward_allocations").insert(
+    filtered.map((a) => ({
+      inward_item_id: inwardItemId,
+      prod_order_item_id: a.prodOrderItemId,
+      qty: Number(a.qty) || 0,
+    })),
+  ));
+  for (const a of filtered) {
+    await persistProdReceivedQty(a.prodOrderItemId, Number(a.qty) || 0);
+  }
+}
+
 function getPendingRowsForShade(
   s: StoreShape, supplierId: string, supplierShadeNumber: string,
 ): PendingProdRow[] {
