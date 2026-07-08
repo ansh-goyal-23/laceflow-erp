@@ -469,6 +469,7 @@ export const yarnStore = {
     const row = throwIfError(await supabase.from("yarn_suppliers").insert({
       name: s.name, contact_person: s.contactPerson, mobile: s.mobile,
       email: s.email, address: s.address, gst: s.gst, remarks: s.remarks,
+      default_paper_tube_weight: s.defaultPaperTubeWeight ?? 0,
     }).select().single());
     await refresh();
     return mapSupplier(row);
@@ -483,6 +484,7 @@ export const yarnStore = {
     if (patch.gst !== undefined) p.gst = patch.gst;
     if (patch.remarks !== undefined) p.remarks = patch.remarks;
     if (patch.active !== undefined) p.active = patch.active;
+    if (patch.defaultPaperTubeWeight !== undefined) p.default_paper_tube_weight = patch.defaultPaperTubeWeight;
     throwIfError(await supabase.from("yarn_suppliers").update(p).eq("id", id));
     await refresh();
   },
