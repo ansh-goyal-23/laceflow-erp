@@ -671,69 +671,94 @@ export const yarnStore = {
     await refresh();
   },
 
-  // ---------- Yarn Receipts ----------
-  async planYarnReceipt(input: {
-    receiptDate: string; supplierId: string; supplierShadeNumber: string;
-    lotNumber?: string; grossWeight: number; cones: number; remarks?: string;
-  }): Promise<
-    | { needsManual: true; pendingRows: PendingProdRow[]; draft: typeof input }
-    | { needsManual: false; receipt: YarnReceipt }
-  > {
+  // ---------- Yarn Inwards (Store dept) ----------
+  async addInward(input: {
+    inwardDate: string; supplierId: string; supplierChallanNumber: string;
+    remarks?: string;
+    items: Array<{
+      supplierShadeNumber: string; lotNumber?: string;
+      grossWeight: number; cones: number; paperTubeWeight: number;
+      remarks?: string;
+    }>;
+  }): Promise<YarnInward> {
     if (!hydrated) await hydrate();
-    const pending = getPendingRowsForShade(state, input.supplierId, input.supplierShadeNumber);
-    const totalPending = pending.reduce((s, r) => s + r.pending, 0);
-    if (input.grossWeight + 0.0001 >= totalPending && totalPending > 0) {
-      const receipt = await this.commitYarnReceipt({
-        ...input,
-        allocations: pending.map((r) => ({ prodOrderItemId: r.prodOrderItemId, qty: r.pending })),
-      });
-      return { needsManual: false, receipt };
-    }
-    if (totalPending <= 0) {
-      const receipt = await this.commitYarnReceipt({ ...input, allocations: [] });
-      return { needsManual: false, receipt };
-    }
-    return { needsManual: true, pendingRows: pending, draft: input };
-  },
-  async commitYarnReceipt(input: {
-    receiptDate: string; supplierId: string; supplierShadeNumber: string;
-    lotNumber?: string; grossWeight: number; cones: number; remarks?: string;
-    allocations: { prodOrderItemId: string; qty: number }[];
-  }): Promise<YarnReceipt> {
-    const filtered = input.allocations.filter((a) => (Number(a.qty) || 0) > 0);
-    const totalAlloc = filtered.reduce((s, a) => s + (Number(a.qty) || 0), 0);
-    const receiptRow = throwIfError(await supabase.from("yarn_receipts").insert({
-      receipt_date: input.receiptDate,
+    if (!input.items.length) throw new Error("Add at least one inward item");
+    const number = nextNumberInternal("INW", state.inwards);
+    const header = throwIfError(await supabase.from("yarn_inwards").insert({
+      number,
+      inward_date: input.inwardDate,
       supplier_id: input.supplierId,
-      supplier_shade_number: input.supplierShadeNumber,
-      lot_number: input.lotNumber,
-      gross_weight: input.grossWeight,
-      cones: input.cones,
-      unallocated_qty: Math.max(0, input.grossWeight - totalAlloc),
+      supplier_challan_number: input.supplierChallanNumber ?? "",
       remarks: input.remarks,
     }).select().single()) as { id: string };
-    if (filtered.length > 0) {
-      throwIfError(await supabase.from("yarn_receipt_allocations").insert(
-        filtered.map((a) => ({
-          receipt_id: receiptRow.id,
-          prod_order_item_id: a.prodOrderItemId,
-          qty: Number(a.qty) || 0,
-        })),
-      ));
-      for (const a of filtered) {
-        await persistProdReceivedQty(a.prodOrderItemId, Number(a.qty) || 0);
+    throwIfError(await supabase.from("yarn_inward_items").insert(
+      input.items.map((i, idx) => {
+        const net = Math.max(0, (Number(i.grossWeight) || 0) - (Number(i.cones) || 0) * (Number(i.paperTubeWeight) || 0));
+        return {
+          inward_id: header.id,
+          supplier_shade_number: i.supplierShadeNumber,
+          lot_number: i.lotNumber || null,
+          gross_weight: Number(i.grossWeight) || 0,
+          cones: Number(i.cones) || 0,
+          paper_tube_weight: Number(i.paperTubeWeight) || 0,
+          net_weight: net,
+          remarks: i.remarks || null,
+          sort_order: idx,
+        };
+      }),
+    ));
+    await refresh();
+    return state.inwards.find((r) => r.id === header.id)!;
+  },
+
+  async deleteInward(id: string) {
+    const rec = state.inwards.find((r) => r.id === id);
+    if (!rec) return;
+    for (const it of rec.items) {
+      for (const a of it.allocations) {
+        await persistProdReceivedQty(a.prodOrderItemId, -a.qty);
       }
     }
+    throwIfError(await supabase.from("yarn_inwards").delete().eq("id", id));
     await refresh();
-    return state.receipts.find((r) => r.id === receiptRow.id)!;
   },
-  async deleteReceipt(id: string) {
-    const rec = state.receipts.find((r) => r.id === id);
-    if (!rec) return;
-    for (const a of rec.allocations) {
-      await persistProdReceivedQty(a.prodOrderItemId, -a.qty);
+
+  /** Auto-allocate one inward item if remaining net covers all pending. */
+  async allocateInwardItemAuto(inwardItemId: string): Promise<
+    | { done: true }
+    | { done: false; pendingRows: PendingProdRow[]; remainingNet: number }
+  > {
+    if (!hydrated) await hydrate();
+    const { item, inward } = findInwardItem(state, inwardItemId);
+    if (!item || !inward) throw new Error("Inward item not found");
+    const remaining = inwardItemUnallocatedQty(item);
+    if (remaining <= 0.0001) return { done: true };
+    const pending = getPendingRowsForShade(state, inward.supplierId, item.supplierShadeNumber);
+    const totalPending = pending.reduce((s, r) => s + r.pending, 0);
+    if (totalPending <= 0.0001) return { done: true }; // nothing to allocate to; stays unallocated
+    if (remaining + 0.0001 >= totalPending) {
+      await commitInwardAllocations(inwardItemId,
+        pending.map((r) => ({ prodOrderItemId: r.prodOrderItemId, qty: r.pending })));
+      await refresh();
+      return { done: true };
     }
-    throwIfError(await supabase.from("yarn_receipts").delete().eq("id", id));
+    return { done: false, pendingRows: pending, remainingNet: remaining };
+  },
+
+  async allocateInwardItemManual(
+    inwardItemId: string,
+    allocations: { prodOrderItemId: string; qty: number }[],
+  ): Promise<void> {
+    if (!hydrated) await hydrate();
+    const { item } = findInwardItem(state, inwardItemId);
+    if (!item) throw new Error("Inward item not found");
+    const remaining = inwardItemUnallocatedQty(item);
+    const filtered = allocations.filter((a) => (Number(a.qty) || 0) > 0);
+    const sum = filtered.reduce((s, a) => s + (Number(a.qty) || 0), 0);
+    if (sum - remaining > 0.0001) {
+      throw new Error(`Allocated ${sum.toFixed(2)} exceeds remaining net ${remaining.toFixed(2)}`);
+    }
+    await commitInwardAllocations(inwardItemId, filtered);
     await refresh();
   },
 
