@@ -1,50 +1,94 @@
-# Yarn Module → Supabase
+## Goal
 
-This is a large refactor (~11 files, sync → async). Confirming the shape before I execute.
+Split the current single "Yarn Receipt" screen into three independent screens:
 
-## Prerequisite
+1. **Yarn Inward** (Store dept) — records physical yarn only, no allocation.
+2. **Pending Yarn Allocation** (Procurement) — auto- or manual-allocates each inward item to Production Yarn Orders.
+3. **Unallocated Yarn** — remaining Net Weight after allocation, for future Inventory.
 
-You've run `docs/yarn-management.sql` in Supabase (tables, RLS, `yarn-swatches` bucket exist).
+Procurement Stage calculations always use **allocated Net Yarn Weight**, never Gross Weight and never unallocated yarn.
 
-## Approach
+## Data model changes (SQL migration – `docs/yarn-management.sql` additions)
 
-Keep the **same public API surface** in `src/lib/yarn-store.ts` so route files change minimally:
+Add to `yarn_suppliers`:
+- `default_paper_tube_weight numeric NOT NULL DEFAULT 0` — default per-cone paper tube weight.
 
-- `useYarnStore(sel)` stays as a selector hook, but it now reads from a **React Query-backed cache** that fetches all yarn tables once per session (Suppliers, Shades, Sample Orders + items + receipts, Production Orders + items, Receipts + allocations, Overrides). Small dataset → single "yarn-bundle" query is fine and keeps selector semantics.
-- `yarnStore.addX / updateX / deleteX` become **async** and go through `supabase.from(...)`. Each writes, then calls `queryClient.invalidateQueries(['yarn'])`.
-- Callers get `await`ed at each call site (~30 call sites across 11 route files). Toast/nav happens after `await`.
+Replace the current single `yarn_receipts` (which stores one shade + gross weight) with a header/line model:
 
-## Data mapping
+- `yarn_inwards` (header)
+  - `id`, `number text UNIQUE` (auto `INW-YYYY-####`), `inward_date`, `supplier_id`,
+    `supplier_challan_number text`, `remarks text`, `created_at`, `created_by`.
+- `yarn_inward_items` (lines)
+  - `id`, `inward_id → yarn_inwards`, `supplier_shade_number`, `lot_number`,
+    `gross_weight`, `cones`, `paper_tube_weight`, `net_weight` (stored, = gross − cones×tube),
+    `remarks`, `sort_order`.
 
-Snake_case DB ↔ camelCase TS via a thin mapper module (`src/lib/yarn/mappers.ts`). One mapper per entity, kept trivial (no business logic).
+Keep `yarn_receipt_allocations` but repoint FK to `yarn_inward_items`:
+- Rename to `yarn_inward_allocations` with `inward_item_id`.
+- `qty numeric CHECK (qty > 0)` — this qty is in **Net kg**.
+- Unallocated qty is derived: `net_weight − SUM(allocations.qty)` (no stored `unallocated_qty` — always live-computed to avoid drift).
 
-## Complex bits preserved as-is
+`yarn_production_order_items.received_qty` continues to track allocated Net kg (delta pattern preserved).
 
-- **`planYarnReceipt`** (auto vs manual allocation) — runs in JS after fetching current production items for the shade; on commit, `INSERT` receipt + allocations in a single RPC-free sequence, then bumps `received_qty` on affected items in one `update` per row. Wrapped so partial failure surfaces via toast.
-- **`ensureShade`** — checks cache first, otherwise `INSERT ... ON CONFLICT DO UPDATE` against the unique index the migration already creates.
-- **Procurement stage functions** (`calculateProcurementStage`, `poOverallStage`, `poItemStage`) — unchanged; they operate on the in-memory `StoreShape`, which the cache still provides.
-- **Order numbering (`SYO-YYYY-####`, `PYO-YYYY-####`)** — kept client-side against the cached list. Racy under concurrent users; acceptable given single-tenant usage. Note: switch to a DB sequence later if needed.
-- **`created_by` / `id` / `created_at`** — set by DB defaults + the trigger from the migration; TS no longer generates UUIDs.
+Grants + RLS mirroring `yarn_receipts` (created_by on header, child gated via parent).
 
-## Auth guard
+The old `yarn_receipts` / `yarn_receipt_allocations` tables and old `unallocated_qty` field are dropped in the same migration.
 
-All queries assume a signed-in Supabase session (already enforced by `_authenticated` layout). No public routes access yarn tables.
+## Store layer (`src/lib/yarn-store.ts`)
 
-## Files
+Rename all "receipt" terminology in the yarn-inward pipeline to "inward":
 
-- **Rewrite:** `src/lib/yarn-store.ts` (Query-backed, async writes, same exports).
-- **Add:** `src/lib/yarn/mappers.ts`.
-- **Edit:** all 10 yarn route files — add `await` on writes, small loading/error states where a mutation blocks navigation. No UI redesign.
-- **Delete:** `localStorage` key `shreelace.yarn.v1` reads (kept as a one-time migration import? see below).
+- New types:
+  - `YarnInwardItem { id, supplierShadeNumber, lotNumber?, grossWeight, cones, paperTubeWeight, netWeight, remarks?, allocations: YarnInwardAllocation[] }`
+  - `YarnInward { id, number, inwardDate, supplierId, supplierChallanNumber, remarks?, items: YarnInwardItem[], createdAt }`
+  - `YarnInwardAllocation { id, inwardItemId, prodOrderItemId, qty }`
+- `YarnSupplier` gains `defaultPaperTubeWeight: number`.
 
-## Optional one-time import (recommend YES)
+`StoreShape` field `receipts` → `inwards: YarnInward[]`.
 
-On first mount, if `localStorage['shreelace.yarn.v1']` exists and Supabase tables are empty for this user, offer a "Import local data" toast → uploads suppliers → shades → orders → receipts, then deletes the key. Prevents users losing what's in their browser. Say the word if you want this — otherwise I skip it and old localStorage data is orphaned.
+New store methods:
+- `addInward({ inwardDate, supplierId, supplierChallanNumber, remarks, items[] })` — inserts header + items; **no allocations**.
+- `deleteInward(id)` — reverses any allocations first (adjust prod `received_qty`), then deletes.
+- `deleteInwardItem(itemId)` — reverse its allocations, delete item.
+- `allocateInwardItemAuto(itemId)` — if Net ≥ total pending for (supplier, shade), allocate all pending and return `{ done: true }`. Otherwise return `{ done: false, pendingRows }` for the popup.
+- `allocateInwardItemManual(itemId, allocations[])` — validate total == net, insert rows, bump prod received_qty.
 
-## Out of scope
+Helpers:
+- `inwardItemAllocatedQty(item)` and `inwardItemUnallocatedQty(item) = net − allocated`.
+- `getPendingRowsForShade(supplierId, shadeNumber)` unchanged.
 
-- Realtime subscriptions (relies on `queryClient.invalidate` after mutations).
-- Swatch upload to `yarn-swatches` bucket — current UI already stores `swatchUrl` string; keep as-is (users paste URLs). If you want file uploads, that's a follow-up.
-- Server-side stage cache table (`procurement_stage_cache` from the plan wasn't in the migration; stage stays computed on the client).
+Procurement stage functions keep using `productionOrderItems.receivedQty` — since only allocations bump it, the "allocated Net Yarn Weight only" rule holds automatically. No code path uses gross weight in stage calc.
 
-Confirm and I'll execute in one pass. Include a note if you want the one-time localStorage import.
+Keep legacy `commitYarnReceipt`/`planYarnReceipt` **removed** — all callers updated.
+
+## Route/UI changes (`src/routes/_authenticated/`)
+
+Delete:
+- `yarn.receipts.index.tsx`
+- `yarn.receipts.new.tsx`
+
+Add:
+- `yarn.inwards.index.tsx` — list of Yarn Inwards. Columns: Number, Date, Supplier, Challan #, # Items, Total Net (Kg). Row → detail.
+- `yarn.inwards.new.tsx` — Dispatch-style form.
+  - Header: Inward Number (auto-preview from last number), Inward Date, Supplier (select), Supplier Challan #, Remarks.
+  - Items grid: Supplier Shade #, Lot #, Gross, Cones, Paper Tube Wt/Cone (prefilled from supplier default, editable per row), Net (auto = gross − cones × tube, read-only), Remarks. Add/remove rows.
+  - Submit → `addInward(...)`, redirect to list.
+- `yarn.inwards.$id.tsx` — inward detail with items and per-item allocation summary.
+- `yarn.pending-allocations.tsx` — lists every `YarnInwardItem` where `unallocated > 0` **AND** matching pending prod-order-items exist. Columns: Supplier, Inward #, Inward Date, Shade #, Lot #, Net (Kg), Unallocated (Kg), Allocation Status, "Allocate" button.
+  - Clicking Allocate calls `allocateInwardItemAuto`. If `done`, toast + refresh. If not, open popup with editable qty per pending prod-order row (Client, PO, Material, Color, Ordered, Already Allocated, Pending, Allocate). Validation: each ≤ pending; total == net remaining to allocate. Submit calls `allocateInwardItemManual`.
+- `yarn.unallocated.tsx` — lists all inward items with `unallocated > 0`. Columns: Supplier, Shade #, Lot #, Available Qty, Inward #, Inward Date.
+
+Sidebar (`src/components/app-sidebar.tsx`) — under "Yarn Management" replace "Receipts" with:
+- Yarn Inward
+- Pending Yarn Allocation
+- Unallocated Yarn
+
+(Suppliers, Shades, Sample Orders, Production Orders remain.)
+
+Supplier form (`src/routes/_authenticated/yarn.suppliers.tsx`) gains a "Default Paper Tube Weight per Cone (Kg)" numeric field.
+
+## Non-goals / preservation
+
+- Procurement Stage badges keep their current meanings; nothing on the PO screens changes.
+- No changes to Sample Orders, Production Orders, Shades, or Suppliers screens beyond the new supplier field.
+- Existing `yarn_receipts` rows are dropped by the migration (per user's earlier "never use Lovable Cloud migrations" — but here they explicitly asked for the schema change; migration file is authored as SQL for them to run manually).

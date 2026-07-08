@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,9 @@ const yarnNav: { to: string; label: string; icon: typeof Plus }[] = [
   { to: "/yarn/shades", label: "Shade Library", icon: Palette },
   { to: "/yarn/sample-orders", label: "Sample Yarn Orders", icon: Beaker },
   { to: "/yarn/production-orders", label: "Production Yarn Orders", icon: Boxes },
-  { to: "/yarn/receipts", label: "Yarn Receipts", icon: PackageCheck },
+  { to: "/yarn/inwards", label: "Yarn Inward", icon: Inbox },
+  { to: "/yarn/pending-allocations", label: "Pending Yarn Allocation", icon: ListTodo },
+  { to: "/yarn/unallocated", label: "Unallocated Yarn", icon: PackageCheck },
 ];
 
 const adminNav: { to: string; label: string; icon: typeof Plus }[] = [

@@ -16,6 +16,7 @@ export interface YarnSupplier {
   gst: string;
   remarks: string;
   active: boolean;
+  defaultPaperTubeWeight: number;
   createdAt: string;
 }
 
@@ -110,23 +111,34 @@ export interface ProductionYarnOrder {
   createdAt: string;
 }
 
-export interface YarnReceiptAllocation {
+export interface YarnInwardAllocation {
   id: string;
+  inwardItemId: string;
   prodOrderItemId: string;
   qty: number;
 }
 
-export interface YarnReceipt {
+export interface YarnInwardItem {
   id: string;
-  receiptDate: string;
-  supplierId: string;
+  inwardId: string;
   supplierShadeNumber: string;
   lotNumber?: string;
   grossWeight: number;
   cones: number;
-  unallocatedQty: number;
+  paperTubeWeight: number;
+  netWeight: number;
   remarks?: string;
-  allocations: YarnReceiptAllocation[];
+  allocations: YarnInwardAllocation[];
+}
+
+export interface YarnInward {
+  id: string;
+  number: string;
+  inwardDate: string;
+  supplierId: string;
+  supplierChallanNumber: string;
+  remarks?: string;
+  items: YarnInwardItem[];
   createdAt: string;
 }
 
@@ -137,7 +149,7 @@ export interface StoreShape {
   shades: YarnShade[];
   sampleOrders: SampleYarnOrder[];
   productionOrders: ProductionYarnOrder[];
-  receipts: YarnReceipt[];
+  inwards: YarnInward[];
   overrides: Record<string, PoItemOverride>;
 }
 
@@ -150,7 +162,7 @@ const empty: StoreShape = {
   shades: [],
   sampleOrders: [],
   productionOrders: [],
-  receipts: [],
+  inwards: [],
   overrides: {},
 };
 
@@ -201,6 +213,7 @@ function mapSupplier(r: any): YarnSupplier {
     gst: r.gst ?? "",
     remarks: r.remarks ?? "",
     active: !!r.active,
+    defaultPaperTubeWeight: Number(r.default_paper_tube_weight) || 0,
     createdAt: r.created_at,
   };
 }
@@ -266,8 +279,28 @@ function mapProdItem(r: any): ProductionYarnOrderItem {
   };
 }
 
-function mapAllocation(r: any): YarnReceiptAllocation {
-  return { id: r.id, prodOrderItemId: r.prod_order_item_id, qty: Number(r.qty) || 0 };
+function mapAllocation(r: any): YarnInwardAllocation {
+  return {
+    id: r.id,
+    inwardItemId: r.inward_item_id,
+    prodOrderItemId: r.prod_order_item_id,
+    qty: Number(r.qty) || 0,
+  };
+}
+
+function mapInwardItem(r: any, allocs: YarnInwardAllocation[]): YarnInwardItem {
+  return {
+    id: r.id,
+    inwardId: r.inward_id,
+    supplierShadeNumber: r.supplier_shade_number,
+    lotNumber: r.lot_number ?? undefined,
+    grossWeight: Number(r.gross_weight) || 0,
+    cones: Number(r.cones) || 0,
+    paperTubeWeight: Number(r.paper_tube_weight) || 0,
+    netWeight: Number(r.net_weight) || 0,
+    remarks: r.remarks ?? undefined,
+    allocations: allocs,
+  };
 }
 
 function computeProdStatus(o: ProductionYarnOrder): ProductionOrderStatus {
@@ -289,7 +322,7 @@ let hydrating: Promise<void> | null = null;
 async function hydrate(): Promise<void> {
   if (hydrating) return hydrating;
   hydrating = (async () => {
-    const [sup, sh, so, soi, sr, po, poi, rc, ra, ov] = await Promise.all([
+    const [sup, sh, so, soi, sr, po, poi, iw, iwi, ia, ov] = await Promise.all([
       supabase.from("yarn_suppliers").select("*").order("name"),
       supabase.from("yarn_shades").select("*").order("created_at", { ascending: false }),
       supabase.from("yarn_sample_orders").select("*").order("created_at", { ascending: false }),
@@ -297,12 +330,13 @@ async function hydrate(): Promise<void> {
       supabase.from("yarn_sample_receipts").select("*"),
       supabase.from("yarn_production_orders").select("*").order("created_at", { ascending: false }),
       supabase.from("yarn_production_order_items").select("*"),
-      supabase.from("yarn_receipts").select("*").order("created_at", { ascending: false }),
-      supabase.from("yarn_receipt_allocations").select("*"),
+      supabase.from("yarn_inwards").select("*").order("created_at", { ascending: false }),
+      supabase.from("yarn_inward_items").select("*").order("sort_order"),
+      supabase.from("yarn_inward_allocations").select("*"),
       supabase.from("yarn_po_item_overrides").select("*"),
     ]);
 
-    const errs = [sup, sh, so, soi, sr, po, poi, rc, ra, ov]
+    const errs = [sup, sh, so, soi, sr, po, poi, iw, iwi, ia, ov]
       .map((r) => r.error).filter(Boolean);
     if (errs.length) {
       console.error("[yarn-store] hydrate errors:", errs);
@@ -354,23 +388,26 @@ async function hydrate(): Promise<void> {
       return { ...base, status: computeProdStatus(base) };
     });
 
-    const allocByReceipt = new Map<string, YarnReceiptAllocation[]>();
-    for (const r of ra.data ?? []) {
+    const allocByItem = new Map<string, YarnInwardAllocation[]>();
+    for (const r of ia.data ?? []) {
       const it = mapAllocation(r);
-      const arr = allocByReceipt.get(r.receipt_id) ?? [];
-      arr.push(it); allocByReceipt.set(r.receipt_id, arr);
+      const arr = allocByItem.get(r.inward_item_id) ?? [];
+      arr.push(it); allocByItem.set(r.inward_item_id, arr);
     }
-    const receipts: YarnReceipt[] = (rc.data ?? []).map((r: any) => ({
+    const itemsByInward = new Map<string, YarnInwardItem[]>();
+    for (const r of iwi.data ?? []) {
+      const it = mapInwardItem(r, allocByItem.get(r.id) ?? []);
+      const arr = itemsByInward.get(r.inward_id) ?? [];
+      arr.push(it); itemsByInward.set(r.inward_id, arr);
+    }
+    const inwards: YarnInward[] = (iw.data ?? []).map((r: any) => ({
       id: r.id,
-      receiptDate: r.receipt_date,
+      number: r.number,
+      inwardDate: r.inward_date,
       supplierId: r.supplier_id,
-      supplierShadeNumber: r.supplier_shade_number,
-      lotNumber: r.lot_number ?? undefined,
-      grossWeight: Number(r.gross_weight) || 0,
-      cones: Number(r.cones) || 0,
-      unallocatedQty: Number(r.unallocated_qty) || 0,
+      supplierChallanNumber: r.supplier_challan_number ?? "",
       remarks: r.remarks ?? undefined,
-      allocations: allocByReceipt.get(r.id) ?? [],
+      items: itemsByInward.get(r.id) ?? [],
       createdAt: r.created_at,
     }));
 
@@ -382,7 +419,7 @@ async function hydrate(): Promise<void> {
       shades: (sh.data ?? []).map(mapShade),
       sampleOrders,
       productionOrders,
-      receipts,
+      inwards,
       overrides,
     });
     hydrated = true;
@@ -432,6 +469,7 @@ export const yarnStore = {
     const row = throwIfError(await supabase.from("yarn_suppliers").insert({
       name: s.name, contact_person: s.contactPerson, mobile: s.mobile,
       email: s.email, address: s.address, gst: s.gst, remarks: s.remarks,
+      default_paper_tube_weight: s.defaultPaperTubeWeight ?? 0,
     }).select().single());
     await refresh();
     return mapSupplier(row);
@@ -446,6 +484,7 @@ export const yarnStore = {
     if (patch.gst !== undefined) p.gst = patch.gst;
     if (patch.remarks !== undefined) p.remarks = patch.remarks;
     if (patch.active !== undefined) p.active = patch.active;
+    if (patch.defaultPaperTubeWeight !== undefined) p.default_paper_tube_weight = patch.defaultPaperTubeWeight;
     throwIfError(await supabase.from("yarn_suppliers").update(p).eq("id", id));
     await refresh();
   },
@@ -634,69 +673,94 @@ export const yarnStore = {
     await refresh();
   },
 
-  // ---------- Yarn Receipts ----------
-  async planYarnReceipt(input: {
-    receiptDate: string; supplierId: string; supplierShadeNumber: string;
-    lotNumber?: string; grossWeight: number; cones: number; remarks?: string;
-  }): Promise<
-    | { needsManual: true; pendingRows: PendingProdRow[]; draft: typeof input }
-    | { needsManual: false; receipt: YarnReceipt }
-  > {
+  // ---------- Yarn Inwards (Store dept) ----------
+  async addInward(input: {
+    inwardDate: string; supplierId: string; supplierChallanNumber: string;
+    remarks?: string;
+    items: Array<{
+      supplierShadeNumber: string; lotNumber?: string;
+      grossWeight: number; cones: number; paperTubeWeight: number;
+      remarks?: string;
+    }>;
+  }): Promise<YarnInward> {
     if (!hydrated) await hydrate();
-    const pending = getPendingRowsForShade(state, input.supplierId, input.supplierShadeNumber);
-    const totalPending = pending.reduce((s, r) => s + r.pending, 0);
-    if (input.grossWeight + 0.0001 >= totalPending && totalPending > 0) {
-      const receipt = await this.commitYarnReceipt({
-        ...input,
-        allocations: pending.map((r) => ({ prodOrderItemId: r.prodOrderItemId, qty: r.pending })),
-      });
-      return { needsManual: false, receipt };
-    }
-    if (totalPending <= 0) {
-      const receipt = await this.commitYarnReceipt({ ...input, allocations: [] });
-      return { needsManual: false, receipt };
-    }
-    return { needsManual: true, pendingRows: pending, draft: input };
-  },
-  async commitYarnReceipt(input: {
-    receiptDate: string; supplierId: string; supplierShadeNumber: string;
-    lotNumber?: string; grossWeight: number; cones: number; remarks?: string;
-    allocations: { prodOrderItemId: string; qty: number }[];
-  }): Promise<YarnReceipt> {
-    const filtered = input.allocations.filter((a) => (Number(a.qty) || 0) > 0);
-    const totalAlloc = filtered.reduce((s, a) => s + (Number(a.qty) || 0), 0);
-    const receiptRow = throwIfError(await supabase.from("yarn_receipts").insert({
-      receipt_date: input.receiptDate,
+    if (!input.items.length) throw new Error("Add at least one inward item");
+    const number = nextNumberInternal("INW", state.inwards);
+    const header = throwIfError(await supabase.from("yarn_inwards").insert({
+      number,
+      inward_date: input.inwardDate,
       supplier_id: input.supplierId,
-      supplier_shade_number: input.supplierShadeNumber,
-      lot_number: input.lotNumber,
-      gross_weight: input.grossWeight,
-      cones: input.cones,
-      unallocated_qty: Math.max(0, input.grossWeight - totalAlloc),
+      supplier_challan_number: input.supplierChallanNumber ?? "",
       remarks: input.remarks,
     }).select().single()) as { id: string };
-    if (filtered.length > 0) {
-      throwIfError(await supabase.from("yarn_receipt_allocations").insert(
-        filtered.map((a) => ({
-          receipt_id: receiptRow.id,
-          prod_order_item_id: a.prodOrderItemId,
-          qty: Number(a.qty) || 0,
-        })),
-      ));
-      for (const a of filtered) {
-        await persistProdReceivedQty(a.prodOrderItemId, Number(a.qty) || 0);
+    throwIfError(await supabase.from("yarn_inward_items").insert(
+      input.items.map((i, idx) => {
+        const net = Math.max(0, (Number(i.grossWeight) || 0) - (Number(i.cones) || 0) * (Number(i.paperTubeWeight) || 0));
+        return {
+          inward_id: header.id,
+          supplier_shade_number: i.supplierShadeNumber,
+          lot_number: i.lotNumber || null,
+          gross_weight: Number(i.grossWeight) || 0,
+          cones: Number(i.cones) || 0,
+          paper_tube_weight: Number(i.paperTubeWeight) || 0,
+          net_weight: net,
+          remarks: i.remarks || null,
+          sort_order: idx,
+        };
+      }),
+    ));
+    await refresh();
+    return state.inwards.find((r) => r.id === header.id)!;
+  },
+
+  async deleteInward(id: string) {
+    const rec = state.inwards.find((r) => r.id === id);
+    if (!rec) return;
+    for (const it of rec.items) {
+      for (const a of it.allocations) {
+        await persistProdReceivedQty(a.prodOrderItemId, -a.qty);
       }
     }
+    throwIfError(await supabase.from("yarn_inwards").delete().eq("id", id));
     await refresh();
-    return state.receipts.find((r) => r.id === receiptRow.id)!;
   },
-  async deleteReceipt(id: string) {
-    const rec = state.receipts.find((r) => r.id === id);
-    if (!rec) return;
-    for (const a of rec.allocations) {
-      await persistProdReceivedQty(a.prodOrderItemId, -a.qty);
+
+  /** Auto-allocate one inward item if remaining net covers all pending. */
+  async allocateInwardItemAuto(inwardItemId: string): Promise<
+    | { done: true }
+    | { done: false; pendingRows: PendingProdRow[]; remainingNet: number }
+  > {
+    if (!hydrated) await hydrate();
+    const { item, inward } = findInwardItem(state, inwardItemId);
+    if (!item || !inward) throw new Error("Inward item not found");
+    const remaining = inwardItemUnallocatedQty(item);
+    if (remaining <= 0.0001) return { done: true };
+    const pending = getPendingRowsForShade(state, inward.supplierId, item.supplierShadeNumber);
+    const totalPending = pending.reduce((s, r) => s + r.pending, 0);
+    if (totalPending <= 0.0001) return { done: true }; // nothing to allocate to; stays unallocated
+    if (remaining + 0.0001 >= totalPending) {
+      await commitInwardAllocations(inwardItemId,
+        pending.map((r) => ({ prodOrderItemId: r.prodOrderItemId, qty: r.pending })));
+      await refresh();
+      return { done: true };
     }
-    throwIfError(await supabase.from("yarn_receipts").delete().eq("id", id));
+    return { done: false, pendingRows: pending, remainingNet: remaining };
+  },
+
+  async allocateInwardItemManual(
+    inwardItemId: string,
+    allocations: { prodOrderItemId: string; qty: number }[],
+  ): Promise<void> {
+    if (!hydrated) await hydrate();
+    const { item } = findInwardItem(state, inwardItemId);
+    if (!item) throw new Error("Inward item not found");
+    const remaining = inwardItemUnallocatedQty(item);
+    const filtered = allocations.filter((a) => (Number(a.qty) || 0) > 0);
+    const sum = filtered.reduce((s, a) => s + (Number(a.qty) || 0), 0);
+    if (sum - remaining > 0.0001) {
+      throw new Error(`Allocated ${sum.toFixed(2)} exceeds remaining net ${remaining.toFixed(2)}`);
+    }
+    await commitInwardAllocations(inwardItemId, filtered);
     await refresh();
   },
 
@@ -729,6 +793,40 @@ export interface PendingProdRow {
   orderedQty: number;
   receivedQty: number;
   pending: number;
+}
+
+export function inwardItemAllocatedQty(it: YarnInwardItem): number {
+  return it.allocations.reduce((s, a) => s + a.qty, 0);
+}
+
+export function inwardItemUnallocatedQty(it: YarnInwardItem): number {
+  return Math.max(0, it.netWeight - inwardItemAllocatedQty(it));
+}
+
+function findInwardItem(s: StoreShape, id: string): { item?: YarnInwardItem; inward?: YarnInward } {
+  for (const inw of s.inwards) {
+    const it = inw.items.find((i) => i.id === id);
+    if (it) return { item: it, inward: inw };
+  }
+  return {};
+}
+
+async function commitInwardAllocations(
+  inwardItemId: string,
+  allocations: { prodOrderItemId: string; qty: number }[],
+): Promise<void> {
+  const filtered = allocations.filter((a) => (Number(a.qty) || 0) > 0);
+  if (!filtered.length) return;
+  throwIfError(await supabase.from("yarn_inward_allocations").insert(
+    filtered.map((a) => ({
+      inward_item_id: inwardItemId,
+      prod_order_item_id: a.prodOrderItemId,
+      qty: Number(a.qty) || 0,
+    })),
+  ));
+  for (const a of filtered) {
+    await persistProdReceivedQty(a.prodOrderItemId, Number(a.qty) || 0);
+  }
 }
 
 function getPendingRowsForShade(

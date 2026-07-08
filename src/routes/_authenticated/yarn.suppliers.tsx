@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/yarn/suppliers")({
   component: SuppliersPage,
 });
 
-const empty = { name: "", contactPerson: "", mobile: "", email: "", address: "", gst: "", remarks: "" };
+const empty = { name: "", contactPerson: "", mobile: "", email: "", address: "", gst: "", remarks: "", defaultPaperTubeWeight: 0 };
 
 function SuppliersPage() {
   const suppliers = useYarnStore((s) => s.suppliers);
@@ -39,6 +39,7 @@ function SuppliersPage() {
     setForm({
       name: s.name, contactPerson: s.contactPerson, mobile: s.mobile,
       email: s.email, address: s.address, gst: s.gst, remarks: s.remarks,
+      defaultPaperTubeWeight: s.defaultPaperTubeWeight,
     });
     setOpen(true);
   };
@@ -117,6 +118,7 @@ function SuppliersPage() {
             <div className="col-span-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             <div className="col-span-2"><Label>Address</Label><Textarea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
             <div><Label>GST</Label><Input value={form.gst} onChange={(e) => setForm({ ...form, gst: e.target.value })} /></div>
+            <div><Label>Default Paper Tube Wt / Cone (Kg)</Label><Input type="number" step="0.001" value={form.defaultPaperTubeWeight} onChange={(e) => setForm({ ...form, defaultPaperTubeWeight: Number(e.target.value) || 0 })} /></div>
             <div className="col-span-2"><Label>Remarks</Label><Textarea rows={2} value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
           </div>
           <DialogFooter>
