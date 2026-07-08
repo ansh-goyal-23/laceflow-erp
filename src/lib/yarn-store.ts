@@ -111,23 +111,34 @@ export interface ProductionYarnOrder {
   createdAt: string;
 }
 
-export interface YarnReceiptAllocation {
+export interface YarnInwardAllocation {
   id: string;
+  inwardItemId: string;
   prodOrderItemId: string;
   qty: number;
 }
 
-export interface YarnReceipt {
+export interface YarnInwardItem {
   id: string;
-  receiptDate: string;
-  supplierId: string;
+  inwardId: string;
   supplierShadeNumber: string;
   lotNumber?: string;
   grossWeight: number;
   cones: number;
-  unallocatedQty: number;
+  paperTubeWeight: number;
+  netWeight: number;
   remarks?: string;
-  allocations: YarnReceiptAllocation[];
+  allocations: YarnInwardAllocation[];
+}
+
+export interface YarnInward {
+  id: string;
+  number: string;
+  inwardDate: string;
+  supplierId: string;
+  supplierChallanNumber: string;
+  remarks?: string;
+  items: YarnInwardItem[];
   createdAt: string;
 }
 
@@ -138,7 +149,7 @@ export interface StoreShape {
   shades: YarnShade[];
   sampleOrders: SampleYarnOrder[];
   productionOrders: ProductionYarnOrder[];
-  receipts: YarnReceipt[];
+  inwards: YarnInward[];
   overrides: Record<string, PoItemOverride>;
 }
 
@@ -151,7 +162,7 @@ const empty: StoreShape = {
   shades: [],
   sampleOrders: [],
   productionOrders: [],
-  receipts: [],
+  inwards: [],
   overrides: {},
 };
 
@@ -202,6 +213,7 @@ function mapSupplier(r: any): YarnSupplier {
     gst: r.gst ?? "",
     remarks: r.remarks ?? "",
     active: !!r.active,
+    defaultPaperTubeWeight: Number(r.default_paper_tube_weight) || 0,
     createdAt: r.created_at,
   };
 }
@@ -267,8 +279,28 @@ function mapProdItem(r: any): ProductionYarnOrderItem {
   };
 }
 
-function mapAllocation(r: any): YarnReceiptAllocation {
-  return { id: r.id, prodOrderItemId: r.prod_order_item_id, qty: Number(r.qty) || 0 };
+function mapAllocation(r: any): YarnInwardAllocation {
+  return {
+    id: r.id,
+    inwardItemId: r.inward_item_id,
+    prodOrderItemId: r.prod_order_item_id,
+    qty: Number(r.qty) || 0,
+  };
+}
+
+function mapInwardItem(r: any, allocs: YarnInwardAllocation[]): YarnInwardItem {
+  return {
+    id: r.id,
+    inwardId: r.inward_id,
+    supplierShadeNumber: r.supplier_shade_number,
+    lotNumber: r.lot_number ?? undefined,
+    grossWeight: Number(r.gross_weight) || 0,
+    cones: Number(r.cones) || 0,
+    paperTubeWeight: Number(r.paper_tube_weight) || 0,
+    netWeight: Number(r.net_weight) || 0,
+    remarks: r.remarks ?? undefined,
+    allocations: allocs,
+  };
 }
 
 function computeProdStatus(o: ProductionYarnOrder): ProductionOrderStatus {
