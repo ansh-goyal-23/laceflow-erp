@@ -33,11 +33,9 @@ import { Route as AuthenticatedAdminUserActivityRouteImport } from './routes/_au
 import { Route as AuthenticatedAdminDailyReportRouteImport } from './routes/_authenticated/admin.daily-report'
 import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin.audit-logs'
 import { Route as AuthenticatedYarnSampleOrdersIndexRouteImport } from './routes/_authenticated/yarn.sample-orders.index'
-import { Route as AuthenticatedYarnReceiptsIndexRouteImport } from './routes/_authenticated/yarn.receipts.index'
 import { Route as AuthenticatedYarnProductionOrdersIndexRouteImport } from './routes/_authenticated/yarn.production-orders.index'
 import { Route as AuthenticatedYarnSampleOrdersNewRouteImport } from './routes/_authenticated/yarn.sample-orders.new'
 import { Route as AuthenticatedYarnSampleOrdersIdRouteImport } from './routes/_authenticated/yarn.sample-orders.$id'
-import { Route as AuthenticatedYarnReceiptsNewRouteImport } from './routes/_authenticated/yarn.receipts.new'
 import { Route as AuthenticatedYarnProductionOrdersNewRouteImport } from './routes/_authenticated/yarn.production-orders.new'
 import { Route as AuthenticatedYarnProductionOrdersIdRouteImport } from './routes/_authenticated/yarn.production-orders.$id'
 import { Route as AuthenticatedPurchaseOrdersIdEditRouteImport } from './routes/_authenticated/purchase-orders.$id.edit'
@@ -178,12 +176,6 @@ const AuthenticatedYarnSampleOrdersIndexRoute =
     path: '/yarn/sample-orders/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedYarnReceiptsIndexRoute =
-  AuthenticatedYarnReceiptsIndexRouteImport.update({
-    id: '/yarn/receipts/',
-    path: '/yarn/receipts/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedYarnProductionOrdersIndexRoute =
   AuthenticatedYarnProductionOrdersIndexRouteImport.update({
     id: '/yarn/production-orders/',
@@ -200,12 +192,6 @@ const AuthenticatedYarnSampleOrdersIdRoute =
   AuthenticatedYarnSampleOrdersIdRouteImport.update({
     id: '/yarn/sample-orders/$id',
     path: '/yarn/sample-orders/$id',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedYarnReceiptsNewRoute =
-  AuthenticatedYarnReceiptsNewRouteImport.update({
-    id: '/yarn/receipts/new',
-    path: '/yarn/receipts/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedYarnProductionOrdersNewRoute =
@@ -260,11 +246,9 @@ export interface FileRoutesByFullPath {
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
   '/yarn/production-orders/$id': typeof AuthenticatedYarnProductionOrdersIdRoute
   '/yarn/production-orders/new': typeof AuthenticatedYarnProductionOrdersNewRoute
-  '/yarn/receipts/new': typeof AuthenticatedYarnReceiptsNewRoute
   '/yarn/sample-orders/$id': typeof AuthenticatedYarnSampleOrdersIdRoute
   '/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
   '/yarn/production-orders/': typeof AuthenticatedYarnProductionOrdersIndexRoute
-  '/yarn/receipts/': typeof AuthenticatedYarnReceiptsIndexRoute
   '/yarn/sample-orders/': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -294,11 +278,9 @@ export interface FileRoutesByTo {
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
   '/yarn/production-orders/$id': typeof AuthenticatedYarnProductionOrdersIdRoute
   '/yarn/production-orders/new': typeof AuthenticatedYarnProductionOrdersNewRoute
-  '/yarn/receipts/new': typeof AuthenticatedYarnReceiptsNewRoute
   '/yarn/sample-orders/$id': typeof AuthenticatedYarnSampleOrdersIdRoute
   '/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
   '/yarn/production-orders': typeof AuthenticatedYarnProductionOrdersIndexRoute
-  '/yarn/receipts': typeof AuthenticatedYarnReceiptsIndexRoute
   '/yarn/sample-orders': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRoutesById {
@@ -330,11 +312,9 @@ export interface FileRoutesById {
   '/_authenticated/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
   '/_authenticated/yarn/production-orders/$id': typeof AuthenticatedYarnProductionOrdersIdRoute
   '/_authenticated/yarn/production-orders/new': typeof AuthenticatedYarnProductionOrdersNewRoute
-  '/_authenticated/yarn/receipts/new': typeof AuthenticatedYarnReceiptsNewRoute
   '/_authenticated/yarn/sample-orders/$id': typeof AuthenticatedYarnSampleOrdersIdRoute
   '/_authenticated/yarn/sample-orders/new': typeof AuthenticatedYarnSampleOrdersNewRoute
   '/_authenticated/yarn/production-orders/': typeof AuthenticatedYarnProductionOrdersIndexRoute
-  '/_authenticated/yarn/receipts/': typeof AuthenticatedYarnReceiptsIndexRoute
   '/_authenticated/yarn/sample-orders/': typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 export interface FileRouteTypes {
@@ -366,11 +346,9 @@ export interface FileRouteTypes {
     | '/purchase-orders/$id/edit'
     | '/yarn/production-orders/$id'
     | '/yarn/production-orders/new'
-    | '/yarn/receipts/new'
     | '/yarn/sample-orders/$id'
     | '/yarn/sample-orders/new'
     | '/yarn/production-orders/'
-    | '/yarn/receipts/'
     | '/yarn/sample-orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -400,11 +378,9 @@ export interface FileRouteTypes {
     | '/purchase-orders/$id/edit'
     | '/yarn/production-orders/$id'
     | '/yarn/production-orders/new'
-    | '/yarn/receipts/new'
     | '/yarn/sample-orders/$id'
     | '/yarn/sample-orders/new'
     | '/yarn/production-orders'
-    | '/yarn/receipts'
     | '/yarn/sample-orders'
   id:
     | '__root__'
@@ -435,11 +411,9 @@ export interface FileRouteTypes {
     | '/_authenticated/purchase-orders/$id/edit'
     | '/_authenticated/yarn/production-orders/$id'
     | '/_authenticated/yarn/production-orders/new'
-    | '/_authenticated/yarn/receipts/new'
     | '/_authenticated/yarn/sample-orders/$id'
     | '/_authenticated/yarn/sample-orders/new'
     | '/_authenticated/yarn/production-orders/'
-    | '/_authenticated/yarn/receipts/'
     | '/_authenticated/yarn/sample-orders/'
   fileRoutesById: FileRoutesById
 }
@@ -619,13 +593,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedYarnSampleOrdersIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/yarn/receipts/': {
-      id: '/_authenticated/yarn/receipts/'
-      path: '/yarn/receipts'
-      fullPath: '/yarn/receipts/'
-      preLoaderRoute: typeof AuthenticatedYarnReceiptsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/yarn/production-orders/': {
       id: '/_authenticated/yarn/production-orders/'
       path: '/yarn/production-orders'
@@ -645,13 +612,6 @@ declare module '@tanstack/react-router' {
       path: '/yarn/sample-orders/$id'
       fullPath: '/yarn/sample-orders/$id'
       preLoaderRoute: typeof AuthenticatedYarnSampleOrdersIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/yarn/receipts/new': {
-      id: '/_authenticated/yarn/receipts/new'
-      path: '/yarn/receipts/new'
-      fullPath: '/yarn/receipts/new'
-      preLoaderRoute: typeof AuthenticatedYarnReceiptsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/yarn/production-orders/new': {
@@ -710,11 +670,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchaseOrdersIdEditRoute: typeof AuthenticatedPurchaseOrdersIdEditRoute
   AuthenticatedYarnProductionOrdersIdRoute: typeof AuthenticatedYarnProductionOrdersIdRoute
   AuthenticatedYarnProductionOrdersNewRoute: typeof AuthenticatedYarnProductionOrdersNewRoute
-  AuthenticatedYarnReceiptsNewRoute: typeof AuthenticatedYarnReceiptsNewRoute
   AuthenticatedYarnSampleOrdersIdRoute: typeof AuthenticatedYarnSampleOrdersIdRoute
   AuthenticatedYarnSampleOrdersNewRoute: typeof AuthenticatedYarnSampleOrdersNewRoute
   AuthenticatedYarnProductionOrdersIndexRoute: typeof AuthenticatedYarnProductionOrdersIndexRoute
-  AuthenticatedYarnReceiptsIndexRoute: typeof AuthenticatedYarnReceiptsIndexRoute
   AuthenticatedYarnSampleOrdersIndexRoute: typeof AuthenticatedYarnSampleOrdersIndexRoute
 }
 
@@ -750,12 +708,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedYarnProductionOrdersIdRoute,
   AuthenticatedYarnProductionOrdersNewRoute:
     AuthenticatedYarnProductionOrdersNewRoute,
-  AuthenticatedYarnReceiptsNewRoute: AuthenticatedYarnReceiptsNewRoute,
   AuthenticatedYarnSampleOrdersIdRoute: AuthenticatedYarnSampleOrdersIdRoute,
   AuthenticatedYarnSampleOrdersNewRoute: AuthenticatedYarnSampleOrdersNewRoute,
   AuthenticatedYarnProductionOrdersIndexRoute:
     AuthenticatedYarnProductionOrdersIndexRoute,
-  AuthenticatedYarnReceiptsIndexRoute: AuthenticatedYarnReceiptsIndexRoute,
   AuthenticatedYarnSampleOrdersIndexRoute:
     AuthenticatedYarnSampleOrdersIndexRoute,
 }
