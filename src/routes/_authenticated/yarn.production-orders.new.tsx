@@ -223,8 +223,13 @@ function NewProdOrder() {
       }
 
       if (nonSampling.length > 0) {
+        const reasonNotes = nonSampling
+          .map((l, i) => l.reason ? `Line ${i + 1} (${l.colorName}): ${l.reason}` : null)
+          .filter(Boolean)
+          .join("; ");
+        const combinedRemarks = [remarks, reasonNotes].filter(Boolean).join(" | ");
         const order = await yarnStore.addProductionOrder({
-          supplierId, orderDate, remarks,
+          supplierId, orderDate, remarks: combinedRemarks,
           items: nonSampling.map((l) => ({
             poId: l.poId,
             poItemId: l.poItemId ?? null,
