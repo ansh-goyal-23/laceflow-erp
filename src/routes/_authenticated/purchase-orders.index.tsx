@@ -270,6 +270,31 @@ function POList() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={!!reopenConfirm} onOpenChange={(o) => !o && setReopenConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reopen this Purchase Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium">{reopenConfirm?.poNumber}</span> will move back to Open and appear as an active working PO again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              if (reopenConfirm) {
+                try {
+                  await store.updatePOStatus(reopenConfirm.id, "open");
+                  toast.success(`${reopenConfirm.poNumber} reopened`);
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Failed to update status");
+                }
+              }
+              setReopenConfirm(null);
+            }}>Yes, Reopen</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!completeConfirm} onOpenChange={(o) => !o && setCompleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -342,13 +367,26 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusBadge({ po, onClickOpen }: { po: PurchaseOrder; onClickOpen: () => void }) {
+function StatusBadge({ po, onClickOpen, onClickReopen }: { po: PurchaseOrder; onClickOpen: () => void; onClickReopen?: () => void }) {
   const base = "inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full";
   if (po.status === "draft") {
     return <span className={`${base} bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200`}>Draft</span>;
   }
   if (po.status === "completed") {
-    return <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>Completed</span>;
+    const cls = `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`;
+    if (onClickReopen) {
+      return (
+        <button
+          type="button"
+          onClick={onClickReopen}
+          title="Click to reopen"
+          className={`${cls} hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer`}
+        >
+          Completed
+        </button>
+      );
+    }
+    return <span className={cls}>Completed</span>;
   }
   return (
     <button
