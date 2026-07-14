@@ -6,13 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, ArrowLeft } from "lucide-react";
-import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poItemStage, poOverallStage, type ProcurementStage } from "@/lib/yarn-store";
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, type ProcurementStage } from "@/lib/yarn-store";
 import { useStore, type PurchaseOrder } from "@/lib/store";
 import { daysRemaining, daysRemainingLabel } from "@/lib/reports";
 import { toast } from "sonner";
@@ -33,7 +32,10 @@ interface Line {
   approvedShadeId: string;
   supplierShadeNumber: string;
   sampling: boolean;
+  reason: string;
 }
+
+const REASON_OPTIONS = ["Additional Requirement", "Production Wastage", "Shade Difference", "Other"];
 
 function NewProdOrder() {
   const nav = useNavigate();
