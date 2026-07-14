@@ -100,6 +100,7 @@ function NewProdOrder() {
       approvedShadeId: "",
       supplierShadeNumber: "",
       sampling: false,
+      reason: "",
     }]);
   };
 
