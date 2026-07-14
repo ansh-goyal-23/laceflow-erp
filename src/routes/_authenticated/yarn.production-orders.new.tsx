@@ -371,22 +371,10 @@ function NewProdOrder() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div><Label className="text-xs">Color</Label>
-                        <Select
-                          value={`${line.material}|${line.colorName}`}
-                          onValueChange={(v) => {
-                            const [material, colorName] = v.split("|");
-                            patchLine(idx, { material, colorName, approvedShadeId: "", supplierShadeNumber: "" });
-                          }}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Color" /></SelectTrigger>
-                          <SelectContent>
-                            {po && distinctColors(po).map((it) => (
-                              <SelectItem key={`${it.materialType}|${it.color}`} value={`${it.materialType}|${it.color}`}>
-                                {it.color} · {it.materialType}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="h-10 px-3 rounded-md border bg-muted/30 flex items-center text-sm">
+                          <span className="font-medium">{line.colorName}</span>
+                          <span className="text-muted-foreground ml-2">· {line.material}</span>
+                        </div>
                       </div>
                       <div><Label className="text-xs">Order Qty (Kg)</Label>
                         <Input type="number" step="0.01" value={line.orderedQty} onChange={(e) => patchLine(idx, { orderedQty: e.target.value })} />
@@ -409,6 +397,15 @@ function NewProdOrder() {
                           </Button>
                         </div>
                       </div>
+                      <div className="col-span-2">
+                        <Label className="text-xs">Reason (optional)</Label>
+                        <Select value={line.reason} onValueChange={(v) => patchLine(idx, { reason: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                          <SelectContent>
+                            {REASON_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="col-span-2 flex items-center justify-between border-t pt-2">
                         <div className="flex items-center gap-2">
                           <Switch checked={line.sampling} onCheckedChange={(c) => patchLine(idx, { sampling: c })} />
@@ -421,13 +418,9 @@ function NewProdOrder() {
               })}
             </div>
           )}
-          {activePO && (
-            <div className="mt-3">
-              <Button variant="outline" size="sm" onClick={() => {
-                const first = distinctColors(activePO)[0];
-                if (!first) { toast.error("This PO has no items"); return; }
-                addLine(activePO, first.color, first.materialType, first.id);
-              }}><Plus className="h-4 w-4 mr-1" /> Add Color from this PO</Button>
+          {activePO && lines.length > 0 && (
+            <div className="text-xs text-muted-foreground mt-3">
+              Tip: You can add multiple lines for the same color (e.g. additional requirement, wastage, or split into different shades).
             </div>
           )}
         </Card>
