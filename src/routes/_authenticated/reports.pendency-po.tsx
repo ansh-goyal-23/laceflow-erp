@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useStore, store, type PurchaseOrder } from "@/lib/store";
+import { useStore, type PurchaseOrder } from "@/lib/store";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X, Download, FileSpreadsheet, Printer } from "lucide-react";
 import {
-  computePOPendencies, daysRemainingLabel, urgencyClass, PRODUCTION_STATUSES,
+  computePOPendencies, daysRemainingLabel, urgencyClass,
   poItemBreakdown, type POPendency,
 } from "@/lib/reports";
-import { useYarnStore, poOverallStage, STAGE_LABEL, STAGE_BADGE } from "@/lib/yarn-store";
+import { useYarnStore, poOverallStage, poItemStage, STAGE_LABEL, STAGE_BADGE } from "@/lib/yarn-store";
 import { Badge } from "@/components/ui/badge";
 import { exportCSV, exportXLSX } from "@/lib/export-table";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_authenticated/reports/pendency-po")({
 
 const PAGE_SIZE = 25;
 
-type SortKey = "brand" | "client" | "poNumber" | "poDate" | "deliveryDate" | "daysLeft" | "ordered" | "dispatched" | "pending" | "prod" | "stage";
+type SortKey = "brand" | "client" | "poNumber" | "poDate" | "deliveryDate" | "daysLeft" | "ordered" | "dispatched" | "pending" | "stage";
 
 function SortH({ label, k, sortKey, dir, onClick }: { label: string; k: SortKey; sortKey: SortKey; dir: "asc" | "desc"; onClick: (k: SortKey) => void }) {
   const active = sortKey === k;
@@ -56,7 +56,6 @@ function PendencyPOReport() {
   const [daysF, setDaysF] = useState("all"); // all | overdue | dueSoon | normal
   const [minPending, setMinPending] = useState("");
   const [maxPending, setMaxPending] = useState("");
-  const [prodF, setProdF] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("daysLeft");
   const [dir, setDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
@@ -83,8 +82,7 @@ function PendencyPOReport() {
         return true;
       })
       .filter((r) => r.pending >= minP && r.pending <= maxP)
-      .filter((r) => prodF === "all" || (r.po.productionStatus ?? "") === prodF)
-      .filter((r) => !t || [r.po.poNumber, brandName(r.po.brandId), clientName(r.po.clientId), r.po.productionStatus ?? "", STAGE_LABEL[stageFor(r.po)]].some((v) => v.toLowerCase().includes(t)))
+      .filter((r) => !t || [r.po.poNumber, brandName(r.po.brandId), clientName(r.po.clientId), STAGE_LABEL[stageFor(r.po)]].some((v) => v.toLowerCase().includes(t)))
       .sort((a, b) => {
         const s = dir === "asc" ? 1 : -1;
         switch (sortKey) {
@@ -97,12 +95,11 @@ function PendencyPOReport() {
           case "ordered": return (a.ordered - b.ordered) * s;
           case "dispatched": return (a.dispatched - b.dispatched) * s;
           case "pending": return (a.pending - b.pending) * s;
-          case "prod": return (a.po.productionStatus ?? "").localeCompare(b.po.productionStatus ?? "") * s;
           case "stage": return STAGE_LABEL[stageFor(a.po)].localeCompare(STAGE_LABEL[stageFor(b.po)]) * s;
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos, invoices, q, brandF, clientF, poF, dueFrom, dueTo, daysF, minPending, maxPending, prodF, sortKey, dir, brands, clients, yarn]);
+  }, [pos, invoices, q, brandF, clientF, poF, dueFrom, dueTo, daysF, minPending, maxPending, sortKey, dir, brands, clients, yarn]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -110,9 +107,9 @@ function PendencyPOReport() {
 
   const exportRows = () => rows.map((r) => [
     brandName(r.po.brandId), clientName(r.po.clientId), r.po.poNumber, r.po.poDate, r.po.deliveryDate,
-    daysRemainingLabel(r.daysLeft), r.ordered, r.dispatched, r.pending, STAGE_LABEL[stageFor(r.po)], r.po.productionStatus ?? "",
+    daysRemainingLabel(r.daysLeft), r.ordered, r.dispatched, r.pending, STAGE_LABEL[stageFor(r.po)],
   ]);
-  const headers = ["Brand", "Client", "PO Number", "PO Date", "Delivery Date", "Days Remaining", "Ordered Qty", "Dispatched Qty", "Pending Qty", "Procurement Stage", "Production Status"];
+  const headers = ["Brand", "Client", "PO Number", "PO Date", "Delivery Date", "Days Remaining", "Ordered Qty", "Dispatched Qty", "Pending Qty", "Procurement Stage"];
 
   return (
     <div className="p-6 lg:p-8 max-w-[1600px]">
@@ -172,13 +169,6 @@ function PendencyPOReport() {
               <SelectItem value="normal">More than 10 days</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={prodF} onValueChange={(v) => { setProdF(v); setPage(1); }}>
-            <SelectTrigger><SelectValue placeholder="Production Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Production Statuses</SelectItem>
-              {PRODUCTION_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
           <div className="flex gap-2 items-center">
             <label className="text-xs text-muted-foreground w-24">Pending ≥</label>
             <Input type="number" value={minPending} onChange={(e) => { setMinPending(e.target.value); setPage(1); }} />
@@ -188,7 +178,7 @@ function PendencyPOReport() {
             <Input type="number" value={maxPending} onChange={(e) => { setMaxPending(e.target.value); setPage(1); }} />
           </div>
           <div className="flex items-end">
-            <Button variant="ghost" size="sm" onClick={() => { setQ(""); setBrandF("all"); setClientF("all"); setPoF(""); setDueFrom(""); setDueTo(""); setDaysF("all"); setMinPending(""); setMaxPending(""); setProdF("all"); setPage(1); }}>
+            <Button variant="ghost" size="sm" onClick={() => { setQ(""); setBrandF("all"); setClientF("all"); setPoF(""); setDueFrom(""); setDueTo(""); setDaysF("all"); setMinPending(""); setMaxPending(""); setPage(1); }}>
               <X className="h-4 w-4 mr-1" /> Clear filters
             </Button>
           </div>
@@ -208,12 +198,11 @@ function PendencyPOReport() {
                 <TableHead className="text-right"><SortH label="Dispatched Qty" k="dispatched" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="text-right"><SortH label="Pending Qty" k="pending" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="w-52"><SortH label="Procurement Stage" k="stage" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
-                <TableHead className="w-56"><SortH label="Production Status" k="prod" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.length === 0 ? (
-                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No pending POs</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No pending POs</TableCell></TableRow>
               ) : pageRows.map((r: POPendency) => (
                 <TableRow key={r.po.id} className={urgencyClass(r.daysLeft)}>
                   <TableCell>{brandName(r.po.brandId)}</TableCell>
@@ -229,21 +218,6 @@ function PendencyPOReport() {
                   <TableCell className="text-right font-medium">{r.pending}</TableCell>
                   <TableCell>
                     {(() => { const st = stageFor(r.po); return <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>; })()}
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={r.po.productionStatus ?? "__none"}
-                      onValueChange={async (v) => {
-                        try { await store.updateProductionStatus(r.po.id, v === "__none" ? null : v); toast.success("Production status updated"); }
-                        catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
-                      }}
-                    >
-                      <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none">—</SelectItem>
-                        {PRODUCTION_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
                   </TableCell>
                 </TableRow>
               ))}
@@ -280,6 +254,7 @@ function PendencyPOReport() {
                     <TableHead className="text-right">Dispatched</TableHead>
                     <TableHead className="text-right">Pending</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
+                    <TableHead>Procurement Stage</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -296,6 +271,9 @@ function PendencyPOReport() {
                       <TableCell className="text-right">{i.dispatched}</TableCell>
                       <TableCell className="text-right font-medium">{i.pending}</TableCell>
                       <TableCell className="text-right">{i.rate}</TableCell>
+                      <TableCell>
+                        {(() => { const st = poItemStage(yarn, viewing, i); return <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>; })()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
