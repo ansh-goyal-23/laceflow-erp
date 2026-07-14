@@ -9,8 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, Printer, CheckCircle2, RefreshCw, PackagePlus } from "lucide-react";
-import { useYarnStore, yarnStore, sampleExpectedDelivery } from "@/lib/yarn-store";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronLeft, Printer, CheckCircle2, RefreshCw, PackagePlus, Pencil, Trash2 } from "lucide-react";
+import { useYarnStore, yarnStore, sampleExpectedDelivery, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 
@@ -30,6 +35,9 @@ function SampleOrderDetail() {
   const [shadeNo, setShadeNo] = useState("");
   const [rcpOpen, setRcpOpen] = useState(false);
   const [rcp, setRcp] = useState({ receiptDate: new Date().toISOString().slice(0, 10), supplierShadeNumber: "", lotNumber: "", grossWeight: "", cones: "", remarks: "" });
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editForm, setEditForm] = useState({ orderDate: "", remarks: "", status: "ordered" as SampleOrderStatus });
 
   if (!order) return <div className="p-6 text-sm text-muted-foreground">Sample order not found. <button onClick={() => nav({ to: "/yarn/sample-orders" })} className="underline">Back</button></div>;
 
@@ -64,6 +72,27 @@ function SampleOrderDetail() {
     } catch (e) { toast.error((e as Error).message); }
   };
 
+  const openEdit = () => {
+    setEditForm({ orderDate: order.orderDate, remarks: order.remarks ?? "", status: order.status });
+    setEditing(true);
+  };
+  const saveEdit = async () => {
+    try {
+      await yarnStore.updateSampleOrder(order.id, {
+        orderDate: editForm.orderDate, remarks: editForm.remarks, status: editForm.status,
+      });
+      toast.success("Updated");
+      setEditing(false);
+    } catch (e) { toast.error((e as Error).message); }
+  };
+  const confirmDelete = async () => {
+    try {
+      await yarnStore.deleteSampleOrder(order.id);
+      toast.success("Deleted");
+      nav({ to: "/yarn/sample-orders" });
+    } catch (e) { toast.error((e as Error).message); }
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-6xl space-y-4 print:p-0 print:max-w-none">
       <div className="print:hidden">
@@ -75,6 +104,8 @@ function SampleOrderDetail() {
               <Button variant="outline" asChild><Link to="/yarn/sample-orders"><ChevronLeft className="h-4 w-4 mr-1" /> Back</Link></Button>
               <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" /> Print</Button>
               <Button variant="outline" onClick={() => setRcpOpen(true)}><PackagePlus className="h-4 w-4 mr-1" /> Add Receipt</Button>
+              <Button variant="outline" onClick={openEdit}><Pencil className="h-4 w-4 mr-1" /> Edit</Button>
+              <Button variant="outline" onClick={() => setDeleting(true)} className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4 mr-1" /> Delete</Button>
             </div>
           }
         />
@@ -196,6 +227,54 @@ function SampleOrderDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Sample Order {order.number}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-2">
+              <Label>Order Date</Label>
+              <Input type="date" value={editForm.orderDate} onChange={(e) => setEditForm({ ...editForm, orderDate: e.target.value })} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as SampleOrderStatus })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
+                  <SelectItem value="received">Received</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Remarks</Label>
+              <Textarea value={editForm.remarks} onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button onClick={saveEdit}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleting} onOpenChange={setDeleting}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete sample order {order.number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the sample order along with its items and receipts. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
