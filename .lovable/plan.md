@@ -1,94 +1,54 @@
-## Goal
+## Overview
 
-Split the current single "Yarn Receipt" screen into three independent screens:
+Refactor Yarn Management to be **color-centric** (not PO-item-centric), simplify the Yarn Inward workflow, and infer Production vs Sample receipts automatically from the shade dropdown behavior. Existing business logic (status calc, sample/production workflows, allocation, reports, inventory) stays intact.
 
-1. **Yarn Inward** (Store dept) — records physical yarn only, no allocation.
-2. **Pending Yarn Allocation** (Procurement) — auto- or manual-allocates each inward item to Production Yarn Orders.
-3. **Unallocated Yarn** — remaining Net Weight after allocation, for future Inventory.
+## Scope of changes
 
-Procurement Stage calculations always use **allocated Net Yarn Weight**, never Gross Weight and never unallocated yarn.
+### 1. Production Yarn Order — Color-centric UI
+File: `src/routes/_authenticated/yarn.production-orders.new.tsx`
+- Replace the item-level PO table on the left with a **Color Group** list, grouped by `color` from `po.items`.
+- Each group row shows: Color name, type (Base/Line — derived from item `colorType` if present, otherwise inferred; if not available, show "Color"), procurement status badge (reuse existing per-item stage logic — a group is at the "least advanced" stage of its items), Ordered Qty (sum from prod orders for this PO+color), Received Qty (sum from prod order items).
+- Expand/collapse (chevron) reveals the individual items using that color (article, W×L, qty, uom) — read-only reference.
+- "Add" button on each color pushes a procurement line pre-populated with `{poId, color, material}` (no `poItemId` — line is color-scoped). Multiple lines per color allowed (multiple production orders).
+- Add optional **Reason** field per line (dropdown: Additional Requirement / Production Wastage / Shade Difference / Other) — stored in `remarks` of the production order item, or new column if simple.
+- Add an advanced **Split Color** toggle (hidden by default under a "More" popover) that lets one color spawn multiple lines with different shades — this is just UI; multiple lines already achieve it.
+- Remove the per-color-selector dropdown inside each procurement line (color is fixed by which group's Add button was clicked); keep material inferred from the group.
 
-## Data model changes (SQL migration – `docs/yarn-management.sql` additions)
+### 2. Data model tweak (minimal)
+File: `src/lib/yarn-store.ts`
+- Add optional `reason?: string` to `ProductionYarnOrderItem` and DB column `reason text` on `yarn_production_order_items`.
+- Keep `poItemId` nullable — color-scoped lines pass `null`.
+- No schema change to color grouping (already have `color_name` + `material` on prod items).
+- Migration SQL added to `docs/yarn-management.sql` (append `ALTER TABLE ... ADD COLUMN reason text;`).
 
-Add to `yarn_suppliers`:
-- `default_paper_tube_weight numeric NOT NULL DEFAULT 0` — default per-cone paper tube weight.
+### 3. Yarn Inward — simplification
+Files: `src/routes/_authenticated/yarn.inwards.new.tsx`, `yarn.inwards.$id.tsx`, `yarn-store.ts`
+- Header: keep Inward#, Inward Date, Supplier, Supplier Challan#, Remarks. Confirm Vehicle# / LR# are already removed (they are).
+- Item row columns: **Color**, **Supplier Shade #**, Lot#, Gross Weight, Cones, Net Weight (auto), Remarks, + optional "Override paper tube weight" (small toggle → number field).
+- Paper tube weight is pulled from supplier's `defaultPaperTubeWeight` automatically; not shown as a column.
+- **Color dropdown**: after supplier is selected, populate only with colors that have a pending qty (ordered − received > 0) in either Production Yarn Orders **or** Sample Yarn Orders for this supplier. No free text.
+- **Supplier Shade # field**: searchable combobox with free-text.
+  - If user picks an existing shade from the dropdown → treated as **Production Receipt** (existing allocation flow to matching prod order item).
+  - If user types a new shade not in the list → treated as **Sample Receipt**; on save, auto-append a `SampleYarnReceipt` to the pending Sample Yarn Order for this supplier+color; the shade string will be added to the Shade Library when the sample is later approved (existing sample-approval path already does this — verify).
+  - Dropdown source: `shades` filtered by `supplierId + colorName` **plus** shades already present on prod-order items for this supplier+color.
+- Net Weight = `grossWeight − cones × paperTubeWeight` (existing; verified server-side too).
 
-Replace the current single `yarn_receipts` (which stores one shade + gross weight) with a header/line model:
+### 4. Pending allocation — unchanged behavior
+- Auto-allocate when exactly one matching Production Yarn Order item exists for supplier+shade+color; otherwise create a pending allocation task (existing popup). Sample-flagged rows do not enter allocation queue — they flow into the linked Sample Order's receipts.
 
-- `yarn_inwards` (header)
-  - `id`, `number text UNIQUE` (auto `INW-YYYY-####`), `inward_date`, `supplier_id`,
-    `supplier_challan_number text`, `remarks text`, `created_at`, `created_by`.
-- `yarn_inward_items` (lines)
-  - `id`, `inward_id → yarn_inwards`, `supplier_shade_number`, `lot_number`,
-    `gross_weight`, `cones`, `paper_tube_weight`, `net_weight` (stored, = gross − cones×tube),
-    `remarks`, `sort_order`.
+### 5. Preserved
+Procurement Status calc (allocated Net Yarn Weight only), sample workflow, production workflow, allocation logic, reports, inventory, existing routes and sidebar entries.
 
-Keep `yarn_receipt_allocations` but repoint FK to `yarn_inward_items`:
-- Rename to `yarn_inward_allocations` with `inward_item_id`.
-- `qty numeric CHECK (qty > 0)` — this qty is in **Net kg**.
-- Unallocated qty is derived: `net_weight − SUM(allocations.qty)` (no stored `unallocated_qty` — always live-computed to avoid drift).
+## Out of scope
+- Renaming existing tables.
+- Reworking Sample Orders module UI (only receipt-linking logic touched).
+- Any change to Inventory or Reports code.
 
-`yarn_production_order_items.received_qty` continues to track allocated Net kg (delta pattern preserved).
+## Technical notes
+- Color grouping keyed by `color` string alone (per spec: "one color = one shade" normally). Material shown as metadata inside the group.
+- "Base / Line" color type: `POLineItem` currently has no `colorType`. If not present, show item's `laceType` or omit the badge — will confirm from `store.ts` during implementation and either add optional field or drop the badge.
+- Split Color: implemented purely as "add another line for the same color with a different shade" — no schema change.
 
-Grants + RLS mirroring `yarn_receipts` (created_by on header, child gated via parent).
-
-The old `yarn_receipts` / `yarn_receipt_allocations` tables and old `unallocated_qty` field are dropped in the same migration.
-
-## Store layer (`src/lib/yarn-store.ts`)
-
-Rename all "receipt" terminology in the yarn-inward pipeline to "inward":
-
-- New types:
-  - `YarnInwardItem { id, supplierShadeNumber, lotNumber?, grossWeight, cones, paperTubeWeight, netWeight, remarks?, allocations: YarnInwardAllocation[] }`
-  - `YarnInward { id, number, inwardDate, supplierId, supplierChallanNumber, remarks?, items: YarnInwardItem[], createdAt }`
-  - `YarnInwardAllocation { id, inwardItemId, prodOrderItemId, qty }`
-- `YarnSupplier` gains `defaultPaperTubeWeight: number`.
-
-`StoreShape` field `receipts` → `inwards: YarnInward[]`.
-
-New store methods:
-- `addInward({ inwardDate, supplierId, supplierChallanNumber, remarks, items[] })` — inserts header + items; **no allocations**.
-- `deleteInward(id)` — reverses any allocations first (adjust prod `received_qty`), then deletes.
-- `deleteInwardItem(itemId)` — reverse its allocations, delete item.
-- `allocateInwardItemAuto(itemId)` — if Net ≥ total pending for (supplier, shade), allocate all pending and return `{ done: true }`. Otherwise return `{ done: false, pendingRows }` for the popup.
-- `allocateInwardItemManual(itemId, allocations[])` — validate total == net, insert rows, bump prod received_qty.
-
-Helpers:
-- `inwardItemAllocatedQty(item)` and `inwardItemUnallocatedQty(item) = net − allocated`.
-- `getPendingRowsForShade(supplierId, shadeNumber)` unchanged.
-
-Procurement stage functions keep using `productionOrderItems.receivedQty` — since only allocations bump it, the "allocated Net Yarn Weight only" rule holds automatically. No code path uses gross weight in stage calc.
-
-Keep legacy `commitYarnReceipt`/`planYarnReceipt` **removed** — all callers updated.
-
-## Route/UI changes (`src/routes/_authenticated/`)
-
-Delete:
-- `yarn.receipts.index.tsx`
-- `yarn.receipts.new.tsx`
-
-Add:
-- `yarn.inwards.index.tsx` — list of Yarn Inwards. Columns: Number, Date, Supplier, Challan #, # Items, Total Net (Kg). Row → detail.
-- `yarn.inwards.new.tsx` — Dispatch-style form.
-  - Header: Inward Number (auto-preview from last number), Inward Date, Supplier (select), Supplier Challan #, Remarks.
-  - Items grid: Supplier Shade #, Lot #, Gross, Cones, Paper Tube Wt/Cone (prefilled from supplier default, editable per row), Net (auto = gross − cones × tube, read-only), Remarks. Add/remove rows.
-  - Submit → `addInward(...)`, redirect to list.
-- `yarn.inwards.$id.tsx` — inward detail with items and per-item allocation summary.
-- `yarn.pending-allocations.tsx` — lists every `YarnInwardItem` where `unallocated > 0` **AND** matching pending prod-order-items exist. Columns: Supplier, Inward #, Inward Date, Shade #, Lot #, Net (Kg), Unallocated (Kg), Allocation Status, "Allocate" button.
-  - Clicking Allocate calls `allocateInwardItemAuto`. If `done`, toast + refresh. If not, open popup with editable qty per pending prod-order row (Client, PO, Material, Color, Ordered, Already Allocated, Pending, Allocate). Validation: each ≤ pending; total == net remaining to allocate. Submit calls `allocateInwardItemManual`.
-- `yarn.unallocated.tsx` — lists all inward items with `unallocated > 0`. Columns: Supplier, Shade #, Lot #, Available Qty, Inward #, Inward Date.
-
-Sidebar (`src/components/app-sidebar.tsx`) — under "Yarn Management" replace "Receipts" with:
-- Yarn Inward
-- Pending Yarn Allocation
-- Unallocated Yarn
-
-(Suppliers, Shades, Sample Orders, Production Orders remain.)
-
-Supplier form (`src/routes/_authenticated/yarn.suppliers.tsx`) gains a "Default Paper Tube Weight per Cone (Kg)" numeric field.
-
-## Non-goals / preservation
-
-- Procurement Stage badges keep their current meanings; nothing on the PO screens changes.
-- No changes to Sample Orders, Production Orders, Shades, or Suppliers screens beyond the new supplier field.
-- Existing `yarn_receipts` rows are dropped by the migration (per user's earlier "never use Lovable Cloud migrations" — but here they explicitly asked for the schema change; migration file is authored as SQL for them to run manually).
+## Deliverables
+- Edited: `yarn.production-orders.new.tsx`, `yarn.inwards.new.tsx`, `yarn.inwards.$id.tsx`, `yarn-store.ts`, `docs/yarn-management.sql`.
+- No sidebar / route additions.
