@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, type ProcurementStage } from "@/lib/yarn-store";
+import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, expandPoColors, type ProcurementStage } from "@/lib/yarn-store";
 import { useStore, type PurchaseOrder } from "@/lib/store";
 import { daysRemaining, daysRemainingLabel } from "@/lib/reports";
 import { toast } from "sonner";
@@ -133,6 +133,7 @@ function NewProdOrder() {
     key: string;
     color: string;
     material: string;
+    kind: "base" | "line" | "single";
     items: PurchaseOrder["items"];
     stage: ProcurementStage;
     orderedQty: number;   // total ordered across all prod orders for this po+color+material
@@ -142,19 +143,23 @@ function NewProdOrder() {
     if (!activePO) return [];
     const map = new Map<string, ColorGroup>();
     for (const it of activePO.items) {
-      const k = `${it.color}|${it.materialType}`;
-      if (!map.has(k)) {
-        map.set(k, {
-          key: k,
-          color: it.color,
-          material: it.materialType,
-          items: [],
-          stage: calculateProcurementStage(yarn, activePO.id, it.materialType, it.color),
-          orderedQty: 0,
-          receivedQty: 0,
-        });
+      // Expand compound colors ("BASE / LINE X") into independent procurement groups.
+      for (const c of expandPoColors(it.color)) {
+        const k = `${c.name}|${it.materialType}`;
+        if (!map.has(k)) {
+          map.set(k, {
+            key: k,
+            color: c.name,
+            material: it.materialType,
+            kind: c.kind,
+            items: [],
+            stage: calculateProcurementStage(yarn, activePO.id, it.materialType, c.name),
+            orderedQty: 0,
+            receivedQty: 0,
+          });
+        }
+        map.get(k)!.items.push(it);
       }
-      map.get(k)!.items.push(it);
     }
     // sum ordered/received across production orders for this po+color+material
     for (const o of yarn.productionOrders) {
@@ -305,6 +310,11 @@ function NewProdOrder() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">{g.color}</span>
+                            {g.kind !== "single" && (
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                {g.kind}
+                              </Badge>
+                            )}
                             <span className="text-xs text-muted-foreground">· {g.material}</span>
                             <Badge className={STAGE_BADGE[g.stage]} variant="secondary">{STAGE_LABEL[g.stage]}</Badge>
                           </div>
