@@ -6,13 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, ArrowLeft } from "lucide-react";
-import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poItemStage, poOverallStage, type ProcurementStage } from "@/lib/yarn-store";
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, type ProcurementStage } from "@/lib/yarn-store";
 import { useStore, type PurchaseOrder } from "@/lib/store";
 import { daysRemaining, daysRemainingLabel } from "@/lib/reports";
 import { toast } from "sonner";
@@ -33,7 +32,10 @@ interface Line {
   approvedShadeId: string;
   supplierShadeNumber: string;
   sampling: boolean;
+  reason: string;
 }
+
+const REASON_OPTIONS = ["Additional Requirement", "Production Wastage", "Shade Difference", "Other"];
 
 function NewProdOrder() {
   const nav = useNavigate();
@@ -98,6 +100,7 @@ function NewProdOrder() {
       approvedShadeId: "",
       supplierShadeNumber: "",
       sampling: false,
+      reason: "",
     }]);
   };
 
@@ -124,6 +127,51 @@ function NewProdOrder() {
       if (seen.has(k)) return false; seen.add(k); return true;
     });
   };
+
+  // Color groups for the active PO: one row per (color, material)
+  interface ColorGroup {
+    key: string;
+    color: string;
+    material: string;
+    items: PurchaseOrder["items"];
+    stage: ProcurementStage;
+    orderedQty: number;   // total ordered across all prod orders for this po+color+material
+    receivedQty: number;
+  }
+  const colorGroups: ColorGroup[] = useMemo(() => {
+    if (!activePO) return [];
+    const map = new Map<string, ColorGroup>();
+    for (const it of activePO.items) {
+      const k = `${it.color}|${it.materialType}`;
+      if (!map.has(k)) {
+        map.set(k, {
+          key: k,
+          color: it.color,
+          material: it.materialType,
+          items: [],
+          stage: calculateProcurementStage(yarn, activePO.id, it.materialType, it.color),
+          orderedQty: 0,
+          receivedQty: 0,
+        });
+      }
+      map.get(k)!.items.push(it);
+    }
+    // sum ordered/received across production orders for this po+color+material
+    for (const o of yarn.productionOrders) {
+      if (o.status === "cancelled") continue;
+      for (const poi of o.items) {
+        if (poi.poId !== activePO.id) continue;
+        const k = `${poi.colorName}|${poi.material}`;
+        const g = map.get(k);
+        if (!g) continue;
+        g.orderedQty += poi.orderedQty;
+        g.receivedQty += poi.receivedQty;
+      }
+    }
+    return Array.from(map.values());
+  }, [activePO, yarn]);
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const doAddShade = async () => {
     if (addShadeOpen === null) return;
@@ -175,8 +223,13 @@ function NewProdOrder() {
       }
 
       if (nonSampling.length > 0) {
+        const reasonNotes = nonSampling
+          .map((l, i) => l.reason ? `Line ${i + 1} (${l.colorName}): ${l.reason}` : null)
+          .filter(Boolean)
+          .join("; ");
+        const combinedRemarks = [remarks, reasonNotes].filter(Boolean).join(" | ");
         const order = await yarnStore.addProductionOrder({
-          supplierId, orderDate, remarks,
+          supplierId, orderDate, remarks: combinedRemarks,
           items: nonSampling.map((l) => ({
             poId: l.poId,
             poItemId: l.poItemId ?? null,
@@ -234,36 +287,68 @@ function NewProdOrder() {
                 <span><span className="text-muted-foreground">Delivery:</span> {activePO.deliveryDate}</span>
                 <Badge variant="outline">{daysRemainingLabel(daysRemaining(activePO.deliveryDate))}</Badge>
               </div>
-              <div className="rounded-md border overflow-x-auto max-h-[500px]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background"><TableRow>
-                    <TableHead>Article</TableHead><TableHead>Lace</TableHead><TableHead>Material</TableHead>
-                    <TableHead>W×L</TableHead><TableHead>Color</TableHead><TableHead>Qty</TableHead>
-                    <TableHead>UOM</TableHead><TableHead>Stage</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {activePO.items.map((it) => {
-                      const st = poItemStage(yarn, activePO, it);
-                      return (
-                        <TableRow key={it.id}>
-                          <TableCell className="font-mono text-xs">{it.articleCode}</TableCell>
-                          <TableCell>{it.laceType}</TableCell>
-                          <TableCell>{it.materialType}</TableCell>
-                          <TableCell>{it.width}×{it.length}</TableCell>
-                          <TableCell>{it.color}</TableCell>
-                          <TableCell>{it.quantity}</TableCell>
-                          <TableCell>{it.uom}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>
-                              <OverrideToggle poItemId={it.id} current={st} />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <div className="rounded-md border max-h-[520px] overflow-y-auto divide-y">
+                {colorGroups.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">This PO has no items.</div>
+                ) : colorGroups.map((g) => {
+                  const isOpen = !!expanded[g.key];
+                  return (
+                    <div key={g.key} className="p-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="p-1 rounded hover:bg-muted"
+                          onClick={() => setExpanded((e) => ({ ...e, [g.key]: !isOpen }))}
+                          aria-label={isOpen ? "Collapse" : "Expand"}
+                        >
+                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{g.color}</span>
+                            <span className="text-xs text-muted-foreground">· {g.material}</span>
+                            <Badge className={STAGE_BADGE[g.stage]} variant="secondary">{STAGE_LABEL[g.stage]}</Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Ordered: <span className="font-medium text-foreground">{g.orderedQty.toFixed(2)} Kg</span>
+                            <span className="mx-2">·</span>
+                            Received: <span className="font-medium text-foreground">{g.receivedQty.toFixed(2)} Kg</span>
+                            <span className="mx-2">·</span>
+                            {g.items.length} item{g.items.length === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => addLine(activePO, g.color, g.material)}>
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Order
+                        </Button>
+                      </div>
+                      {isOpen && (
+                        <div className="ml-7 mt-2 rounded-md border bg-muted/30">
+                          <Table>
+                            <TableHeader><TableRow>
+                              <TableHead className="h-8">Article</TableHead>
+                              <TableHead className="h-8">Lace</TableHead>
+                              <TableHead className="h-8">W×L</TableHead>
+                              <TableHead className="h-8">Qty</TableHead>
+                              <TableHead className="h-8">UOM</TableHead>
+                              <TableHead className="h-8"></TableHead>
+                            </TableRow></TableHeader>
+                            <TableBody>
+                              {g.items.map((it) => (
+                                <TableRow key={it.id}>
+                                  <TableCell className="font-mono text-xs">{it.articleCode}</TableCell>
+                                  <TableCell>{it.laceType}</TableCell>
+                                  <TableCell>{it.width}×{it.length}</TableCell>
+                                  <TableCell>{it.quantity}</TableCell>
+                                  <TableCell>{it.uom}</TableCell>
+                                  <TableCell><OverrideToggle poItemId={it.id} current={g.stage} /></TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -291,22 +376,10 @@ function NewProdOrder() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div><Label className="text-xs">Color</Label>
-                        <Select
-                          value={`${line.material}|${line.colorName}`}
-                          onValueChange={(v) => {
-                            const [material, colorName] = v.split("|");
-                            patchLine(idx, { material, colorName, approvedShadeId: "", supplierShadeNumber: "" });
-                          }}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Color" /></SelectTrigger>
-                          <SelectContent>
-                            {po && distinctColors(po).map((it) => (
-                              <SelectItem key={`${it.materialType}|${it.color}`} value={`${it.materialType}|${it.color}`}>
-                                {it.color} · {it.materialType}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="h-10 px-3 rounded-md border bg-muted/30 flex items-center text-sm">
+                          <span className="font-medium">{line.colorName}</span>
+                          <span className="text-muted-foreground ml-2">· {line.material}</span>
+                        </div>
                       </div>
                       <div><Label className="text-xs">Order Qty (Kg)</Label>
                         <Input type="number" step="0.01" value={line.orderedQty} onChange={(e) => patchLine(idx, { orderedQty: e.target.value })} />
@@ -329,6 +402,15 @@ function NewProdOrder() {
                           </Button>
                         </div>
                       </div>
+                      <div className="col-span-2">
+                        <Label className="text-xs">Reason (optional)</Label>
+                        <Select value={line.reason} onValueChange={(v) => patchLine(idx, { reason: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                          <SelectContent>
+                            {REASON_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="col-span-2 flex items-center justify-between border-t pt-2">
                         <div className="flex items-center gap-2">
                           <Switch checked={line.sampling} onCheckedChange={(c) => patchLine(idx, { sampling: c })} />
@@ -341,13 +423,9 @@ function NewProdOrder() {
               })}
             </div>
           )}
-          {activePO && (
-            <div className="mt-3">
-              <Button variant="outline" size="sm" onClick={() => {
-                const first = distinctColors(activePO)[0];
-                if (!first) { toast.error("This PO has no items"); return; }
-                addLine(activePO, first.color, first.materialType, first.id);
-              }}><Plus className="h-4 w-4 mr-1" /> Add Color from this PO</Button>
+          {activePO && lines.length > 0 && (
+            <div className="text-xs text-muted-foreground mt-3">
+              Tip: You can add multiple lines for the same color (e.g. additional requirement, wastage, or split into different shades).
             </div>
           )}
         </Card>
