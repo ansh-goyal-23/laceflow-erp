@@ -932,17 +932,49 @@ export function poItemStage(
   s: StoreShape, po: PurchaseOrder, item: POLineItem,
 ): ProcurementStage {
   if (s.overrides[item.id] === "yarn_not_required") return "yarn_not_required";
-  return calculateProcurementStage(s, po.id, item.materialType, item.color);
+  // A single PO item may reference a base + line color (e.g. "LIMPET / LINE ORANGE").
+  // Its overall stage is the least-advanced of its expanded colors.
+  let best = 999;
+  for (const c of expandPoColors(item.color)) {
+    const st = calculateProcurementStage(s, po.id, item.materialType, c.name);
+    const idx = STAGE_PRIORITY.indexOf(st);
+    if (idx >= 0 && idx < best) best = idx;
+  }
+  return best === 999 ? "waiting_for_yarn_order" : STAGE_PRIORITY[best];
 }
 
 export function poOverallStage(s: StoreShape, po: PurchaseOrder): ProcurementStage {
   let best = 999;
   for (const it of po.items) {
     if (s.overrides[it.id] === "yarn_not_required") continue;
-    const st = calculateProcurementStage(s, po.id, it.materialType, it.color);
-    const idx = STAGE_PRIORITY.indexOf(st);
-    if (idx >= 0 && idx < best) best = idx;
+    for (const c of expandPoColors(it.color)) {
+      const st = calculateProcurementStage(s, po.id, it.materialType, c.name);
+      const idx = STAGE_PRIORITY.indexOf(st);
+      if (idx >= 0 && idx < best) best = idx;
+    }
   }
   if (best === 999) return "yarn_not_required";
   return STAGE_PRIORITY[best];
+}
+
+/**
+ * Parse a raw PO color string into independent procurement colors.
+ * Customer POs often write compound colors like:
+ *   "LIMPET SHELL / LINE VIBRANT ORANGE"
+ *   "WHITE / LINE BLACK"
+ * which really describe two yarns (base + line trim) that must be procured
+ * separately. Detection is on the "/LINE" or "/ LINE" separator (case-insensitive).
+ * Colors without that marker are returned as a single entry.
+ */
+export function expandPoColors(raw: string): Array<{ name: string; kind: "base" | "line" | "single" }> {
+  const s = (raw ?? "").trim();
+  if (!s) return [];
+  const m = s.match(/^(.*?)\s*\/\s*LINE\s+(.+)$/i);
+  if (!m) return [{ name: s, kind: "single" }];
+  const base = m[1].trim();
+  const line = m[2].trim();
+  const out: Array<{ name: string; kind: "base" | "line" | "single" }> = [];
+  if (base) out.push({ name: base, kind: "base" });
+  if (line) out.push({ name: line, kind: "line" });
+  return out.length ? out : [{ name: s, kind: "single" }];
 }
