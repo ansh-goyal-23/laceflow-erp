@@ -69,6 +69,7 @@ function POList() {
   const [confirm, setConfirm] = useState<PurchaseOrder | null>(null);
   const [viewing, setViewing] = useState<PurchaseOrder | null>(null);
   const [completeConfirm, setCompleteConfirm] = useState<PurchaseOrder | null>(null);
+  const [reopenConfirm, setReopenConfirm] = useState<PurchaseOrder | null>(null);
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
@@ -203,7 +204,11 @@ function POList() {
                   <TableCell>{p.poDate}</TableCell>
                   <TableCell>{p.deliveryDate}</TableCell>
                   <TableCell>
-                    <StatusBadge po={p} onClickOpen={() => setCompleteConfirm(p)} />
+                    <StatusBadge
+                      po={p}
+                      onClickOpen={() => setCompleteConfirm(p)}
+                      onClickReopen={canModify(p) ? () => setReopenConfirm(p) : undefined}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => setViewing(p)} title="View"><Eye className="h-4 w-4" /></Button>
@@ -261,6 +266,31 @@ function POList() {
               }
               setConfirm(null);
             }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!reopenConfirm} onOpenChange={(o) => !o && setReopenConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reopen this Purchase Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium">{reopenConfirm?.poNumber}</span> will move back to Open and appear as an active working PO again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              if (reopenConfirm) {
+                try {
+                  await store.updatePOStatus(reopenConfirm.id, "open");
+                  toast.success(`${reopenConfirm.poNumber} reopened`);
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Failed to update status");
+                }
+              }
+              setReopenConfirm(null);
+            }}>Yes, Reopen</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -337,13 +367,26 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusBadge({ po, onClickOpen }: { po: PurchaseOrder; onClickOpen: () => void }) {
+function StatusBadge({ po, onClickOpen, onClickReopen }: { po: PurchaseOrder; onClickOpen: () => void; onClickReopen?: () => void }) {
   const base = "inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full";
   if (po.status === "draft") {
     return <span className={`${base} bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200`}>Draft</span>;
   }
   if (po.status === "completed") {
-    return <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>Completed</span>;
+    const cls = `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`;
+    if (onClickReopen) {
+      return (
+        <button
+          type="button"
+          onClick={onClickReopen}
+          title="Click to reopen"
+          className={`${cls} hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer`}
+        >
+          Completed
+        </button>
+      );
+    }
+    return <span className={cls}>Completed</span>;
   }
   return (
     <button
