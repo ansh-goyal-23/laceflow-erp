@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -234,8 +234,8 @@ function NewInward() {
                 const suggestions = suggestedShades(r);
                 const isSample = rowIsSample(r);
                 return (
-                  <>
-                    <TableRow key={i}>
+                  <Fragment key={i}>
+                    <TableRow>
                       <TableCell>
                         <Select value={r.colorKey} onValueChange={(v) => {
                           const [colorName, material] = v.split("|");
@@ -273,7 +273,7 @@ function NewInward() {
                       <TableCell><Input value={r.remarks} onChange={(e) => updateRow(i, { remarks: e.target.value })} /></TableCell>
                       <TableCell><Button variant="ghost" size="icon" onClick={() => removeRow(i)} disabled={rows.length === 1}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
-                    <TableRow key={`${i}-o`} className="border-t-0">
+                    <TableRow className="border-t-0">
                       <TableCell colSpan={9} className="py-1 bg-muted/20">
                         <div className="flex items-center gap-3 text-xs">
                           <div className="flex items-center gap-2">
@@ -295,7 +295,7 @@ function NewInward() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  </>
+                  </Fragment>
                 );
               })}
             </TableBody>
