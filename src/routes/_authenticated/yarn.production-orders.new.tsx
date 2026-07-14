@@ -282,36 +282,68 @@ function NewProdOrder() {
                 <span><span className="text-muted-foreground">Delivery:</span> {activePO.deliveryDate}</span>
                 <Badge variant="outline">{daysRemainingLabel(daysRemaining(activePO.deliveryDate))}</Badge>
               </div>
-              <div className="rounded-md border overflow-x-auto max-h-[500px]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background"><TableRow>
-                    <TableHead>Article</TableHead><TableHead>Lace</TableHead><TableHead>Material</TableHead>
-                    <TableHead>W×L</TableHead><TableHead>Color</TableHead><TableHead>Qty</TableHead>
-                    <TableHead>UOM</TableHead><TableHead>Stage</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {activePO.items.map((it) => {
-                      const st = poItemStage(yarn, activePO, it);
-                      return (
-                        <TableRow key={it.id}>
-                          <TableCell className="font-mono text-xs">{it.articleCode}</TableCell>
-                          <TableCell>{it.laceType}</TableCell>
-                          <TableCell>{it.materialType}</TableCell>
-                          <TableCell>{it.width}×{it.length}</TableCell>
-                          <TableCell>{it.color}</TableCell>
-                          <TableCell>{it.quantity}</TableCell>
-                          <TableCell>{it.uom}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>
-                              <OverrideToggle poItemId={it.id} current={st} />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <div className="rounded-md border max-h-[520px] overflow-y-auto divide-y">
+                {colorGroups.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">This PO has no items.</div>
+                ) : colorGroups.map((g) => {
+                  const isOpen = !!expanded[g.key];
+                  return (
+                    <div key={g.key} className="p-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="p-1 rounded hover:bg-muted"
+                          onClick={() => setExpanded((e) => ({ ...e, [g.key]: !isOpen }))}
+                          aria-label={isOpen ? "Collapse" : "Expand"}
+                        >
+                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{g.color}</span>
+                            <span className="text-xs text-muted-foreground">· {g.material}</span>
+                            <Badge className={STAGE_BADGE[g.stage]} variant="secondary">{STAGE_LABEL[g.stage]}</Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Ordered: <span className="font-medium text-foreground">{g.orderedQty.toFixed(2)} Kg</span>
+                            <span className="mx-2">·</span>
+                            Received: <span className="font-medium text-foreground">{g.receivedQty.toFixed(2)} Kg</span>
+                            <span className="mx-2">·</span>
+                            {g.items.length} item{g.items.length === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => addLine(activePO, g.color, g.material)}>
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Order
+                        </Button>
+                      </div>
+                      {isOpen && (
+                        <div className="ml-7 mt-2 rounded-md border bg-muted/30">
+                          <Table>
+                            <TableHeader><TableRow>
+                              <TableHead className="h-8">Article</TableHead>
+                              <TableHead className="h-8">Lace</TableHead>
+                              <TableHead className="h-8">W×L</TableHead>
+                              <TableHead className="h-8">Qty</TableHead>
+                              <TableHead className="h-8">UOM</TableHead>
+                              <TableHead className="h-8"></TableHead>
+                            </TableRow></TableHeader>
+                            <TableBody>
+                              {g.items.map((it) => (
+                                <TableRow key={it.id}>
+                                  <TableCell className="font-mono text-xs">{it.articleCode}</TableCell>
+                                  <TableCell>{it.laceType}</TableCell>
+                                  <TableCell>{it.width}×{it.length}</TableCell>
+                                  <TableCell>{it.quantity}</TableCell>
+                                  <TableCell>{it.uom}</TableCell>
+                                  <TableCell><OverrideToggle poItemId={it.id} current={g.stage} /></TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
