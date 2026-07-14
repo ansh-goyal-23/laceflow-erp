@@ -128,6 +128,51 @@ function NewProdOrder() {
     });
   };
 
+  // Color groups for the active PO: one row per (color, material)
+  interface ColorGroup {
+    key: string;
+    color: string;
+    material: string;
+    items: PurchaseOrder["items"];
+    stage: ProcurementStage;
+    orderedQty: number;   // total ordered across all prod orders for this po+color+material
+    receivedQty: number;
+  }
+  const colorGroups: ColorGroup[] = useMemo(() => {
+    if (!activePO) return [];
+    const map = new Map<string, ColorGroup>();
+    for (const it of activePO.items) {
+      const k = `${it.color}|${it.materialType}`;
+      if (!map.has(k)) {
+        map.set(k, {
+          key: k,
+          color: it.color,
+          material: it.materialType,
+          items: [],
+          stage: calculateProcurementStage(yarn, activePO.id, it.materialType, it.color),
+          orderedQty: 0,
+          receivedQty: 0,
+        });
+      }
+      map.get(k)!.items.push(it);
+    }
+    // sum ordered/received across production orders for this po+color+material
+    for (const o of yarn.productionOrders) {
+      if (o.status === "cancelled") continue;
+      for (const poi of o.items) {
+        if (poi.poId !== activePO.id) continue;
+        const k = `${poi.colorName}|${poi.material}`;
+        const g = map.get(k);
+        if (!g) continue;
+        g.orderedQty += poi.orderedQty;
+        g.receivedQty += poi.receivedQty;
+      }
+    }
+    return Array.from(map.values());
+  }, [activePO, yarn]);
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
   const doAddShade = async () => {
     if (addShadeOpen === null) return;
     const line = lines[addShadeOpen];
