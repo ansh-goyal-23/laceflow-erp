@@ -13,6 +13,8 @@ import {
   computePOPendencies, daysRemainingLabel, urgencyClass, PRODUCTION_STATUSES,
   poItemBreakdown, type POPendency,
 } from "@/lib/reports";
+import { useYarnStore, poOverallStage, STAGE_LABEL, STAGE_BADGE } from "@/lib/yarn-store";
+import { Badge } from "@/components/ui/badge";
 import { exportCSV, exportXLSX } from "@/lib/export-table";
 import { toast } from "sonner";
 
@@ -22,7 +24,7 @@ export const Route = createFileRoute("/_authenticated/reports/pendency-po")({
 
 const PAGE_SIZE = 25;
 
-type SortKey = "brand" | "client" | "poNumber" | "poDate" | "deliveryDate" | "daysLeft" | "ordered" | "dispatched" | "pending" | "prod";
+type SortKey = "brand" | "client" | "poNumber" | "poDate" | "deliveryDate" | "daysLeft" | "ordered" | "dispatched" | "pending" | "prod" | "stage";
 
 function SortH({ label, k, sortKey, dir, onClick }: { label: string; k: SortKey; sortKey: SortKey; dir: "asc" | "desc"; onClick: (k: SortKey) => void }) {
   const active = sortKey === k;
@@ -39,6 +41,8 @@ function PendencyPOReport() {
   const invoices = useStore((s) => s.invoices);
   const brands = useStore((s) => s.brands);
   const clients = useStore((s) => s.clients);
+  const yarn = useYarnStore((s) => s);
+  const stageFor = (po: PurchaseOrder) => poOverallStage(yarn, po);
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
@@ -80,7 +84,7 @@ function PendencyPOReport() {
       })
       .filter((r) => r.pending >= minP && r.pending <= maxP)
       .filter((r) => prodF === "all" || (r.po.productionStatus ?? "") === prodF)
-      .filter((r) => !t || [r.po.poNumber, brandName(r.po.brandId), clientName(r.po.clientId), r.po.productionStatus ?? ""].some((v) => v.toLowerCase().includes(t)))
+      .filter((r) => !t || [r.po.poNumber, brandName(r.po.brandId), clientName(r.po.clientId), r.po.productionStatus ?? "", STAGE_LABEL[stageFor(r.po)]].some((v) => v.toLowerCase().includes(t)))
       .sort((a, b) => {
         const s = dir === "asc" ? 1 : -1;
         switch (sortKey) {
@@ -94,10 +98,11 @@ function PendencyPOReport() {
           case "dispatched": return (a.dispatched - b.dispatched) * s;
           case "pending": return (a.pending - b.pending) * s;
           case "prod": return (a.po.productionStatus ?? "").localeCompare(b.po.productionStatus ?? "") * s;
+          case "stage": return STAGE_LABEL[stageFor(a.po)].localeCompare(STAGE_LABEL[stageFor(b.po)]) * s;
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos, invoices, q, brandF, clientF, poF, dueFrom, dueTo, daysF, minPending, maxPending, prodF, sortKey, dir, brands, clients]);
+  }, [pos, invoices, q, brandF, clientF, poF, dueFrom, dueTo, daysF, minPending, maxPending, prodF, sortKey, dir, brands, clients, yarn]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -105,9 +110,9 @@ function PendencyPOReport() {
 
   const exportRows = () => rows.map((r) => [
     brandName(r.po.brandId), clientName(r.po.clientId), r.po.poNumber, r.po.poDate, r.po.deliveryDate,
-    daysRemainingLabel(r.daysLeft), r.ordered, r.dispatched, r.pending, r.po.productionStatus ?? "",
+    daysRemainingLabel(r.daysLeft), r.ordered, r.dispatched, r.pending, STAGE_LABEL[stageFor(r.po)], r.po.productionStatus ?? "",
   ]);
-  const headers = ["Brand", "Client", "PO Number", "PO Date", "Delivery Date", "Days Remaining", "Ordered Qty", "Dispatched Qty", "Pending Qty", "Production Status"];
+  const headers = ["Brand", "Client", "PO Number", "PO Date", "Delivery Date", "Days Remaining", "Ordered Qty", "Dispatched Qty", "Pending Qty", "Procurement Stage", "Production Status"];
 
   return (
     <div className="p-6 lg:p-8 max-w-[1600px]">
@@ -202,12 +207,13 @@ function PendencyPOReport() {
                 <TableHead className="text-right"><SortH label="Ordered Qty" k="ordered" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="text-right"><SortH label="Dispatched Qty" k="dispatched" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="text-right"><SortH label="Pending Qty" k="pending" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
+                <TableHead className="w-52"><SortH label="Procurement Stage" k="stage" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="w-56"><SortH label="Production Status" k="prod" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.length === 0 ? (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No pending POs</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No pending POs</TableCell></TableRow>
               ) : pageRows.map((r: POPendency) => (
                 <TableRow key={r.po.id} className={urgencyClass(r.daysLeft)}>
                   <TableCell>{brandName(r.po.brandId)}</TableCell>
@@ -221,6 +227,9 @@ function PendencyPOReport() {
                   <TableCell className="text-right">{r.ordered}</TableCell>
                   <TableCell className="text-right">{r.dispatched}</TableCell>
                   <TableCell className="text-right font-medium">{r.pending}</TableCell>
+                  <TableCell>
+                    {(() => { const st = stageFor(r.po); return <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>; })()}
+                  </TableCell>
                   <TableCell>
                     <Select
                       value={r.po.productionStatus ?? "__none"}
