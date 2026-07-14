@@ -69,6 +69,7 @@ function POList() {
   const [confirm, setConfirm] = useState<PurchaseOrder | null>(null);
   const [viewing, setViewing] = useState<PurchaseOrder | null>(null);
   const [completeConfirm, setCompleteConfirm] = useState<PurchaseOrder | null>(null);
+  const [reopenConfirm, setReopenConfirm] = useState<PurchaseOrder | null>(null);
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
@@ -203,7 +204,11 @@ function POList() {
                   <TableCell>{p.poDate}</TableCell>
                   <TableCell>{p.deliveryDate}</TableCell>
                   <TableCell>
-                    <StatusBadge po={p} onClickOpen={() => setCompleteConfirm(p)} />
+                    <StatusBadge
+                      po={p}
+                      onClickOpen={() => setCompleteConfirm(p)}
+                      onClickReopen={canModify(p) ? () => setReopenConfirm(p) : undefined}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => setViewing(p)} title="View"><Eye className="h-4 w-4" /></Button>
