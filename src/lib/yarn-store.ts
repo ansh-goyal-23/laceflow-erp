@@ -61,6 +61,10 @@ export interface SampleYarnReceipt {
   grossWeight: number;
   cones: number;
   remarks?: string;
+  /** Derived from a marker embedded in remarks when the receipt is mirrored
+   *  from a Yarn Inward row; identifies the specific sample order item
+   *  (color/material) that was physically received. */
+  sampleOrderItemId?: string;
 }
 
 export type SampleOrderStatus = "draft" | "ordered" | "received" | "completed" | "cancelled";
