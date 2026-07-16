@@ -96,29 +96,46 @@ function SampleOrdersList() {
     }> = [];
     for (const o of orders) {
       if (o.status !== "received") continue;
-      const receipt = o.receipts[o.receipts.length - 1];
-      if (!receipt) continue;
-      // Prefer the exact net from the mirrored inward item; fall back to gross - cones * supplier tube.
-      const inwItem = (() => {
-        for (const iw of inwards) {
-          if (iw.supplierId !== o.supplierId || iw.inwardDate !== receipt.receiptDate) continue;
-          const it = iw.items.find((i) =>
-            (i.supplierShadeNumber || "").trim().toLowerCase() === (receipt.supplierShadeNumber || "").trim().toLowerCase() &&
-            (i.lotNumber || "").trim().toLowerCase() === (receipt.lotNumber || "").trim().toLowerCase() &&
-            Math.abs(i.grossWeight - receipt.grossWeight) < 0.01 &&
-            Math.abs(i.cones - receipt.cones) < 0.5,
-          );
-          if (it) return it;
-        }
-        return undefined;
-      })();
       const sup = suppliers.find((s) => s.id === o.supplierId);
       const tube = sup?.defaultPaperTubeWeight ?? 0;
-      const net = inwItem
-        ? inwItem.netWeight
-        : Math.max(0, receipt.grossWeight - receipt.cones * tube);
       for (const it of o.items) {
         if (it.approvalStatus !== "pending") continue;
+        // Only surface items that actually have a physical receipt.
+        // Prefer receipts explicitly linked to this item; otherwise fall back
+        // to matching on color+material via the mirrored inward row.
+        let receipt = o.receipts.find((r) => r.sampleOrderItemId === it.id);
+        let inwItem: typeof inwards[number]["items"][number] | undefined;
+        if (!receipt) {
+          for (const r of o.receipts) {
+            if (r.sampleOrderItemId) continue; // already tied to a different item
+            for (const iw of inwards) {
+              if (iw.supplierId !== o.supplierId || iw.inwardDate !== r.receiptDate) continue;
+              const cand = iw.items.find((i) =>
+                (i.supplierShadeNumber || "").trim().toLowerCase() === (r.supplierShadeNumber || "").trim().toLowerCase() &&
+                (i.lotNumber || "").trim().toLowerCase() === (r.lotNumber || "").trim().toLowerCase() &&
+                Math.abs(i.grossWeight - r.grossWeight) < 0.01 &&
+                Math.abs(i.cones - r.cones) < 0.5 &&
+                i.sampleOrderItemId === it.id,
+              );
+              if (cand) { receipt = r; inwItem = cand; break; }
+            }
+            if (receipt) break;
+          }
+        }
+        if (!receipt) continue;
+        if (!inwItem) {
+          for (const iw of inwards) {
+            if (iw.supplierId !== o.supplierId || iw.inwardDate !== receipt.receiptDate) continue;
+            const cand = iw.items.find((i) =>
+              (i.supplierShadeNumber || "").trim().toLowerCase() === (receipt!.supplierShadeNumber || "").trim().toLowerCase() &&
+              (i.lotNumber || "").trim().toLowerCase() === (receipt!.lotNumber || "").trim().toLowerCase() &&
+              Math.abs(i.grossWeight - receipt!.grossWeight) < 0.01 &&
+              Math.abs(i.cones - receipt!.cones) < 0.5,
+            );
+            if (cand) { inwItem = cand; break; }
+          }
+        }
+        const net = inwItem ? inwItem.netWeight : Math.max(0, receipt.grossWeight - receipt.cones * tube);
         list.push({
           orderId: o.id, orderNumber: o.number,
           supplier: sName(o.supplierId),
@@ -133,7 +150,7 @@ function SampleOrdersList() {
       }
     }
     return list.sort((a, b) => b.daysSince - a.daysSince);
-  }, [orders, suppliers, clients, brands, pos]);
+  }, [orders, suppliers, clients, brands, pos, inwards]);
 
   const doApprove = async () => {
     if (!approveFor || !shadeNo.trim()) { toast.error("Enter supplier shade #"); return; }
