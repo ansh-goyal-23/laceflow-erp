@@ -37,6 +37,7 @@ export const Route = createFileRoute("/_authenticated/yarn/sample-orders/")({
 function SampleOrdersList() {
   const orders = useYarnStore((s) => s.sampleOrders);
   const suppliers = useYarnStore((s) => s.suppliers);
+  const inwards = useYarnStore((s) => s.inwards);
   const clients = useStore((s) => s.clients);
   const brands = useStore((s) => s.brands);
   const pos = useStore((s) => s.purchaseOrders);
@@ -97,10 +98,27 @@ function SampleOrdersList() {
       if (o.status !== "received") continue;
       const receipt = o.receipts[o.receipts.length - 1];
       if (!receipt) continue;
+      // Prefer the exact net from the mirrored inward item; fall back to gross - cones * supplier tube.
+      const inwItem = (() => {
+        for (const iw of inwards) {
+          if (iw.supplierId !== o.supplierId || iw.inwardDate !== receipt.receiptDate) continue;
+          const it = iw.items.find((i) =>
+            (i.supplierShadeNumber || "").trim().toLowerCase() === (receipt.supplierShadeNumber || "").trim().toLowerCase() &&
+            (i.lotNumber || "").trim().toLowerCase() === (receipt.lotNumber || "").trim().toLowerCase() &&
+            Math.abs(i.grossWeight - receipt.grossWeight) < 0.01 &&
+            Math.abs(i.cones - receipt.cones) < 0.5,
+          );
+          if (it) return it;
+        }
+        return undefined;
+      })();
+      const sup = suppliers.find((s) => s.id === o.supplierId);
+      const tube = sup?.defaultPaperTubeWeight ?? 0;
+      const net = inwItem
+        ? inwItem.netWeight
+        : Math.max(0, receipt.grossWeight - receipt.cones * tube);
       for (const it of o.items) {
         if (it.approvalStatus !== "pending") continue;
-        // Best-effort net for this row from paper tube — approximate.
-        const net = Math.max(0, receipt.grossWeight - receipt.cones * 0);
         list.push({
           orderId: o.id, orderNumber: o.number,
           supplier: sName(o.supplierId),
