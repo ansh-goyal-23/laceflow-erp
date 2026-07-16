@@ -132,7 +132,7 @@ function NewInward() {
     const items: Array<{
       supplierShadeNumber: string; lotNumber?: string;
       grossWeight: number; cones: number; paperTubeWeight: number;
-      remarks?: string; sampleOrderId?: string;
+      remarks?: string; sampleOrderId?: string; sampleOrderItemId?: string;
     }> = [];
     let sampleLinked = 0;
     let sampleUnmatched = 0;
@@ -157,7 +157,12 @@ function NewInward() {
           ),
         );
         if (match) {
-          items.push({ ...base, sampleOrderId: match.id });
+          const matchItem = match.items.find((i) =>
+            i.approvalStatus !== "approved" &&
+            i.colorName.trim().toLowerCase() === r.colorName.trim().toLowerCase() &&
+            i.material.trim().toLowerCase() === r.material.trim().toLowerCase(),
+          );
+          items.push({ ...base, sampleOrderId: match.id, sampleOrderItemId: matchItem?.id });
           sampleLinked++;
         } else {
           items.push(base);

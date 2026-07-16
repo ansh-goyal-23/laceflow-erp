@@ -61,6 +61,10 @@ export interface SampleYarnReceipt {
   grossWeight: number;
   cones: number;
   remarks?: string;
+  /** Derived from a marker embedded in remarks when the receipt is mirrored
+   *  from a Yarn Inward row; identifies the specific sample order item
+   *  (color/material) that was physically received. */
+  sampleOrderItemId?: string;
 }
 
 export type SampleOrderStatus = "draft" | "ordered" | "received" | "completed" | "cancelled";
@@ -252,6 +256,10 @@ function mapSampleItem(r: any): SampleYarnOrderItem {
 }
 
 function mapSampleReceipt(r: any): SampleYarnReceipt {
+  const raw: string = r.remarks ?? "";
+  const m = raw.match(/^\[\[soi:([^\]]+)\]\]\s*/);
+  const sampleOrderItemId = m ? m[1] : undefined;
+  const remarks = m ? raw.slice(m[0].length) : raw;
   return {
     id: r.id,
     receiptDate: r.receipt_date,
@@ -259,7 +267,8 @@ function mapSampleReceipt(r: any): SampleYarnReceipt {
     lotNumber: r.lot_number ?? undefined,
     grossWeight: Number(r.gross_weight) || 0,
     cones: Number(r.cones) || 0,
-    remarks: r.remarks ?? undefined,
+    remarks: remarks ? remarks : undefined,
+    sampleOrderItemId,
   };
 }
 
@@ -682,6 +691,7 @@ export const yarnStore = {
       grossWeight: number; cones: number; paperTubeWeight: number;
       remarks?: string;
       sampleOrderId?: string;
+      sampleOrderItemId?: string;
     }>;
   }): Promise<YarnInward> {
     if (!hydrated) await hydrate();
@@ -722,7 +732,9 @@ export const yarnStore = {
           lot_number: i.lotNumber || null,
           gross_weight: Number(i.grossWeight) || 0,
           cones: Number(i.cones) || 0,
-          remarks: i.remarks || null,
+          remarks: i.sampleOrderItemId
+            ? `[[soi:${i.sampleOrderItemId}]]${i.remarks ? " " + i.remarks : ""}`
+            : (i.remarks || null),
         })),
       ));
       const orderIds = Array.from(new Set(sampleRows.map((i) => i.sampleOrderId!)));
@@ -1055,12 +1067,11 @@ export function inwardItemContext(
   }
   const { order: sOrder, receipt: sRec } = matchSampleReceipt(s, inward, item);
   if (sOrder && sRec) {
-    const colors = Array.from(new Set(sOrder.items.map((i) => i.colorName)));
-    const mats = Array.from(new Set(sOrder.items.map((i) => i.material)));
+    const { colorName, material } = sampleReceiptItemColor(s, sOrder, sRec);
     return {
       type: "sample",
-      colorName: colors.length === 1 ? colors[0] : colors.join(", "),
-      material: mats.length === 1 ? mats[0] : undefined,
+      colorName,
+      material,
       linkedOrderId: sOrder.id, linkedOrderNumber: sOrder.number,
       linkedOrderKind: "sample",
       sampleReceiptId: sRec.id,
@@ -1088,6 +1099,10 @@ export function inwardItemContext(
 export function sampleReceiptItemColor(
   s: StoreShape, order: SampleYarnOrder, receipt: SampleYarnReceipt,
 ): { colorName?: string; material?: string } {
+  if (receipt.sampleOrderItemId) {
+    const it = order.items.find((i) => i.id === receipt.sampleOrderItemId);
+    if (it) return { colorName: it.colorName, material: it.material };
+  }
   const shadeKey = (receipt.supplierShadeNumber || "").trim().toLowerCase();
   if (shadeKey) {
     for (const it of order.items) {
@@ -1101,8 +1116,5 @@ export function sampleReceiptItemColor(
   if (order.items.length === 1) {
     return { colorName: order.items[0].colorName, material: order.items[0].material };
   }
-  return {
-    colorName: order.items.map((i) => i.colorName).join(", "),
-    material: undefined,
-  };
+  return { colorName: undefined, material: undefined };
 }
