@@ -691,6 +691,7 @@ export const yarnStore = {
       grossWeight: number; cones: number; paperTubeWeight: number;
       remarks?: string;
       sampleOrderId?: string;
+      sampleOrderItemId?: string;
     }>;
   }): Promise<YarnInward> {
     if (!hydrated) await hydrate();
@@ -731,7 +732,9 @@ export const yarnStore = {
           lot_number: i.lotNumber || null,
           gross_weight: Number(i.grossWeight) || 0,
           cones: Number(i.cones) || 0,
-          remarks: i.remarks || null,
+          remarks: i.sampleOrderItemId
+            ? `[[soi:${i.sampleOrderItemId}]]${i.remarks ? " " + i.remarks : ""}`
+            : (i.remarks || null),
         })),
       ));
       const orderIds = Array.from(new Set(sampleRows.map((i) => i.sampleOrderId!)));
