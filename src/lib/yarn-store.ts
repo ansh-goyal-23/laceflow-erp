@@ -931,7 +931,8 @@ export function calculateProcurementStage(
 export function poItemStage(
   s: StoreShape, po: PurchaseOrder, item: POLineItem,
 ): ProcurementStage {
-  if (s.overrides[item.id] === "yarn_not_required") return "yarn_not_required";
+  // "Yarn Not Required" means procurement is complete for this item — treat as In Production.
+  if (s.overrides[item.id] === "yarn_not_required") return "production_pending";
   // A single PO item may reference a base + line color (e.g. "LIMPET / LINE ORANGE").
   // Its overall stage is the least-advanced of its expanded colors.
   let best = 999;
