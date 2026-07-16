@@ -1067,12 +1067,11 @@ export function inwardItemContext(
   }
   const { order: sOrder, receipt: sRec } = matchSampleReceipt(s, inward, item);
   if (sOrder && sRec) {
-    const colors = Array.from(new Set(sOrder.items.map((i) => i.colorName)));
-    const mats = Array.from(new Set(sOrder.items.map((i) => i.material)));
+    const { colorName, material } = sampleReceiptItemColor(s, sOrder, sRec);
     return {
       type: "sample",
-      colorName: colors.length === 1 ? colors[0] : colors.join(", "),
-      material: mats.length === 1 ? mats[0] : undefined,
+      colorName,
+      material,
       linkedOrderId: sOrder.id, linkedOrderNumber: sOrder.number,
       linkedOrderKind: "sample",
       sampleReceiptId: sRec.id,
@@ -1100,6 +1099,10 @@ export function inwardItemContext(
 export function sampleReceiptItemColor(
   s: StoreShape, order: SampleYarnOrder, receipt: SampleYarnReceipt,
 ): { colorName?: string; material?: string } {
+  if (receipt.sampleOrderItemId) {
+    const it = order.items.find((i) => i.id === receipt.sampleOrderItemId);
+    if (it) return { colorName: it.colorName, material: it.material };
+  }
   const shadeKey = (receipt.supplierShadeNumber || "").trim().toLowerCase();
   if (shadeKey) {
     for (const it of order.items) {
@@ -1113,8 +1116,5 @@ export function sampleReceiptItemColor(
   if (order.items.length === 1) {
     return { colorName: order.items[0].colorName, material: order.items[0].material };
   }
-  return {
-    colorName: order.items.map((i) => i.colorName).join(", "),
-    material: undefined,
-  };
+  return { colorName: undefined, material: undefined };
 }
