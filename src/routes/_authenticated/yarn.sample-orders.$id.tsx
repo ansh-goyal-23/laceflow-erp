@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, Printer, CheckCircle2, RefreshCw, PackagePlus, Pencil, Trash2 } from "lucide-react";
-import { useYarnStore, yarnStore, sampleExpectedDelivery, type SampleOrderStatus } from "@/lib/yarn-store";
+import { useYarnStore, yarnStore, sampleExpectedDelivery, sampleReceiptItemColor, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 
@@ -28,6 +28,8 @@ function SampleOrderDetail() {
   const nav = useNavigate();
   const order = useYarnStore((s) => s.sampleOrders.find((o) => o.id === id));
   const suppliers = useYarnStore((s) => s.suppliers);
+  const store = useYarnStore((s) => s);
+  const inwards = useYarnStore((s) => s.inwards);
   const clients = useStore((s) => s.clients);
   const brands = useStore((s) => s.brands);
   const pos = useStore((s) => s.purchaseOrders);
@@ -171,24 +173,56 @@ function SampleOrderDetail() {
 
       {order.receipts.length > 0 && (
         <Card className="p-4">
-          <h3 className="font-medium mb-2">Receipts</h3>
+          <h3 className="font-medium mb-2">Yarn Receipts</h3>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Date</TableHead><TableHead>Shade #</TableHead><TableHead>Lot</TableHead>
-                <TableHead>Gross (Kg)</TableHead><TableHead>Cones</TableHead><TableHead>Remarks</TableHead>
+                <TableHead>Receipt Date</TableHead>
+                <TableHead>Inward #</TableHead>
+                <TableHead>Color</TableHead>
+                <TableHead>Shade #</TableHead>
+                <TableHead>Lot</TableHead>
+                <TableHead>Gross (Kg)</TableHead>
+                <TableHead>Cones</TableHead>
+                <TableHead>Net (Kg)</TableHead>
+                <TableHead>Remarks</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {order.receipts.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.receiptDate}</TableCell>
-                    <TableCell className="font-mono text-xs">{r.supplierShadeNumber || "—"}</TableCell>
-                    <TableCell>{r.lotNumber || "—"}</TableCell>
-                    <TableCell>{r.grossWeight}</TableCell>
-                    <TableCell>{r.cones}</TableCell>
-                    <TableCell>{r.remarks || "—"}</TableCell>
-                  </TableRow>
-                ))}
+                {order.receipts.map((r) => {
+                  const { colorName } = sampleReceiptItemColor(store, order, r);
+                  // Find the mirrored inward item (matched by supplier + date + shade + lot + gross + cones).
+                  const inw = inwards.find((iw) =>
+                    iw.supplierId === order.supplierId &&
+                    iw.inwardDate === r.receiptDate &&
+                    iw.items.some((it) =>
+                      (it.supplierShadeNumber || "").trim().toLowerCase() === (r.supplierShadeNumber || "").trim().toLowerCase() &&
+                      (it.lotNumber || "").trim().toLowerCase() === (r.lotNumber || "").trim().toLowerCase() &&
+                      Math.abs(it.grossWeight - r.grossWeight) < 0.01 &&
+                      Math.abs(it.cones - r.cones) < 0.5,
+                    ),
+                  );
+                  const inwItem = inw?.items.find((it) =>
+                    (it.supplierShadeNumber || "").trim().toLowerCase() === (r.supplierShadeNumber || "").trim().toLowerCase() &&
+                    (it.lotNumber || "").trim().toLowerCase() === (r.lotNumber || "").trim().toLowerCase() &&
+                    Math.abs(it.grossWeight - r.grossWeight) < 0.01 &&
+                    Math.abs(it.cones - r.cones) < 0.5,
+                  );
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell>{r.receiptDate}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {inw ? <Link to="/yarn/inwards/$id" params={{ id: inw.id }} className="hover:underline">{inw.number}</Link> : "—"}
+                      </TableCell>
+                      <TableCell className="font-medium">{colorName || "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{r.supplierShadeNumber || "—"}</TableCell>
+                      <TableCell>{r.lotNumber || "—"}</TableCell>
+                      <TableCell>{r.grossWeight}</TableCell>
+                      <TableCell>{r.cones}</TableCell>
+                      <TableCell>{inwItem ? inwItem.netWeight.toFixed(2) : "—"}</TableCell>
+                      <TableCell>{r.remarks || "—"}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
