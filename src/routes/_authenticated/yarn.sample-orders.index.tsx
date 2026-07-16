@@ -98,50 +98,35 @@ function SampleOrdersList() {
       if (o.status !== "received") continue;
       const sup = suppliers.find((s) => s.id === o.supplierId);
       const tube = sup?.defaultPaperTubeWeight ?? 0;
-      for (const it of o.items) {
-        if (it.approvalStatus !== "pending") continue;
-        // Only surface items that actually have a physical receipt.
-        // Prefer receipts explicitly linked to this item; otherwise fall back
-        // to matching on color+material via the mirrored inward row.
-        let receipt = o.receipts.find((r) => r.sampleOrderItemId === it.id);
-        let inwItem: typeof inwards[number]["items"][number] | undefined;
-        if (!receipt) {
-          for (const r of o.receipts) {
-            if (r.sampleOrderItemId) continue; // already tied to a different item
-            for (const iw of inwards) {
-              if (iw.supplierId !== o.supplierId || iw.inwardDate !== r.receiptDate) continue;
-              const cand = iw.items.find((i) =>
-                (i.supplierShadeNumber || "").trim().toLowerCase() === (r.supplierShadeNumber || "").trim().toLowerCase() &&
-                (i.lotNumber || "").trim().toLowerCase() === (r.lotNumber || "").trim().toLowerCase() &&
-                Math.abs(i.grossWeight - r.grossWeight) < 0.01 &&
-                Math.abs(i.cones - r.cones) < 0.5 &&
-                i.sampleOrderItemId === it.id,
-              );
-              if (cand) { receipt = r; inwItem = cand; break; }
-            }
-            if (receipt) break;
-          }
+      // Iterate physical receipts and surface only the item actually received.
+      for (const receipt of o.receipts) {
+        // Resolve target item: explicit link → single-item fallback → skip.
+        let target = receipt.sampleOrderItemId
+          ? o.items.find((i) => i.id === receipt.sampleOrderItemId)
+          : undefined;
+        if (!target && o.items.length === 1) target = o.items[0];
+        if (!target || target.approvalStatus !== "pending") continue;
+        // Skip duplicates if the same item was already added from an earlier receipt.
+        if (list.some((r) => r.orderId === o.id && r.itemId === target!.id)) continue;
+        // Prefer exact net from the mirrored inward item.
+        let inwNet: number | undefined;
+        for (const iw of inwards) {
+          if (iw.supplierId !== o.supplierId || iw.inwardDate !== receipt.receiptDate) continue;
+          const cand = iw.items.find((i) =>
+            (i.supplierShadeNumber || "").trim().toLowerCase() === (receipt.supplierShadeNumber || "").trim().toLowerCase() &&
+            (i.lotNumber || "").trim().toLowerCase() === (receipt.lotNumber || "").trim().toLowerCase() &&
+            Math.abs(i.grossWeight - receipt.grossWeight) < 0.01 &&
+            Math.abs(i.cones - receipt.cones) < 0.5,
+          );
+          if (cand) { inwNet = cand.netWeight; break; }
         }
-        if (!receipt) continue;
-        if (!inwItem) {
-          for (const iw of inwards) {
-            if (iw.supplierId !== o.supplierId || iw.inwardDate !== receipt.receiptDate) continue;
-            const cand = iw.items.find((i) =>
-              (i.supplierShadeNumber || "").trim().toLowerCase() === (receipt!.supplierShadeNumber || "").trim().toLowerCase() &&
-              (i.lotNumber || "").trim().toLowerCase() === (receipt!.lotNumber || "").trim().toLowerCase() &&
-              Math.abs(i.grossWeight - receipt!.grossWeight) < 0.01 &&
-              Math.abs(i.cones - receipt!.cones) < 0.5,
-            );
-            if (cand) { inwItem = cand; break; }
-          }
-        }
-        const net = inwItem ? inwItem.netWeight : Math.max(0, receipt.grossWeight - receipt.cones * tube);
+        const net = inwNet ?? Math.max(0, receipt.grossWeight - receipt.cones * tube);
         list.push({
           orderId: o.id, orderNumber: o.number,
           supplier: sName(o.supplierId),
-          client: cName(it.clientId), brand: bName(it.brandId),
+          client: cName(target.clientId), brand: bName(target.brandId),
           linkedPo: poNum(o.linkedPoId),
-          itemId: it.id, colorName: it.colorName, material: it.material,
+          itemId: target.id, colorName: target.colorName, material: target.material,
           supplierShadeNumber: receipt.supplierShadeNumber || "",
           receiptDate: receipt.receiptDate,
           netWeight: net,
