@@ -1001,3 +1001,108 @@ export function expandPoColors(raw: string): Array<{ name: string; kind: "base" 
   if (line) out.push({ name: line, kind: "line" });
   return out.length ? out : [{ name: s, kind: "single" }];
 }
+
+// ============================================================================
+// Inward item context (production vs sample + linked order + inferred color)
+// ============================================================================
+
+export interface InwardItemContext {
+  type: "production" | "sample" | "unknown";
+  colorName?: string;
+  material?: string;
+  linkedOrderId?: string;
+  linkedOrderNumber?: string;
+  linkedOrderKind?: "production" | "sample";
+  sampleReceiptId?: string;
+}
+
+function matchSampleReceipt(
+  s: StoreShape, inward: YarnInward, item: YarnInwardItem,
+): { order?: SampleYarnOrder; receipt?: SampleYarnReceipt } {
+  const shade = (item.supplierShadeNumber || "").trim().toLowerCase();
+  const lot = (item.lotNumber || "").trim().toLowerCase();
+  for (const o of s.sampleOrders) {
+    if (o.supplierId !== inward.supplierId) continue;
+    const r = o.receipts.find((r) =>
+      r.receiptDate === inward.inwardDate &&
+      (r.supplierShadeNumber || "").trim().toLowerCase() === shade &&
+      (r.lotNumber || "").trim().toLowerCase() === lot &&
+      Math.abs(r.grossWeight - item.grossWeight) < 0.01 &&
+      Math.abs(r.cones - item.cones) < 0.5,
+    );
+    if (r) return { order: o, receipt: r };
+  }
+  return {};
+}
+
+/** Best-effort classification: allocation → production; matching sample receipt → sample. */
+export function inwardItemContext(
+  s: StoreShape, inward: YarnInward, item: YarnInwardItem,
+): InwardItemContext {
+  if (item.allocations.length > 0) {
+    for (const o of s.productionOrders) {
+      for (const it of o.items) {
+        if (item.allocations.some((a) => a.prodOrderItemId === it.id)) {
+          return {
+            type: "production",
+            colorName: it.colorName, material: it.material,
+            linkedOrderId: o.id, linkedOrderNumber: o.number,
+            linkedOrderKind: "production",
+          };
+        }
+      }
+    }
+  }
+  const { order: sOrder, receipt: sRec } = matchSampleReceipt(s, inward, item);
+  if (sOrder && sRec) {
+    const colors = Array.from(new Set(sOrder.items.map((i) => i.colorName)));
+    const mats = Array.from(new Set(sOrder.items.map((i) => i.material)));
+    return {
+      type: "sample",
+      colorName: colors.length === 1 ? colors[0] : colors.join(", "),
+      material: mats.length === 1 ? mats[0] : undefined,
+      linkedOrderId: sOrder.id, linkedOrderNumber: sOrder.number,
+      linkedOrderKind: "sample",
+      sampleReceiptId: sRec.id,
+    };
+  }
+  const key = (item.supplierShadeNumber || "").trim().toLowerCase();
+  for (const o of s.productionOrders) {
+    if (o.supplierId !== inward.supplierId) continue;
+    for (const it of o.items) {
+      if ((it.supplierShadeNumber || "").trim().toLowerCase() === key) {
+        return {
+          type: "production",
+          colorName: it.colorName, material: it.material,
+          linkedOrderId: o.id, linkedOrderNumber: o.number,
+          linkedOrderKind: "production",
+        };
+      }
+    }
+  }
+  return { type: "unknown" };
+}
+
+/** Guess which sample order item a receipt refers to (by supplier shade # of an approved shade,
+ *  else by only-item fallback). Returns undefined when the order has multiple items and no unique match. */
+export function sampleReceiptItemColor(
+  s: StoreShape, order: SampleYarnOrder, receipt: SampleYarnReceipt,
+): { colorName?: string; material?: string } {
+  const shadeKey = (receipt.supplierShadeNumber || "").trim().toLowerCase();
+  if (shadeKey) {
+    for (const it of order.items) {
+      if (!it.approvedShadeId) continue;
+      const sh = s.shades.find((x) => x.id === it.approvedShadeId);
+      if (sh && sh.supplierShadeNumber.trim().toLowerCase() === shadeKey) {
+        return { colorName: it.colorName, material: it.material };
+      }
+    }
+  }
+  if (order.items.length === 1) {
+    return { colorName: order.items[0].colorName, material: order.items[0].material };
+  }
+  return {
+    colorName: order.items.map((i) => i.colorName).join(", "),
+    material: undefined,
+  };
+}
