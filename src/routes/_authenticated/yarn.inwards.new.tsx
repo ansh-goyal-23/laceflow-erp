@@ -127,32 +127,26 @@ function NewInward() {
     const cleaned = rows.filter((r) => r.supplierShadeNumber.trim() && r.colorName && (Number(r.grossWeight) || 0) > 0);
     if (!cleaned.length) { toast.error("Add at least one row with shade # and gross weight"); return; }
 
-    const productionRows: Row[] = [];
-    const sampleRows: Row[] = [];
-    for (const r of cleaned) (rowIsSample(r) ? sampleRows : productionRows).push(r);
-
-    try {
-      // 1) Production inward — through existing flow (goes to Pending Allocation)
-      if (productionRows.length) {
-        await yarnStore.addInward({
-          inwardDate, supplierId,
-          supplierChallanNumber: challan.trim(),
-          remarks: remarks.trim() || undefined,
-          items: productionRows.map((r) => ({
-            supplierShadeNumber: r.supplierShadeNumber.trim(),
-            lotNumber: r.lotNumber.trim() || undefined,
-            grossWeight: Number(r.grossWeight) || 0,
-            cones: Number(r.cones) || 0,
-            paperTubeWeight: r.overrideTube ? (Number(r.tubeOverride) || 0) : defaultTube,
-            remarks: r.remarks.trim() || undefined,
-          })),
-        });
-      }
-
-      // 2) Sample rows — attach as sample receipts on the matching pending Sample Order
-      let sampleAttached = 0;
-      let sampleUnmatched = 0;
-      for (const r of sampleRows) {
+    // Every row becomes an inward item. Sample rows additionally auto-link to
+    // the matching pending sample order via sampleOrderId.
+    const items: Array<{
+      supplierShadeNumber: string; lotNumber?: string;
+      grossWeight: number; cones: number; paperTubeWeight: number;
+      remarks?: string; sampleOrderId?: string;
+    }> = [];
+    let sampleLinked = 0;
+    let sampleUnmatched = 0;
+    let productionCount = 0;
+    for (const r of cleaned) {
+      const base = {
+        supplierShadeNumber: r.supplierShadeNumber.trim(),
+        lotNumber: r.lotNumber.trim() || undefined,
+        grossWeight: Number(r.grossWeight) || 0,
+        cones: Number(r.cones) || 0,
+        paperTubeWeight: r.overrideTube ? (Number(r.tubeOverride) || 0) : defaultTube,
+        remarks: r.remarks.trim() || undefined,
+      };
+      if (rowIsSample(r)) {
         const match = sampleOrders.find((o) =>
           o.supplierId === supplierId &&
           o.status !== "cancelled" && o.status !== "completed" &&
@@ -162,23 +156,31 @@ function NewInward() {
             i.material.trim().toLowerCase() === r.material.trim().toLowerCase(),
           ),
         );
-        if (!match) { sampleUnmatched++; continue; }
-        await yarnStore.addSampleReceipt(match.id, {
-          receiptDate: inwardDate,
-          supplierShadeNumber: r.supplierShadeNumber.trim(),
-          lotNumber: r.lotNumber.trim() || undefined,
-          grossWeight: Number(r.grossWeight) || 0,
-          cones: Number(r.cones) || 0,
-          remarks: r.remarks.trim() || undefined,
-        });
-        sampleAttached++;
+        if (match) {
+          items.push({ ...base, sampleOrderId: match.id });
+          sampleLinked++;
+        } else {
+          items.push(base);
+          sampleUnmatched++;
+        }
+      } else {
+        items.push(base);
+        productionCount++;
       }
+    }
 
+    try {
+      await yarnStore.addInward({
+        inwardDate, supplierId,
+        supplierChallanNumber: challan.trim(),
+        remarks: remarks.trim() || undefined,
+        items,
+      });
       const msgs: string[] = [];
-      if (productionRows.length) msgs.push(`${productionRows.length} production line(s) saved`);
-      if (sampleAttached) msgs.push(`${sampleAttached} sample receipt(s) linked`);
-      if (sampleUnmatched) msgs.push(`${sampleUnmatched} sample row(s) had no pending sample order — skipped`);
-      toast.success(msgs.join(" · ") || "Saved");
+      if (productionCount) msgs.push(`${productionCount} production line(s)`);
+      if (sampleLinked) msgs.push(`${sampleLinked} sample line(s) linked`);
+      if (sampleUnmatched) msgs.push(`${sampleUnmatched} sample line(s) saved without link`);
+      toast.success(`Inward saved — ${msgs.join(" · ")}`);
       nav({ to: "/yarn/inwards" });
     } catch (e) { toast.error((e as Error).message); }
   };
