@@ -256,6 +256,10 @@ function mapSampleItem(r: any): SampleYarnOrderItem {
 }
 
 function mapSampleReceipt(r: any): SampleYarnReceipt {
+  const raw: string = r.remarks ?? "";
+  const m = raw.match(/^\[\[soi:([^\]]+)\]\]\s*/);
+  const sampleOrderItemId = m ? m[1] : undefined;
+  const remarks = m ? raw.slice(m[0].length) : raw;
   return {
     id: r.id,
     receiptDate: r.receipt_date,
@@ -263,7 +267,8 @@ function mapSampleReceipt(r: any): SampleYarnReceipt {
     lotNumber: r.lot_number ?? undefined,
     grossWeight: Number(r.gross_weight) || 0,
     cones: Number(r.cones) || 0,
-    remarks: r.remarks ?? undefined,
+    remarks: remarks ? remarks : undefined,
+    sampleOrderItemId,
   };
 }
 
