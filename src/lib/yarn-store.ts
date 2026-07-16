@@ -750,11 +750,36 @@ export const yarnStore = {
   async deleteInward(id: string) {
     const rec = state.inwards.find((r) => r.id === id);
     if (!rec) return;
+    // 1) Reverse production allocations (received qty).
     for (const it of rec.items) {
       for (const a of it.allocations) {
         await persistProdReceivedQty(a.prodOrderItemId, -a.qty);
       }
     }
+    // 2) Reverse mirrored sample receipts and roll back the sample order status.
+    const affectedSampleOrderIds = new Set<string>();
+    const receiptIdsToDelete: string[] = [];
+    for (const it of rec.items) {
+      const { order, receipt } = matchSampleReceipt(state, rec, it);
+      if (order && receipt) {
+        receiptIdsToDelete.push(receipt.id);
+        affectedSampleOrderIds.add(order.id);
+      }
+    }
+    if (receiptIdsToDelete.length) {
+      throwIfError(await supabase.from("yarn_sample_receipts")
+        .delete().in("id", receiptIdsToDelete));
+    }
+    for (const orderId of affectedSampleOrderIds) {
+      const order = state.sampleOrders.find((o) => o.id === orderId);
+      if (!order || order.status !== "received") continue;
+      const remaining = order.receipts.filter((r) => !receiptIdsToDelete.includes(r.id));
+      if (remaining.length === 0) {
+        throwIfError(await supabase.from("yarn_sample_orders")
+          .update({ status: "ordered" }).eq("id", orderId));
+      }
+    }
+    // 3) Delete the inward header (items/allocations cascade).
     throwIfError(await supabase.from("yarn_inwards").delete().eq("id", id));
     await refresh();
   },
