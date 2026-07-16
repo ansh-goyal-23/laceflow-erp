@@ -681,6 +681,7 @@ export const yarnStore = {
       supplierShadeNumber: string; lotNumber?: string;
       grossWeight: number; cones: number; paperTubeWeight: number;
       remarks?: string;
+      sampleOrderId?: string;
     }>;
   }): Promise<YarnInward> {
     if (!hydrated) await hydrate();
@@ -709,6 +710,27 @@ export const yarnStore = {
         };
       }),
     ));
+    // For rows tagged as sample, mirror as a sample receipt so the sample order
+    // sees the physical arrival and the two records can be matched later.
+    const sampleRows = input.items.filter((i) => i.sampleOrderId);
+    if (sampleRows.length) {
+      throwIfError(await supabase.from("yarn_sample_receipts").insert(
+        sampleRows.map((i) => ({
+          order_id: i.sampleOrderId,
+          receipt_date: input.inwardDate,
+          supplier_shade_number: i.supplierShadeNumber,
+          lot_number: i.lotNumber || null,
+          gross_weight: Number(i.grossWeight) || 0,
+          cones: Number(i.cones) || 0,
+          remarks: i.remarks || null,
+        })),
+      ));
+      const orderIds = Array.from(new Set(sampleRows.map((i) => i.sampleOrderId!)));
+      throwIfError(
+        await supabase.from("yarn_sample_orders")
+          .update({ status: "received" }).in("id", orderIds),
+      );
+    }
     await refresh();
     return state.inwards.find((r) => r.id === header.id)!;
   },
