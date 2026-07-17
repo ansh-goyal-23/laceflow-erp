@@ -388,10 +388,16 @@ function NewProdOrder() {
                       <div><Label className="text-xs">Color</Label>
                         <div className="h-10 px-3 rounded-md border bg-muted/30 flex items-center text-sm">
                           <span className="font-medium">{line.colorName}</span>
-                          <span className="text-muted-foreground ml-2">· {line.material}</span>
                         </div>
                       </div>
-                      <div><Label className="text-xs">Order Qty (Kg)</Label>
+                      <div><Label className="text-xs">Material</Label>
+                        <Input
+                          value={line.material}
+                          onChange={(e) => patchLine(idx, { material: e.target.value, approvedShadeId: "", supplierShadeNumber: "" })}
+                          placeholder="Material"
+                        />
+                      </div>
+                      <div className="col-span-2"><Label className="text-xs">Order Qty (Kg)</Label>
                         <Input type="number" step="0.01" value={line.orderedQty} onChange={(e) => patchLine(idx, { orderedQty: e.target.value })} />
                       </div>
                       <div className="col-span-2"><Label className="text-xs">Approved Shade</Label>
