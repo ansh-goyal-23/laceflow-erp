@@ -22,6 +22,7 @@ import { Route as AuthenticatedYarnUnallocatedRouteImport } from './routes/_auth
 import { Route as AuthenticatedYarnSuppliersRouteImport } from './routes/_authenticated/yarn.suppliers'
 import { Route as AuthenticatedYarnShadesRouteImport } from './routes/_authenticated/yarn.shades'
 import { Route as AuthenticatedYarnPendingAllocationsRouteImport } from './routes/_authenticated/yarn.pending-allocations'
+import { Route as AuthenticatedReportsYarnOrderMasterRouteImport } from './routes/_authenticated/reports.yarn-order-master'
 import { Route as AuthenticatedReportsPendencyPoRouteImport } from './routes/_authenticated/reports.pendency-po'
 import { Route as AuthenticatedReportsPendencyItemRouteImport } from './routes/_authenticated/reports.pendency-item'
 import { Route as AuthenticatedPurchaseOrdersPdfImportHistoryRouteImport } from './routes/_authenticated/purchase-orders.pdf-import-history'
@@ -113,6 +114,12 @@ const AuthenticatedYarnPendingAllocationsRoute =
   AuthenticatedYarnPendingAllocationsRouteImport.update({
     id: '/yarn/pending-allocations',
     path: '/yarn/pending-allocations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedReportsYarnOrderMasterRoute =
+  AuthenticatedReportsYarnOrderMasterRouteImport.update({
+    id: '/reports/yarn-order-master',
+    path: '/reports/yarn-order-master',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedReportsPendencyPoRoute =
@@ -273,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/reports/yarn-order-master': typeof AuthenticatedReportsYarnOrderMasterRoute
   '/yarn/pending-allocations': typeof AuthenticatedYarnPendingAllocationsRoute
   '/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
@@ -310,6 +318,7 @@ export interface FileRoutesByTo {
   '/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/reports/yarn-order-master': typeof AuthenticatedReportsYarnOrderMasterRoute
   '/yarn/pending-allocations': typeof AuthenticatedYarnPendingAllocationsRoute
   '/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
@@ -349,6 +358,7 @@ export interface FileRoutesById {
   '/_authenticated/purchase-orders/pdf-import-history': typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   '/_authenticated/reports/pendency-item': typeof AuthenticatedReportsPendencyItemRoute
   '/_authenticated/reports/pendency-po': typeof AuthenticatedReportsPendencyPoRoute
+  '/_authenticated/reports/yarn-order-master': typeof AuthenticatedReportsYarnOrderMasterRoute
   '/_authenticated/yarn/pending-allocations': typeof AuthenticatedYarnPendingAllocationsRoute
   '/_authenticated/yarn/shades': typeof AuthenticatedYarnShadesRoute
   '/_authenticated/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
@@ -388,6 +398,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/reports/yarn-order-master'
     | '/yarn/pending-allocations'
     | '/yarn/shades'
     | '/yarn/suppliers'
@@ -425,6 +436,7 @@ export interface FileRouteTypes {
     | '/purchase-orders/pdf-import-history'
     | '/reports/pendency-item'
     | '/reports/pendency-po'
+    | '/reports/yarn-order-master'
     | '/yarn/pending-allocations'
     | '/yarn/shades'
     | '/yarn/suppliers'
@@ -463,6 +475,7 @@ export interface FileRouteTypes {
     | '/_authenticated/purchase-orders/pdf-import-history'
     | '/_authenticated/reports/pendency-item'
     | '/_authenticated/reports/pendency-po'
+    | '/_authenticated/reports/yarn-order-master'
     | '/_authenticated/yarn/pending-allocations'
     | '/_authenticated/yarn/shades'
     | '/_authenticated/yarn/suppliers'
@@ -579,6 +592,13 @@ declare module '@tanstack/react-router' {
       path: '/yarn/pending-allocations'
       fullPath: '/yarn/pending-allocations'
       preLoaderRoute: typeof AuthenticatedYarnPendingAllocationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports/yarn-order-master': {
+      id: '/_authenticated/reports/yarn-order-master'
+      path: '/reports/yarn-order-master'
+      fullPath: '/reports/yarn-order-master'
+      preLoaderRoute: typeof AuthenticatedReportsYarnOrderMasterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports/pendency-po': {
@@ -762,6 +782,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchaseOrdersPdfImportHistoryRoute: typeof AuthenticatedPurchaseOrdersPdfImportHistoryRoute
   AuthenticatedReportsPendencyItemRoute: typeof AuthenticatedReportsPendencyItemRoute
   AuthenticatedReportsPendencyPoRoute: typeof AuthenticatedReportsPendencyPoRoute
+  AuthenticatedReportsYarnOrderMasterRoute: typeof AuthenticatedReportsYarnOrderMasterRoute
   AuthenticatedYarnPendingAllocationsRoute: typeof AuthenticatedYarnPendingAllocationsRoute
   AuthenticatedYarnShadesRoute: typeof AuthenticatedYarnShadesRoute
   AuthenticatedYarnSuppliersRoute: typeof AuthenticatedYarnSuppliersRoute
@@ -802,6 +823,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedPurchaseOrdersPdfImportHistoryRoute,
   AuthenticatedReportsPendencyItemRoute: AuthenticatedReportsPendencyItemRoute,
   AuthenticatedReportsPendencyPoRoute: AuthenticatedReportsPendencyPoRoute,
+  AuthenticatedReportsYarnOrderMasterRoute:
+    AuthenticatedReportsYarnOrderMasterRoute,
   AuthenticatedYarnPendingAllocationsRoute:
     AuthenticatedYarnPendingAllocationsRoute,
   AuthenticatedYarnShadesRoute: AuthenticatedYarnShadesRoute,
