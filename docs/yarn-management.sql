@@ -325,12 +325,7 @@ CREATE POLICY "sample_receipts select" ON public.yarn_sample_receipts
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY "sample_receipts write via parent" ON public.yarn_sample_receipts
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.yarn_sample_orders o
-                  WHERE o.id = order_id
-                    AND (o.created_by = auth.uid() OR public.has_role(auth.uid(), 'admin'))))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.yarn_sample_orders o
-                       WHERE o.id = order_id
-                         AND (o.created_by = auth.uid() OR public.has_role(auth.uid(), 'admin'))));
+  USING (true) WITH CHECK (true);
 
 CREATE POLICY "prod_items select" ON public.yarn_production_order_items
   FOR SELECT TO authenticated USING (true);
