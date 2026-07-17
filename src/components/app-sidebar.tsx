@@ -29,6 +29,7 @@ const dispatchNav: { to: string; label: string; icon: typeof Plus; exact?: boole
 const reportsNav: { to: string; label: string; icon: typeof Plus }[] = [
   { to: "/reports/pendency-po", label: "Pendency (PO Wise)", icon: ClipboardList },
   { to: "/reports/pendency-item", label: "Pendency (Item Wise)", icon: Package },
+  { to: "/reports/yarn-order-master", label: "Yarn Order Master", icon: Boxes },
 ];
 
 const yarnNav: { to: string; label: string; icon: typeof Plus }[] = [
