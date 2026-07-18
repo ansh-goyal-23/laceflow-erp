@@ -8,12 +8,21 @@
 --   * Trigger that auto-creates a profile row on new auth.users signup
 --
 -- Depends on: public.has_role(uuid, app_role), public.user_roles, public.app_role.
+--
+-- IMPORTANT: Postgres does not allow a newly added enum value to be used in
+-- the same transaction that added it ("unsafe use of new value ... of enum
+-- type"). Run STEP 1 below on its own first, then run STEP 2 as a separate
+-- query in the Supabase SQL Editor.
 
--- ---------------------------------------------------------------------------
--- 1. Extend the app_role enum
--- ---------------------------------------------------------------------------
+-- ===========================================================================
+-- STEP 1 — Run this ALONE first, then run STEP 2 in a separate query.
+-- ===========================================================================
 ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'editor';
 ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'viewer';
+
+-- ===========================================================================
+-- STEP 2 — Run everything below AFTER Step 1 has been committed.
+-- ===========================================================================
 
 -- ---------------------------------------------------------------------------
 -- 2. user_profiles table
@@ -127,7 +136,7 @@ SELECT
   COALESCE(
     (SELECT role::text FROM public.user_roles r
      WHERE r.user_id = p.id
-     ORDER BY CASE r.role
+     ORDER BY CASE r.role::text
        WHEN 'admin'  THEN 1
        WHEN 'editor' THEN 2
        WHEN 'viewer' THEN 3
