@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo, UserCog } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ const yarnNav: { to: string; label: string; icon: typeof Plus }[] = [
 ];
 
 const adminNav: { to: string; label: string; icon: typeof Plus }[] = [
+  { to: "/admin/users", label: "User Management", icon: UserCog },
   { to: "/admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
   { to: "/admin/user-activity", label: "User Activity", icon: Activity },
   { to: "/admin/daily-report", label: "Daily Work Report", icon: CalendarDays },
