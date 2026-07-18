@@ -74,6 +74,23 @@ export function can(role: AppRole | undefined, module: ModuleKey, action: Permis
   return Boolean(MATRIX[role]?.[module]?.[action]);
 }
 
+/**
+ * Row-level check for edit/delete actions.
+ * - Admin: can modify any row.
+ * - Editor: can modify only rows they created (ownerId === userId).
+ * - Viewer/user: cannot modify.
+ */
+export function canModifyRow(
+  role: AppRole | undefined,
+  currentUserId: string | undefined,
+  ownerId: string | null | undefined,
+): boolean {
+  if (!role || !currentUserId) return false;
+  if (role === "admin") return true;
+  if (role === "editor") return !!ownerId && ownerId === currentUserId;
+  return false;
+}
+
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin",
   editor: "Editor",
