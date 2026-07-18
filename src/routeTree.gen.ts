@@ -32,6 +32,7 @@ import { Route as AuthenticatedPurchaseOrdersImportHistoryRouteImport } from './
 import { Route as AuthenticatedPurchaseOrdersImportRouteImport } from './routes/_authenticated/purchase-orders.import'
 import { Route as AuthenticatedInvoicesNewRouteImport } from './routes/_authenticated/invoices.new'
 import { Route as AuthenticatedInvoicesImportRouteImport } from './routes/_authenticated/invoices.import'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminUserActivityRouteImport } from './routes/_authenticated/admin.user-activity'
 import { Route as AuthenticatedAdminDailyReportRouteImport } from './routes/_authenticated/admin.daily-report'
 import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin.audit-logs'
@@ -176,6 +177,11 @@ const AuthenticatedInvoicesImportRoute =
     path: '/invoices/import',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminUserActivityRoute =
   AuthenticatedAdminUserActivityRouteImport.update({
     id: '/admin/user-activity',
@@ -271,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/admin/daily-report': typeof AuthenticatedAdminDailyReportRoute
   '/admin/user-activity': typeof AuthenticatedAdminUserActivityRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/admin/daily-report': typeof AuthenticatedAdminDailyReportRoute
   '/admin/user-activity': typeof AuthenticatedAdminUserActivityRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/_authenticated/admin/daily-report': typeof AuthenticatedAdminDailyReportRoute
   '/_authenticated/admin/user-activity': typeof AuthenticatedAdminUserActivityRoute
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/invoices/import': typeof AuthenticatedInvoicesImportRoute
   '/_authenticated/invoices/new': typeof AuthenticatedInvoicesNewRoute
   '/_authenticated/purchase-orders/import': typeof AuthenticatedPurchaseOrdersImportRoute
@@ -389,6 +398,7 @@ export interface FileRouteTypes {
     | '/admin/audit-logs'
     | '/admin/daily-report'
     | '/admin/user-activity'
+    | '/admin/users'
     | '/invoices/import'
     | '/invoices/new'
     | '/purchase-orders/import'
@@ -427,6 +437,7 @@ export interface FileRouteTypes {
     | '/admin/audit-logs'
     | '/admin/daily-report'
     | '/admin/user-activity'
+    | '/admin/users'
     | '/invoices/import'
     | '/invoices/new'
     | '/purchase-orders/import'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/audit-logs'
     | '/_authenticated/admin/daily-report'
     | '/_authenticated/admin/user-activity'
+    | '/_authenticated/admin/users'
     | '/_authenticated/invoices/import'
     | '/_authenticated/invoices/new'
     | '/_authenticated/purchase-orders/import'
@@ -664,6 +676,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvoicesImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/user-activity': {
       id: '/_authenticated/admin/user-activity'
       path: '/admin/user-activity'
@@ -773,6 +792,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute
   AuthenticatedAdminDailyReportRoute: typeof AuthenticatedAdminDailyReportRoute
   AuthenticatedAdminUserActivityRoute: typeof AuthenticatedAdminUserActivityRoute
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedInvoicesImportRoute: typeof AuthenticatedInvoicesImportRoute
   AuthenticatedInvoicesNewRoute: typeof AuthenticatedInvoicesNewRoute
   AuthenticatedPurchaseOrdersImportRoute: typeof AuthenticatedPurchaseOrdersImportRoute
@@ -810,6 +830,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminAuditLogsRoute: AuthenticatedAdminAuditLogsRoute,
   AuthenticatedAdminDailyReportRoute: AuthenticatedAdminDailyReportRoute,
   AuthenticatedAdminUserActivityRoute: AuthenticatedAdminUserActivityRoute,
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedInvoicesImportRoute: AuthenticatedInvoicesImportRoute,
   AuthenticatedInvoicesNewRoute: AuthenticatedInvoicesNewRoute,
   AuthenticatedPurchaseOrdersImportRoute:
