@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo, UserCog } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo, UserCog, HardHat } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,7 @@ export function AppSidebar() {
   const reportsActive = pathname.startsWith("/reports/");
   const [yarnOpen, setYarnOpen] = useState(true);
   const yarnActive = pathname.startsWith("/yarn/");
+  const productionActive = pathname === "/production" || pathname.startsWith("/production/");
   const [adminOpen, setAdminOpen] = useState(true);
   const adminActive = pathname.startsWith("/admin/");
   const isAdmin = user?.role === "admin";
@@ -246,6 +247,18 @@ export function AppSidebar() {
             })}
           </div>
         )}
+
+        <Link
+          to="/production"
+          className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+            productionActive
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          }`}
+        >
+          <HardHat className="h-4 w-4" />
+          Production
+        </Link>
 
         <Link
           to="/ai-learning"
