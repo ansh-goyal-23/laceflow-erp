@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import type { PurchaseOrder, POLineItem } from "@/lib/store";
 import {
   expandPoColors,
-  poOverallStage,
   type StoreShape as YarnStoreShape,
 } from "@/lib/yarn-store";
 
