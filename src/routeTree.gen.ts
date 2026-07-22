@@ -17,6 +17,7 @@ import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated/brands'
 import { Route as AuthenticatedAiLearningRouteImport } from './routes/_authenticated/ai-learning'
 import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_authenticated/purchase-orders.index'
+import { Route as AuthenticatedProductionIndexRouteImport } from './routes/_authenticated/production.index'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
 import { Route as AuthenticatedYarnUnallocatedRouteImport } from './routes/_authenticated/yarn.unallocated'
 import { Route as AuthenticatedYarnSuppliersRouteImport } from './routes/_authenticated/yarn.suppliers'
@@ -86,6 +87,12 @@ const AuthenticatedPurchaseOrdersIndexRoute =
   AuthenticatedPurchaseOrdersIndexRouteImport.update({
     id: '/purchase-orders/',
     path: '/purchase-orders/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedProductionIndexRoute =
+  AuthenticatedProductionIndexRouteImport.update({
+    id: '/production/',
+    path: '/production/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedInvoicesIndexRoute =
@@ -293,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/yarn/unallocated': typeof AuthenticatedYarnUnallocatedRoute
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
+  '/production/': typeof AuthenticatedProductionIndexRoute
   '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
@@ -332,6 +340,7 @@ export interface FileRoutesByTo {
   '/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/yarn/unallocated': typeof AuthenticatedYarnUnallocatedRoute
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
+  '/production': typeof AuthenticatedProductionIndexRoute
   '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
@@ -373,6 +382,7 @@ export interface FileRoutesById {
   '/_authenticated/yarn/suppliers': typeof AuthenticatedYarnSuppliersRoute
   '/_authenticated/yarn/unallocated': typeof AuthenticatedYarnUnallocatedRoute
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
+  '/_authenticated/production/': typeof AuthenticatedProductionIndexRoute
   '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
   '/_authenticated/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/_authenticated/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/yarn/suppliers'
     | '/yarn/unallocated'
     | '/invoices/'
+    | '/production/'
     | '/purchase-orders/'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/yarn/suppliers'
     | '/yarn/unallocated'
     | '/invoices'
+    | '/production'
     | '/purchase-orders'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
@@ -493,6 +505,7 @@ export interface FileRouteTypes {
     | '/_authenticated/yarn/suppliers'
     | '/_authenticated/yarn/unallocated'
     | '/_authenticated/invoices/'
+    | '/_authenticated/production/'
     | '/_authenticated/purchase-orders/'
     | '/_authenticated/invoices/$id/edit'
     | '/_authenticated/purchase-orders/$id/edit'
@@ -569,6 +582,13 @@ declare module '@tanstack/react-router' {
       path: '/purchase-orders'
       fullPath: '/purchase-orders/'
       preLoaderRoute: typeof AuthenticatedPurchaseOrdersIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/production/': {
+      id: '/_authenticated/production/'
+      path: '/production'
+      fullPath: '/production/'
+      preLoaderRoute: typeof AuthenticatedProductionIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/invoices/': {
@@ -808,6 +828,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedYarnSuppliersRoute: typeof AuthenticatedYarnSuppliersRoute
   AuthenticatedYarnUnallocatedRoute: typeof AuthenticatedYarnUnallocatedRoute
   AuthenticatedInvoicesIndexRoute: typeof AuthenticatedInvoicesIndexRoute
+  AuthenticatedProductionIndexRoute: typeof AuthenticatedProductionIndexRoute
   AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
   AuthenticatedInvoicesIdEditRoute: typeof AuthenticatedInvoicesIdEditRoute
   AuthenticatedPurchaseOrdersIdEditRoute: typeof AuthenticatedPurchaseOrdersIdEditRoute
@@ -852,6 +873,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedYarnSuppliersRoute: AuthenticatedYarnSuppliersRoute,
   AuthenticatedYarnUnallocatedRoute: AuthenticatedYarnUnallocatedRoute,
   AuthenticatedInvoicesIndexRoute: AuthenticatedInvoicesIndexRoute,
+  AuthenticatedProductionIndexRoute: AuthenticatedProductionIndexRoute,
   AuthenticatedPurchaseOrdersIndexRoute: AuthenticatedPurchaseOrdersIndexRoute,
   AuthenticatedInvoicesIdEditRoute: AuthenticatedInvoicesIdEditRoute,
   AuthenticatedPurchaseOrdersIdEditRoute:
