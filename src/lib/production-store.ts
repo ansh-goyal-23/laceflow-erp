@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import type { PurchaseOrder, POLineItem } from "@/lib/store";
 import {
   expandPoColors,
-  poOverallStage,
   type StoreShape as YarnStoreShape,
 } from "@/lib/yarn-store";
 
@@ -199,10 +198,9 @@ export function poProductionTab(
   const rec = records[po.id];
   if (rec?.status === "packed_ready") return "packed_ready";
   if (rec?.status === "in_production") return "in_production";
-  // Waiting = fully procured, not yet released.
-  const stage = poOverallStage(yarnState, po);
-  if (stage === "production_pending" || stage === "yarn_not_required") return "waiting";
-  return null;
+  // Waiting = any open PO not yet released to production (regardless of
+  // procurement stage). Procurement decides when to release.
+  return "waiting";
 }
 
 /** Ordered shade lookup for a PO item's colours. Uses the production yarn
