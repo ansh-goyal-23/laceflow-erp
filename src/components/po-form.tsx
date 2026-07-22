@@ -106,6 +106,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
 
   const [brandOpen, setBrandOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const poNumberTouched = useRef(!!existing);
   useEffect(() => {
@@ -142,6 +143,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
   }
 
   async function save(action: "draft" | "submit") {
+    if (saving) return;
     const err = validate(action === "submit");
     if (err) { toast.error(err); return; }
     // Preserve non-draft statuses on edit; new/draft POs move to Open on submit.
@@ -152,6 +154,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
           ? "open"
           : "draft";
     const payload = { poNumber: poNumber.trim(), brandId, clientId, poDate, deliveryDate, items, status: finalStatus };
+    setSaving(true);
     try {
       if (existing) {
         await store.updatePO(existing.id, payload);
@@ -163,6 +166,8 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
       navigate({ to: "/purchase-orders" });
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to save PO");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -320,12 +325,12 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
       </datalist>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => navigate({ to: "/purchase-orders" })}>Cancel</Button>
-        <Button type="button" variant="secondary" onClick={() => save("draft")}>
-          <Save className="h-4 w-4 mr-1" /> Save Draft
+        <Button type="button" variant="outline" onClick={() => navigate({ to: "/purchase-orders" })} disabled={saving}>Cancel</Button>
+        <Button type="button" variant="secondary" onClick={() => save("draft")} disabled={saving}>
+          <Save className="h-4 w-4 mr-1" /> {saving ? "Saving…" : "Save Draft"}
         </Button>
-        <Button type="button" onClick={() => save("submit")}>
-          <Send className="h-4 w-4 mr-1" /> Submit PO
+        <Button type="button" onClick={() => save("submit")} disabled={saving}>
+          <Send className="h-4 w-4 mr-1" /> {saving ? "Saving…" : "Submit PO"}
         </Button>
       </div>
 

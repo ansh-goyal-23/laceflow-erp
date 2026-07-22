@@ -37,6 +37,7 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
   );
   const [selectedPoId, setSelectedPoId] = useState<string>("");
   const [poRows, setPoRows] = useState<Record<string, number>>({}); // poItemId -> qty input
+  const [saving, setSaving] = useState(false);
 
   // Dispatched map excludes current invoice when editing so balances reflect "other invoices"
   const dispByItem = useMemo(() => dispatchedByPOItem(invoices, existing?.id), [invoices, existing?.id]);
@@ -126,11 +127,13 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
   }, [items]);
 
   async function submit() {
+    if (saving) return;
     if (!invoiceNumber.trim()) return toast.error("Invoice Number is required");
     if (!dispatchDate) return toast.error("Dispatch Date is required");
     if (!clientId) return toast.error("Client is required");
     if (items.length === 0) return toast.error("Add at least one item");
 
+    setSaving(true);
     try {
       const payload = { invoiceNumber: invoiceNumber.trim(), dispatchDate, clientId, items };
       if (existing) {
@@ -143,6 +146,8 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
       navigate({ to: "/invoices" });
     } catch (e) {
       toast.error((e as Error).message ?? "Failed to save invoice");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -362,9 +367,9 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
       )}
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => navigate({ to: "/invoices" })}>Cancel</Button>
-        <Button onClick={submit}>
-          <Send className="h-4 w-4 mr-1" /> {existing ? "Update Invoice" : "Submit Invoice"}
+        <Button variant="outline" onClick={() => navigate({ to: "/invoices" })} disabled={saving}>Cancel</Button>
+        <Button onClick={submit} disabled={saving}>
+          <Send className="h-4 w-4 mr-1" /> {saving ? "Saving…" : existing ? "Update Invoice" : "Submit Invoice"}
         </Button>
       </div>
     </div>
