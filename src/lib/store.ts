@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "@/lib/audit";
+import { dispatchedByPOItem, dispatchedByPO, poFulfillmentStatus } from "@/lib/dispatch";
 
 export interface Brand {
   id: string;
@@ -436,12 +437,15 @@ export const store = {
     await insertInvoiceItems(invId, inv.items);
     await refreshInvoice(invId);
     void logActivity("Invoices", "CREATE", "Invoice", inv.invoiceNumber);
+    await syncPOStatuses(inv.items.map((i) => i.poId).filter(Boolean) as string[]);
     return state.invoices.find((i) => i.id === invId)!;
   },
   async updateInvoice(
     id: string,
     inv: Omit<Invoice, "id" | "createdAt" | "createdBy" | "items"> & { items: Omit<InvoiceItem, "id" | "invoiceId">[] },
   ) {
+    const prev = state.invoices.find((i) => i.id === id);
+    const prevPoIds = prev ? prev.items.map((i) => i.poId).filter(Boolean) as string[] : [];
     const { error } = await supabase
       .from("invoices")
       .update({
@@ -456,15 +460,36 @@ export const store = {
     await insertInvoiceItems(id, inv.items);
     await refreshInvoice(id);
     void logActivity("Invoices", "EDIT", "Invoice", inv.invoiceNumber);
+    const nextPoIds = inv.items.map((i) => i.poId).filter(Boolean) as string[];
+    await syncPOStatuses([...prevPoIds, ...nextPoIds]);
   },
   async deleteInvoice(id: string) {
     const existing = state.invoices.find((i) => i.id === id);
+    const affected = existing ? existing.items.map((i) => i.poId).filter(Boolean) as string[] : [];
     const { error } = await supabase.from("invoices").delete().eq("id", id);
     if (error) throw error;
     set({ ...state, invoices: state.invoices.filter((i) => i.id !== id) });
     void logActivity("Invoices", "DELETE", "Invoice", existing?.invoiceNumber ?? id);
+    await syncPOStatuses(affected);
   },
 };
+
+async function syncPOStatuses(poIds: string[]) {
+  const unique = Array.from(new Set(poIds));
+  if (!unique.length) return;
+  const byItem = dispatchedByPOItem(state.invoices);
+  const byPo = dispatchedByPO(state.invoices);
+  for (const poId of unique) {
+    const po = state.purchaseOrders.find((p) => p.id === poId);
+    if (!po) continue;
+    const fulfil = poFulfillmentStatus(po, byItem, byPo);
+    if (fulfil === "Completed" && po.status === "open") {
+      try { await store.updatePOStatus(po.id, "completed"); } catch (e) { console.error(e); }
+    } else if (fulfil !== "Completed" && po.status === "completed") {
+      try { await store.updatePOStatus(po.id, "open"); } catch (e) { console.error(e); }
+    }
+  }
+}
 
 async function insertInvoiceItems(invoiceId: string, items: Omit<InvoiceItem, "id" | "invoiceId">[]) {
   if (!items.length) return;
