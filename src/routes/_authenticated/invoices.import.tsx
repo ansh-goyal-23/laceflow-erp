@@ -87,21 +87,11 @@ function ImportDispatchPage() {
 
   const unlinkedPreview: UnlinkedRow[] = parsed
     ? parsed.validRows.reduce<UnlinkedRow[]>((acc, r) => {
-        const client = r.client.trim().toLowerCase();
-        const po = pos.find((p) => {
-          const c = pos.length ? true : false; // no-op to keep types happy
-          void c;
-          return p.poNumber === r.poNumber;
-        });
-        // match by po number + client name (client id resolved at import time)
-        const poMatch = pos.find(
-          (p) => p.poNumber === r.poNumber,
-        );
+        const poMatch = pos.find((p) => p.poNumber === r.poNumber);
         if (!poMatch) {
           acc.push({ row: r, reason: "no-po", candidates: 0 });
           return acc;
         }
-        void po;
         const cands = poItemCandidates(poMatch, r);
         if (cands.length === 0) acc.push({ row: r, reason: "no-match", candidates: 0 });
         else if (cands.length > 1) acc.push({ row: r, reason: "ambiguous", candidates: cands.length });
