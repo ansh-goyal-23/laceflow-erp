@@ -19,7 +19,21 @@ interface Result {
   invoicesCreated: number;
   itemsCreated: number;
   failed: DispatchImportRow[];
+  unlinkedItems: number;
 }
+
+type UnlinkedReason = "no-po" | "no-match" | "ambiguous";
+interface UnlinkedRow {
+  row: DispatchImportRow;
+  reason: UnlinkedReason;
+  candidates: number;
+}
+
+const REASON_LABEL: Record<UnlinkedReason, string> = {
+  "no-po": "PO not found",
+  "no-match": "No matching PO item",
+  ambiguous: "Multiple matching PO items (ambiguous)",
+};
 
 function ImportDispatchPage() {
   const pos = useStore((s) => s.purchaseOrders);
@@ -62,6 +76,39 @@ function ImportDispatchPage() {
     return candidates.length === 1 ? candidates[0] : undefined;
   }
 
+  function poItemCandidates(po: PurchaseOrder, row: DispatchImportRow): POLineItem[] {
+    return po.items.filter((it) =>
+      (!row.articleCode || it.articleCode.trim().toLowerCase() === row.articleCode.trim().toLowerCase()) &&
+      (!row.width || it.width.trim() === row.width.trim()) &&
+      (!row.length || it.length.trim() === row.length.trim()) &&
+      (!row.color || it.color.trim().toLowerCase() === row.color.trim().toLowerCase()),
+    );
+  }
+
+  const unlinkedPreview: UnlinkedRow[] = parsed
+    ? parsed.validRows.reduce<UnlinkedRow[]>((acc, r) => {
+        const client = r.client.trim().toLowerCase();
+        const po = pos.find((p) => {
+          const c = pos.length ? true : false; // no-op to keep types happy
+          void c;
+          return p.poNumber === r.poNumber;
+        });
+        // match by po number + client name (client id resolved at import time)
+        const poMatch = pos.find(
+          (p) => p.poNumber === r.poNumber,
+        );
+        if (!poMatch) {
+          acc.push({ row: r, reason: "no-po", candidates: 0 });
+          return acc;
+        }
+        void po;
+        const cands = poItemCandidates(poMatch, r);
+        if (cands.length === 0) acc.push({ row: r, reason: "no-match", candidates: 0 });
+        else if (cands.length > 1) acc.push({ row: r, reason: "ambiguous", candidates: cands.length });
+        return acc;
+      }, [])
+    : [];
+
   async function runImport() {
     if (!parsed) return;
     setImporting(true);
@@ -69,6 +116,7 @@ function ImportDispatchPage() {
     const failed: DispatchImportRow[] = [...parsed.invalidRows];
     let invoicesCreated = 0;
     let itemsCreated = 0;
+    let unlinkedItems = 0;
 
     // Group by client+invoice+date
     const groups = new Map<string, { sample: DispatchImportRow; items: DispatchImportRow[] }>();
@@ -90,6 +138,7 @@ function ImportDispatchPage() {
           const lineItems = items.map((r) => {
             const po = pos.find((p) => p.poNumber === r.poNumber && p.clientId === clientId);
             const poItem = po ? matchPOItem(po, r) : undefined;
+            if (!poItem) unlinkedItems++;
             return {
               poId: po?.id ?? null,
               poItemId: poItem?.id ?? null,
@@ -121,8 +170,12 @@ function ImportDispatchPage() {
         setProgress(Math.round((done / total) * 100));
         setProgressLabel(`Importing ${done} of ${total} invoices…`);
       }
-      setResult({ totalRows: parsed.rows.length, invoicesCreated, itemsCreated, failed });
-      toast.success(`Import complete: ${invoicesCreated} invoices, ${itemsCreated} items`);
+      setResult({ totalRows: parsed.rows.length, invoicesCreated, itemsCreated, failed, unlinkedItems });
+      if (unlinkedItems > 0) {
+        toast.warning(`Import complete: ${invoicesCreated} invoices, ${itemsCreated} items — ${unlinkedItems} not linked to a PO item`);
+      } else {
+        toast.success(`Import complete: ${invoicesCreated} invoices, ${itemsCreated} items`);
+      }
     } catch (e) {
       toast.error((e as Error).message ?? "Import failed");
     } finally {
