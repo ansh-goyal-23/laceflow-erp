@@ -45,20 +45,23 @@ export interface POPendency {
 
 export function computePOPendencies(pos: PurchaseOrder[], invoices: Invoice[]): POPendency[] {
   const byItem = dispatchedByPOItem(invoices);
-  const byPo = dispatchedByPO(invoices);
   return pos
     .filter((p) => p.status === "open")
     .map((po) => {
       const ordered = po.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
       let dispatched = 0;
-      for (const it of po.items) dispatched += byItem.get(it.id) ?? 0;
-      const extra = (byPo.get(po.id) ?? 0) - dispatched;
-      if (extra > 0) dispatched += extra;
+      let pending = 0;
+      for (const it of po.items) {
+        const d = byItem.get(it.id) ?? 0;
+        const q = Number(it.quantity) || 0;
+        dispatched += d;
+        pending += Math.max(0, q - d);
+      }
       return {
         po,
         ordered,
         dispatched,
-        pending: Math.max(0, ordered - dispatched),
+        pending,
         daysLeft: daysRemaining(po.deliveryDate),
       };
     });
