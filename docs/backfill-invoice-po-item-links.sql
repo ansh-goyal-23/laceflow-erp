@@ -80,9 +80,12 @@ WITH candidates AS (
   JOIN public.purchase_order_items poi
     ON poi.po_id = ii.po_id
    AND pg_temp.invoice_po_match_text(poi.article_code) = pg_temp.invoice_po_match_text(ii.article_code)
+   AND pg_temp.invoice_po_match_text(poi.lace_type) = pg_temp.invoice_po_match_text(ii.lace_type)
+   AND pg_temp.invoice_po_match_text(poi.material_type) = pg_temp.invoice_po_match_text(ii.material_type)
    AND pg_temp.invoice_po_match_dimension(poi.width, ii.width)
    AND pg_temp.invoice_po_match_dimension(poi.length, ii.length)
    AND pg_temp.invoice_po_match_text(poi.color) = pg_temp.invoice_po_match_text(ii.color)
+   AND pg_temp.invoice_po_match_text(poi.uom) = pg_temp.invoice_po_match_text(ii.uom)
   WHERE ii.po_item_id IS NULL
     AND ii.po_id IS NOT NULL
 )
@@ -112,8 +115,11 @@ WITH candidates AS (
   JOIN public.purchase_order_items poi
     ON poi.po_id = ii.po_id
    AND pg_temp.invoice_po_match_text(poi.article_code) = pg_temp.invoice_po_match_text(ii.article_code)
+   AND pg_temp.invoice_po_match_text(poi.lace_type) = pg_temp.invoice_po_match_text(ii.lace_type)
+   AND pg_temp.invoice_po_match_text(poi.material_type) = pg_temp.invoice_po_match_text(ii.material_type)
    AND pg_temp.invoice_po_match_dimension(poi.width, ii.width)
    AND pg_temp.invoice_po_match_dimension(poi.length, ii.length)
+   AND pg_temp.invoice_po_match_text(poi.uom) = pg_temp.invoice_po_match_text(ii.uom)
    AND pg_temp.invoice_po_match_text(ii.color) <> ''
    AND pg_temp.invoice_po_match_text(poi.color) <> ''
    AND (
@@ -150,9 +156,12 @@ WITH candidates AS (
   JOIN public.purchase_order_items poi
     ON poi.po_id = po.id
    AND pg_temp.invoice_po_match_text(poi.article_code) = pg_temp.invoice_po_match_text(ii.article_code)
+   AND pg_temp.invoice_po_match_text(poi.lace_type) = pg_temp.invoice_po_match_text(ii.lace_type)
+   AND pg_temp.invoice_po_match_text(poi.material_type) = pg_temp.invoice_po_match_text(ii.material_type)
    AND pg_temp.invoice_po_match_dimension(poi.width, ii.width)
    AND pg_temp.invoice_po_match_dimension(poi.length, ii.length)
    AND pg_temp.invoice_po_match_text(poi.color) = pg_temp.invoice_po_match_text(ii.color)
+   AND pg_temp.invoice_po_match_text(poi.uom) = pg_temp.invoice_po_match_text(ii.uom)
   WHERE ii.po_item_id IS NULL
     AND ii.po_number IS NOT NULL
 )

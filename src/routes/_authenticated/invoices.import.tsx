@@ -67,21 +67,20 @@ function ImportDispatchPage() {
   }
 
   function matchPOItem(po: PurchaseOrder, row: DispatchImportRow): POLineItem | undefined {
-    const candidates = po.items.filter((it) =>
-      (!row.articleCode || it.articleCode.trim().toLowerCase() === row.articleCode.trim().toLowerCase()) &&
-      (!row.width || it.width.trim() === row.width.trim()) &&
-      (!row.length || it.length.trim() === row.length.trim()) &&
-      (!row.color || it.color.trim().toLowerCase() === row.color.trim().toLowerCase()),
-    );
+    const candidates = poItemCandidates(po, row);
     return candidates.length === 1 ? candidates[0] : undefined;
   }
 
   function poItemCandidates(po: PurchaseOrder, row: DispatchImportRow): POLineItem[] {
+    const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
     return po.items.filter((it) =>
-      (!row.articleCode || it.articleCode.trim().toLowerCase() === row.articleCode.trim().toLowerCase()) &&
+      (!row.articleCode || eq(it.articleCode, row.articleCode)) &&
+      (!row.laceType || eq(it.laceType, row.laceType)) &&
+      (!row.materialType || eq(it.materialType, row.materialType)) &&
       (!row.width || it.width.trim() === row.width.trim()) &&
       (!row.length || it.length.trim() === row.length.trim()) &&
-      (!row.color || it.color.trim().toLowerCase() === row.color.trim().toLowerCase()),
+      (!row.color || eq(it.color, row.color)) &&
+      (!row.uom || eq(it.uom, row.uom)),
     );
   }
 

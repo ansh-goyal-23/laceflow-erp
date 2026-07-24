@@ -611,8 +611,10 @@ export const bulkImport = {
       })
       .eq("id", poId);
     if (error) throw error;
-    // Diff by natural key (article/width/length/color) so existing UUIDs — and
-    // any invoice_items.po_item_id links to them — are preserved across re-imports.
+    // Diff by natural key (article/lace/material/width/length/color/uom) so
+    // existing UUIDs — and any invoice_items.po_item_id links to them — are
+    // preserved across re-imports. Quantity and rate are excluded on purpose:
+    // they legitimately change when a PO is revised.
     const items: POLineItem[] = input.items.map((i) => ({ ...i, id: crypto.randomUUID() }));
     await diffUpsertItemsByNaturalKey(poId, items);
     await refreshPO(poId);
@@ -725,10 +727,19 @@ function norm(v: string | null | undefined) {
 async function diffUpsertItemsByNaturalKey(poId: string, items: POLineItem[]) {
   const { data: existingRows, error: exErr } = await supabase
     .from("purchase_order_items")
-    .select("id, article_code, width, length, color")
+    .select("id, article_code, lace_type, material_type, width, length, color, uom")
     .eq("po_id", poId);
   if (exErr) throw exErr;
-  type Row = { id: string; article_code: string | null; width: string | null; length: string | null; color: string | null };
+  type Row = {
+    id: string;
+    article_code: string | null;
+    lace_type: string | null;
+    material_type: string | null;
+    width: string | null;
+    length: string | null;
+    color: string | null;
+    uom: string | null;
+  };
   const existing = (existingRows ?? []) as Row[];
   const usedExisting = new Set<string>();
   const remapped: POLineItem[] = items.map((i) => {
@@ -736,9 +747,12 @@ async function diffUpsertItemsByNaturalKey(poId: string, items: POLineItem[]) {
       (e) =>
         !usedExisting.has(e.id) &&
         norm(e.article_code) === norm(i.articleCode) &&
+        norm(e.lace_type) === norm(i.laceType) &&
+        norm(e.material_type) === norm(i.materialType) &&
         norm(e.width) === norm(i.width) &&
         norm(e.length) === norm(i.length) &&
-        norm(e.color) === norm(i.color),
+        norm(e.color) === norm(i.color) &&
+        norm(e.uom) === norm(i.uom),
     );
     if (match) {
       usedExisting.add(match.id);
