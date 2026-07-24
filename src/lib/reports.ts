@@ -1,5 +1,5 @@
 import type { Invoice, PurchaseOrder } from "@/lib/store";
-import { dispatchedByPO, dispatchedByPOItem } from "@/lib/dispatch";
+import { dispatchedByPOItem } from "@/lib/dispatch";
 
 export const PRODUCTION_STATUSES = [
   "Waiting for Yarn Order",
