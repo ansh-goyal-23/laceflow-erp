@@ -363,10 +363,8 @@ export const store = {
       })
       .eq("id", id);
     if (error) throw error;
-    // Replace items: delete all then insert fresh
-    const del = await supabase.from("purchase_order_items").delete().eq("po_id", id);
-    if (del.error) throw del.error;
-    await insertItems(id, po.items);
+    // Diff items: preserve existing row IDs so invoice_items.po_item_id links stay intact.
+    await diffUpsertItems(id, po.items);
     await refreshPO(id);
     void logActivity("Purchase Orders", "EDIT", "PO", po.poNumber);
   },
