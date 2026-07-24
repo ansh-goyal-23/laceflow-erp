@@ -1,54 +1,77 @@
-## Overview
+## Root cause: editing a PO wipes `po_item_id` on existing invoice items
 
-Refactor Yarn Management to be **color-centric** (not PO-item-centric), simplify the Yarn Inward workflow, and infer Production vs Sample receipts automatically from the shade dropdown behavior. Existing business logic (status calc, sample/production workflows, allocation, reports, inventory) stays intact.
+For a manually-created invoice, the form always sets `poItemId` from the selected PO line (`src/components/invoice-form.tsx`, `poItemId: it.id`). So the null didn't come from the create step. It came later, from a **PO update**.
 
-## Scope of changes
+### The mechanism
 
-### 1. Production Yarn Order — Color-centric UI
-File: `src/routes/_authenticated/yarn.production-orders.new.tsx`
-- Replace the item-level PO table on the left with a **Color Group** list, grouped by `color` from `po.items`.
-- Each group row shows: Color name, type (Base/Line — derived from item `colorType` if present, otherwise inferred; if not available, show "Color"), procurement status badge (reuse existing per-item stage logic — a group is at the "least advanced" stage of its items), Ordered Qty (sum from prod orders for this PO+color), Received Qty (sum from prod order items).
-- Expand/collapse (chevron) reveals the individual items using that color (article, W×L, qty, uom) — read-only reference.
-- "Add" button on each color pushes a procurement line pre-populated with `{poId, color, material}` (no `poItemId` — line is color-scoped). Multiple lines per color allowed (multiple production orders).
-- Add optional **Reason** field per line (dropdown: Additional Requirement / Production Wastage / Shade Difference / Other) — stored in `remarks` of the production order item, or new column if simple.
-- Add an advanced **Split Color** toggle (hidden by default under a "More" popover) that lets one color spawn multiple lines with different shades — this is just UI; multiple lines already achieve it.
-- Remove the per-color-selector dropdown inside each procurement line (color is fixed by which group's Add button was clicked); keep material inferred from the group.
+`docs/invoices.sql` defines:
 
-### 2. Data model tweak (minimal)
-File: `src/lib/yarn-store.ts`
-- Add optional `reason?: string` to `ProductionYarnOrderItem` and DB column `reason text` on `yarn_production_order_items`.
-- Keep `poItemId` nullable — color-scoped lines pass `null`.
-- No schema change to color grouping (already have `color_name` + `material` on prod items).
-- Migration SQL added to `docs/yarn-management.sql` (append `ALTER TABLE ... ADD COLUMN reason text;`).
+```sql
+po_item_id uuid REFERENCES public.purchase_order_items(id) ON DELETE SET NULL
+```
 
-### 3. Yarn Inward — simplification
-Files: `src/routes/_authenticated/yarn.inwards.new.tsx`, `yarn.inwards.$id.tsx`, `yarn-store.ts`
-- Header: keep Inward#, Inward Date, Supplier, Supplier Challan#, Remarks. Confirm Vehicle# / LR# are already removed (they are).
-- Item row columns: **Color**, **Supplier Shade #**, Lot#, Gross Weight, Cones, Net Weight (auto), Remarks, + optional "Override paper tube weight" (small toggle → number field).
-- Paper tube weight is pulled from supplier's `defaultPaperTubeWeight` automatically; not shown as a column.
-- **Color dropdown**: after supplier is selected, populate only with colors that have a pending qty (ordered − received > 0) in either Production Yarn Orders **or** Sample Yarn Orders for this supplier. No free text.
-- **Supplier Shade # field**: searchable combobox with free-text.
-  - If user picks an existing shade from the dropdown → treated as **Production Receipt** (existing allocation flow to matching prod order item).
-  - If user types a new shade not in the list → treated as **Sample Receipt**; on save, auto-append a `SampleYarnReceipt` to the pending Sample Yarn Order for this supplier+color; the shade string will be added to the Shade Library when the sample is later approved (existing sample-approval path already does this — verify).
-  - Dropdown source: `shades` filtered by `supplierId + colorName` **plus** shades already present on prod-order items for this supplier+color.
-- Net Weight = `grossWeight − cones × paperTubeWeight` (existing; verified server-side too).
+So whenever a `purchase_order_items` row is deleted, every `invoice_items.po_item_id` pointing to it is silently set to `NULL` by Postgres. `po_id` stays, because the parent PO row is untouched.
 
-### 4. Pending allocation — unchanged behavior
-- Auto-allocate when exactly one matching Production Yarn Order item exists for supplier+shade+color; otherwise create a pending allocation task (existing popup). Sample-flagged rows do not enter allocation queue — they flow into the linked Sample Order's receipts.
+`src/lib/store.ts` deletes and re-inserts all PO line items on every edit:
 
-### 5. Preserved
-Procurement Status calc (allocated Net Yarn Weight only), sample workflow, production workflow, allocation logic, reports, inventory, existing routes and sidebar entries.
+```
+353:  async updatePO(id, po) {
+      ...
+367:    const del = await supabase.from("purchase_order_items").delete().eq("po_id", id);
+      ...   // then re-insert po.items with brand new UUIDs
+```
 
-## Out of scope
-- Renaming existing tables.
-- Reworking Sample Orders module UI (only receipt-linking logic touched).
-- Any change to Inventory or Reports code.
+The bulk PO importer does the same in "update/replace" mode (line 616). Even editing a single field on the PO (delivery date, one line's color, adding a row) causes the whole set of PO items to be deleted and recreated with new UUIDs. All older UUIDs referenced by existing invoices become invalid → the FK fires `SET NULL` on every matching `invoice_items.po_item_id`.
 
-## Technical notes
-- Color grouping keyed by `color` string alone (per spec: "one color = one shade" normally). Material shown as metadata inside the group.
-- "Base / Line" color type: `POLineItem` currently has no `colorType`. If not present, show item's `laceType` or omit the badge — will confirm from `store.ts` during implementation and either add optional field or drop the badge.
-- Split Color: implemented purely as "add another line for the same color with a different shade" — no schema change.
+### Why one item on invoice 2026-27/0356 has `po_item_id` and the other doesn't
 
-## Deliverables
-- Edited: `yarn.production-orders.new.tsx`, `yarn.inwards.new.tsx`, `yarn.inwards.$id.tsx`, `yarn-store.ts`, `docs/yarn-management.sql`.
-- No sidebar / route additions.
+Most likely sequence:
+
+1. Invoice was created against the PO — both items had `po_item_id` correctly.
+2. The PO was edited (or re-imported), which deleted+reinserted its line items with new IDs.
+3. Both invoice items got `po_item_id = NULL`.
+4. Later, the invoice was edited and one of its rows was re-selected from the current PO → that row got a fresh, valid `po_item_id`. The other row was left as-is → still `NULL`.
+
+Alternate but same-root path: a single PO line was deleted and re-added on the PO (say to fix a color), so only the one item that had linked to the deleted PO line lost its link; the other item's PO line was never touched.
+
+Either way the trigger is: **PO edits (or re-imports) drop and recreate `purchase_order_items` rows, and the FK's `ON DELETE SET NULL` breaks the invoice links.**
+
+### Consequence
+
+- PO-level pendency is still correct — `dispatchedByPO` falls back on `po_id`.
+- Item-level pendency (`reports.pendency-item`, PO drill-down) understates dispatched against the specific line that lost its link, because `dispatchedByPOItem` only counts rows with a `po_item_id`.
+- Auto-complete of PO status still works (it uses the po-level total via `poFulfillmentStatus`'s "extra" branch), so this bug is largely invisible until you look at per-item balances.
+
+### Fix options (pick one; I'll build after you choose)
+
+- **A. Stop deleting PO items on update (recommended).** Change `store.updatePO` and `bulkImport` "update" mode to diff the items: update existing rows in place, insert new rows, delete only rows the user actually removed. Existing UUIDs are preserved, invoice links stay intact. Most invasive but fixes the class of bug end-to-end.
+- **B. Re-link on update.** Keep the delete+reinsert, but before deleting, snapshot the old items, and after inserting the new ones, re-link `invoice_items.po_item_id` by matching on `(article_code, width, length, color)`. Cheaper change, but ambiguous when duplicates exist on the PO and doesn't help if a line was actually deleted.
+- **C. Backfill only.** One-off SQL/UI to relink historical `invoice_items` where `po_item_id IS NULL` but `po_id` is set, by matching article/width/length/color to the current PO items. Does not prevent future breakage.
+- **D. A + C combined.** Fix the write path and backfill the existing null rows in one go.
+
+### How to confirm on 2026-27/0356 before I change anything
+
+Run in Supabase SQL Editor:
+
+```sql
+select ii.id, ii.article_code, ii.width, ii.length, ii.color,
+       ii.po_id, ii.po_item_id,
+       (select count(*) from purchase_order_items poi
+         where poi.po_id = ii.po_id
+           and lower(coalesce(poi.article_code,'')) = lower(coalesce(ii.article_code,''))
+           and coalesce(poi.width,'')  = coalesce(ii.width,'')
+           and coalesce(poi.length,'') = coalesce(ii.length,'')
+           and lower(coalesce(poi.color,'')) = lower(coalesce(ii.color,''))
+       ) as matching_po_items_now
+from invoice_items ii
+join invoices i on i.id = ii.invoice_id
+where i.invoice_number = '2026-27/0356';
+```
+
+If the null-`po_item_id` row shows `matching_po_items_now >= 1`, the PO still has a corresponding line — confirming the link was severed by a PO edit, not by missing data. That result also tells us backfill (option C/D) is safe for this row.
+
+### Note on the Excel-import case (kept for reference, not the cause here)
+
+`src/routes/_authenticated/invoices.import.tsx` → `matchPOItem` only sets `po_item_id` when exactly one PO line matches on article/width/length/color, and silently stores `null` otherwise. Any fix for null links (B/C/D) should also cover imported invoices. Improving import to surface unmatched rows is a separate small change I can bundle in if you want.
+
+No code changes in this plan. Tell me which option (A / B / C / D, and whether to include the import-warning tweak) and I'll implement.

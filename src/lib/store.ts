@@ -363,10 +363,8 @@ export const store = {
       })
       .eq("id", id);
     if (error) throw error;
-    // Replace items: delete all then insert fresh
-    const del = await supabase.from("purchase_order_items").delete().eq("po_id", id);
-    if (del.error) throw del.error;
-    await insertItems(id, po.items);
+    // Diff items: preserve existing row IDs so invoice_items.po_item_id links stay intact.
+    await diffUpsertItems(id, po.items);
     await refreshPO(id);
     void logActivity("Purchase Orders", "EDIT", "PO", po.poNumber);
   },
@@ -613,10 +611,10 @@ export const bulkImport = {
       })
       .eq("id", poId);
     if (error) throw error;
-    const del = await supabase.from("purchase_order_items").delete().eq("po_id", poId);
-    if (del.error) throw del.error;
+    // Diff by natural key (article/width/length/color) so existing UUIDs — and
+    // any invoice_items.po_item_id links to them — are preserved across re-imports.
     const items: POLineItem[] = input.items.map((i) => ({ ...i, id: crypto.randomUUID() }));
-    await insertItems(poId, items);
+    await diffUpsertItemsByNaturalKey(poId, items);
     await refreshPO(poId);
     return items.length;
   },
@@ -665,6 +663,7 @@ export const bulkImport = {
 async function insertItems(poId: string, items: POLineItem[]) {
   if (!items.length) return;
   const rows = items.map((i, idx) => ({
+    id: i.id,
     po_id: poId,
     article_code: i.articleCode,
     lace_type: i.laceType,
@@ -679,6 +678,75 @@ async function insertItems(poId: string, items: POLineItem[]) {
   }));
   const { error } = await supabase.from("purchase_order_items").insert(rows);
   if (error) throw error;
+}
+
+// Diff by row id: update rows still present, insert new ones, delete removed ones.
+// Preserves purchase_order_items.id so invoice_items.po_item_id FK links stay intact.
+async function diffUpsertItems(poId: string, items: POLineItem[]) {
+  const { data: existing, error: exErr } = await supabase
+    .from("purchase_order_items")
+    .select("id")
+    .eq("po_id", poId);
+  if (exErr) throw exErr;
+  const existingIds = new Set((existing ?? []).map((r) => (r as { id: string }).id));
+  const incomingIds = new Set(items.map((i) => i.id));
+  const toDelete = [...existingIds].filter((x) => !incomingIds.has(x));
+  if (toDelete.length) {
+    const { error } = await supabase.from("purchase_order_items").delete().in("id", toDelete);
+    if (error) throw error;
+  }
+  if (items.length) {
+    const rows = items.map((i, idx) => ({
+      id: i.id,
+      po_id: poId,
+      article_code: i.articleCode,
+      lace_type: i.laceType,
+      material_type: i.materialType,
+      width: i.width,
+      length: i.length,
+      color: i.color,
+      uom: i.uom,
+      quantity: i.quantity,
+      rate: i.rate,
+      sort_order: idx,
+    }));
+    const { error } = await supabase
+      .from("purchase_order_items")
+      .upsert(rows, { onConflict: "id" });
+    if (error) throw error;
+  }
+}
+
+// For re-imports where incoming items have fresh UUIDs: reuse an existing row's
+// id when article/width/length/color match, so invoice links survive re-import.
+function norm(v: string | null | undefined) {
+  return (v ?? "").trim().toLowerCase();
+}
+async function diffUpsertItemsByNaturalKey(poId: string, items: POLineItem[]) {
+  const { data: existingRows, error: exErr } = await supabase
+    .from("purchase_order_items")
+    .select("id, article_code, width, length, color")
+    .eq("po_id", poId);
+  if (exErr) throw exErr;
+  type Row = { id: string; article_code: string | null; width: string | null; length: string | null; color: string | null };
+  const existing = (existingRows ?? []) as Row[];
+  const usedExisting = new Set<string>();
+  const remapped: POLineItem[] = items.map((i) => {
+    const match = existing.find(
+      (e) =>
+        !usedExisting.has(e.id) &&
+        norm(e.article_code) === norm(i.articleCode) &&
+        norm(e.width) === norm(i.width) &&
+        norm(e.length) === norm(i.length) &&
+        norm(e.color) === norm(i.color),
+    );
+    if (match) {
+      usedExisting.add(match.id);
+      return { ...i, id: match.id };
+    }
+    return i;
+  });
+  await diffUpsertItems(poId, remapped);
 }
 
 async function refreshPO(id: string) {
