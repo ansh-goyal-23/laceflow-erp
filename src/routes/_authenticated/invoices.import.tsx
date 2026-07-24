@@ -19,7 +19,21 @@ interface Result {
   invoicesCreated: number;
   itemsCreated: number;
   failed: DispatchImportRow[];
+  unlinkedItems: number;
 }
+
+type UnlinkedReason = "no-po" | "no-match" | "ambiguous";
+interface UnlinkedRow {
+  row: DispatchImportRow;
+  reason: UnlinkedReason;
+  candidates: number;
+}
+
+const REASON_LABEL: Record<UnlinkedReason, string> = {
+  "no-po": "PO not found",
+  "no-match": "No matching PO item",
+  ambiguous: "Multiple matching PO items (ambiguous)",
+};
 
 function ImportDispatchPage() {
   const pos = useStore((s) => s.purchaseOrders);
@@ -62,6 +76,29 @@ function ImportDispatchPage() {
     return candidates.length === 1 ? candidates[0] : undefined;
   }
 
+  function poItemCandidates(po: PurchaseOrder, row: DispatchImportRow): POLineItem[] {
+    return po.items.filter((it) =>
+      (!row.articleCode || it.articleCode.trim().toLowerCase() === row.articleCode.trim().toLowerCase()) &&
+      (!row.width || it.width.trim() === row.width.trim()) &&
+      (!row.length || it.length.trim() === row.length.trim()) &&
+      (!row.color || it.color.trim().toLowerCase() === row.color.trim().toLowerCase()),
+    );
+  }
+
+  const unlinkedPreview: UnlinkedRow[] = parsed
+    ? parsed.validRows.reduce<UnlinkedRow[]>((acc, r) => {
+        const poMatch = pos.find((p) => p.poNumber === r.poNumber);
+        if (!poMatch) {
+          acc.push({ row: r, reason: "no-po", candidates: 0 });
+          return acc;
+        }
+        const cands = poItemCandidates(poMatch, r);
+        if (cands.length === 0) acc.push({ row: r, reason: "no-match", candidates: 0 });
+        else if (cands.length > 1) acc.push({ row: r, reason: "ambiguous", candidates: cands.length });
+        return acc;
+      }, [])
+    : [];
+
   async function runImport() {
     if (!parsed) return;
     setImporting(true);
@@ -69,6 +106,7 @@ function ImportDispatchPage() {
     const failed: DispatchImportRow[] = [...parsed.invalidRows];
     let invoicesCreated = 0;
     let itemsCreated = 0;
+    let unlinkedItems = 0;
 
     // Group by client+invoice+date
     const groups = new Map<string, { sample: DispatchImportRow; items: DispatchImportRow[] }>();
@@ -90,6 +128,7 @@ function ImportDispatchPage() {
           const lineItems = items.map((r) => {
             const po = pos.find((p) => p.poNumber === r.poNumber && p.clientId === clientId);
             const poItem = po ? matchPOItem(po, r) : undefined;
+            if (!poItem) unlinkedItems++;
             return {
               poId: po?.id ?? null,
               poItemId: poItem?.id ?? null,
@@ -121,8 +160,12 @@ function ImportDispatchPage() {
         setProgress(Math.round((done / total) * 100));
         setProgressLabel(`Importing ${done} of ${total} invoices…`);
       }
-      setResult({ totalRows: parsed.rows.length, invoicesCreated, itemsCreated, failed });
-      toast.success(`Import complete: ${invoicesCreated} invoices, ${itemsCreated} items`);
+      setResult({ totalRows: parsed.rows.length, invoicesCreated, itemsCreated, failed, unlinkedItems });
+      if (unlinkedItems > 0) {
+        toast.warning(`Import complete: ${invoicesCreated} invoices, ${itemsCreated} items — ${unlinkedItems} not linked to a PO item`);
+      } else {
+        toast.success(`Import complete: ${invoicesCreated} invoices, ${itemsCreated} items`);
+      }
     } catch (e) {
       toast.error((e as Error).message ?? "Import failed");
     } finally {
@@ -218,6 +261,56 @@ function ImportDispatchPage() {
               </CardContent>
             </Card>
           )}
+
+          {unlinkedPreview.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  {unlinkedPreview.length} row{unlinkedPreview.length === 1 ? "" : "s"} will import without a PO item link
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground mb-3">
+                  These rows will still be imported, but <code>po_item_id</code> will be left NULL because the PO or a unique item match could not be found. Pendency reports for those items may be inaccurate until relinked.
+                </div>
+                <div className="max-h-64 overflow-auto border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Row</TableHead>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead>PO</TableHead>
+                        <TableHead>Article</TableHead>
+                        <TableHead>Color</TableHead>
+                        <TableHead>Size</TableHead>
+                        <TableHead>Reason</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unlinkedPreview.slice(0, 100).map((u) => (
+                        <TableRow key={`${u.row.rowNumber}-${u.reason}`}>
+                          <TableCell>{u.row.rowNumber}</TableCell>
+                          <TableCell>{u.row.invoiceNo || "—"}</TableCell>
+                          <TableCell>{u.row.poNumber || "—"}</TableCell>
+                          <TableCell>{u.row.articleCode || "—"}</TableCell>
+                          <TableCell>{u.row.color || "—"}</TableCell>
+                          <TableCell>{[u.row.width, u.row.length].filter(Boolean).join(" × ") || "—"}</TableCell>
+                          <TableCell className="text-sm text-amber-700">
+                            {REASON_LABEL[u.reason]}
+                            {u.reason === "ambiguous" ? ` (${u.candidates})` : ""}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {unlinkedPreview.length > 100 && (
+                  <div className="text-xs text-muted-foreground mt-2">Showing first 100 of {unlinkedPreview.length}.</div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -231,6 +324,14 @@ function ImportDispatchPage() {
               <Stat label="Items Created" value={result.itemsCreated} />
               <Stat label="Failed" value={result.failed.length} />
             </div>
+            {result.unlinkedItems > 0 && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-medium">{result.unlinkedItems}</span> item{result.unlinkedItems === 1 ? "" : "s"} were imported without a PO item link. Pendency reports may be inaccurate for these until you edit the invoice and re-select the PO item, or run the backfill script.
+                </div>
+              </div>
+            )}
             {result.failed.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => downloadFailedDispatchRows(result.failed)}>
                 <Download className="h-4 w-4 mr-1" /> Download failed rows
