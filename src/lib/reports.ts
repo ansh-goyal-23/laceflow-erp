@@ -49,16 +49,32 @@ export function computePOPendencies(pos: PurchaseOrder[], invoices: Invoice[]): 
   return pos
     .filter((p) => p.status === "open")
     .map((po) => {
-      const ordered = po.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+      let ordered = 0;
       let dispatched = 0;
-      for (const it of po.items) dispatched += byItem.get(it.id) ?? 0;
-      const extra = (byPo.get(po.id) ?? 0) - dispatched;
+      let pending = 0;
+      for (const it of po.items) {
+        const o = Number(it.quantity) || 0;
+        const d = byItem.get(it.id) ?? 0;
+        ordered += o;
+        // effective dispatched per item is capped at ordered so over-dispatch
+        // on one item doesn't offset pending on another (keeps this total
+        // aligned with the item-level breakdown).
+        dispatched += Math.min(o, d);
+        pending += Math.max(0, o - d);
+      }
+      // Include any po-level dispatch not tied to a specific item as extra
+      // dispatched (does not reduce pending, which is item-driven).
+      const itemDispatchedRaw = po.items.reduce(
+        (s, it) => s + (byItem.get(it.id) ?? 0),
+        0,
+      );
+      const extra = (byPo.get(po.id) ?? 0) - itemDispatchedRaw;
       if (extra > 0) dispatched += extra;
       return {
         po,
         ordered,
         dispatched,
-        pending: Math.max(0, ordered - dispatched),
+        pending,
         daysLeft: daysRemaining(po.deliveryDate),
       };
     });
