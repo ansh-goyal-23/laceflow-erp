@@ -336,26 +336,34 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
               </TableHeader>
               <TableBody>
                 {items.map((it) => (
-                  <TableRow key={it.id} className="align-top">
-                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.articleCode} onChange={(v) => updateItem(it.id, { articleCode: v })} suggestions={suggestions.article} /></TableCell>
-                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.laceType} onChange={(v) => updateItem(it.id, { laceType: v })} suggestions={suggestions.lace} /></TableCell>
-                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.materialType} onChange={(v) => updateItem(it.id, { materialType: v })} suggestions={suggestions.material} /></TableCell>
-                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
-                    <TableCell className="px-1 align-top"><Textarea rows={1} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
-                    <TableCell className="px-1 align-top"><SuggestTextarea className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight" value={it.color} onChange={(v) => updateItem(it.id, { color: v })} suggestions={suggestions.color} /></TableCell>
+                  <TableRow key={it.id} className={`align-top ${isLocked(it.id) ? "bg-muted/40" : ""}`}>
+                    <TableCell className="px-1 align-top">
+                      <div className="flex items-start gap-1">
+                        {isLocked(it.id) && <Lock className="h-3 w-3 mt-2 text-muted-foreground shrink-0" aria-label={`Dispatched: ${dispatchedFor(it.id)}`} />}
+                        <SuggestTextarea className={`min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight ${isLocked(it.id) ? "opacity-60 cursor-not-allowed" : ""}`} value={it.articleCode} onChange={(v) => !isLocked(it.id) && updateItem(it.id, { articleCode: v })} suggestions={suggestions.article} />
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-1 align-top"><SuggestTextarea className={`min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight ${isLocked(it.id) ? "opacity-60 cursor-not-allowed" : ""}`} value={it.laceType} onChange={(v) => !isLocked(it.id) && updateItem(it.id, { laceType: v })} suggestions={suggestions.lace} /></TableCell>
+                    <TableCell className="px-1 align-top"><SuggestTextarea className={`min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight ${isLocked(it.id) ? "opacity-60 cursor-not-allowed" : ""}`} value={it.materialType} onChange={(v) => !isLocked(it.id) && updateItem(it.id, { materialType: v })} suggestions={suggestions.material} /></TableCell>
+                    <TableCell className="px-1 align-top"><Textarea rows={1} disabled={isLocked(it.id)} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight disabled:opacity-60" value={it.width} onChange={(e) => updateItem(it.id, { width: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><Textarea rows={1} disabled={isLocked(it.id)} className="min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight disabled:opacity-60" value={it.length} onChange={(e) => updateItem(it.id, { length: e.target.value })} /></TableCell>
+                    <TableCell className="px-1 align-top"><SuggestTextarea className={`min-h-8 py-1 px-2 text-xs w-full resize-none break-words whitespace-pre-wrap leading-tight ${isLocked(it.id) ? "opacity-60 cursor-not-allowed" : ""}`} value={it.color} onChange={(v) => !isLocked(it.id) && updateItem(it.id, { color: v })} suggestions={suggestions.color} /></TableCell>
                     <TableCell className="px-1">
-                      <Select value={it.uom} onValueChange={(v) => updateItem(it.id, { uom: v })}>
+                      <Select value={it.uom} onValueChange={(v) => updateItem(it.id, { uom: v })} disabled={isLocked(it.id)}>
                         <SelectTrigger className="h-8 px-2 text-xs w-full"><SelectValue /></SelectTrigger>
                         <SelectContent>{UOMS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="px-1 align-top"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} /></TableCell>
-                    <TableCell className="px-1 align-top"><Input className="h-8 px-2 text-xs w-full" type="number" min="0" step="any" value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
+                    <TableCell className="px-1 align-top">
+                      <Input className="h-8 px-2 text-xs w-full" type="number" min={isLocked(it.id) ? dispatchedFor(it.id) : 0} step="any" value={it.quantity || ""} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} title={isLocked(it.id) ? `Dispatched: ${dispatchedFor(it.id)} — cannot go lower` : undefined} />
+                    </TableCell>
+                    <TableCell className="px-1 align-top"><Input className="h-8 px-2 text-xs w-full disabled:opacity-60" type="number" min="0" step="any" disabled={isLocked(it.id)} value={it.rate || ""} onChange={(e) => updateItem(it.id, { rate: parseFloat(e.target.value) || 0 })} /></TableCell>
                     <TableCell className="px-1 align-top text-right font-medium text-xs pt-3">
                       {((it.quantity || 0) * (it.rate || 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="px-0 align-top">
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" disabled={items.length === 1}
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" disabled={items.length === 1 || isLocked(it.id)}
+                        title={isLocked(it.id) ? "Item has dispatched invoices" : undefined}
                         onClick={() => setItems((a) => a.filter((x) => x.id !== it.id))}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
