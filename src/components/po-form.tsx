@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useStore, store, nextPONumber, type PurchaseOrder, type POLineItem } from "@/lib/store";
+import { dispatchedByPOItem } from "@/lib/dispatch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Save, Send } from "lucide-react";
+import { Plus, Trash2, Save, Send, Lock } from "lucide-react";
 import { BrandDialog } from "@/components/brand-dialog";
 import { ClientDialog } from "@/components/client-dialog";
 import { toast } from "sonner";
@@ -72,6 +73,7 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
   const brands = useStore((s) => s.brands);
   const clients = useStore((s) => s.clients);
   const pos = useStore((s) => s.purchaseOrders);
+  const invoices = useStore((s) => s.invoices);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -104,6 +106,23 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
   const [deliveryDate, setDeliveryDate] = useState(existing?.deliveryDate ?? "");
   const [items, setItems] = useState<POLineItem[]>(existing?.items?.length ? existing.items : [emptyItem()]);
 
+  const dispatchedMap = useMemo(
+    () => (existing ? dispatchedByPOItem(invoices) : new Map<string, number>()),
+    [existing, invoices],
+  );
+  const originalItems = useMemo(() => {
+    const m = new Map<string, POLineItem>();
+    for (const it of existing?.items ?? []) m.set(it.id, it);
+    return m;
+  }, [existing]);
+  const dispatchedFor = (id: string) => dispatchedMap.get(id) ?? 0;
+  const isLocked = (id: string) => originalItems.has(id) && dispatchedFor(id) > 0;
+  const anyLocked = useMemo(
+    () => items.some((it) => isLocked(it.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, dispatchedMap, originalItems],
+  );
+
   const [brandOpen, setBrandOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -128,7 +147,20 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
   );
 
   function updateItem(id: string, patch: Partial<POLineItem>) {
-    setItems((arr) => arr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    setItems((arr) => arr.map((i) => {
+      if (i.id !== id) return i;
+      if (isLocked(id)) {
+        const orig = originalItems.get(id)!;
+        const allowed: Partial<POLineItem> = {};
+        if ("quantity" in patch) {
+          const min = dispatchedFor(id);
+          const q = Number(patch.quantity) || 0;
+          allowed.quantity = q < min ? min : q;
+        }
+        return { ...i, ...allowed, articleCode: orig.articleCode, laceType: orig.laceType, materialType: orig.materialType, width: orig.width, length: orig.length, color: orig.color, uom: orig.uom, rate: orig.rate };
+      }
+      return { ...i, ...patch };
+    }));
   }
 
   function validate(submit: boolean) {
@@ -139,6 +171,35 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
     if (!deliveryDate) return "Delivery Date is required";
     if (dateError) return dateError;
     if (submit && items.every((i) => !i.articleCode.trim() && !i.quantity)) return "Add at least one line item";
+    // Locked-item guards
+    for (const it of items) {
+      if (!isLocked(it.id)) continue;
+      const orig = originalItems.get(it.id)!;
+      const min = dispatchedFor(it.id);
+      if ((Number(it.quantity) || 0) + 0.0001 < min) {
+        return `Item "${orig.articleCode || "(no article)"}" has ${min} dispatched; qty cannot be less`;
+      }
+      const mismatches: string[] = [];
+      if (it.articleCode !== orig.articleCode) mismatches.push("article");
+      if (it.laceType !== orig.laceType) mismatches.push("lace type");
+      if (it.materialType !== orig.materialType) mismatches.push("material");
+      if (it.width !== orig.width) mismatches.push("width");
+      if (it.length !== orig.length) mismatches.push("length");
+      if (it.color !== orig.color) mismatches.push("color");
+      if (it.uom !== orig.uom) mismatches.push("UOM");
+      if ((Number(it.rate) || 0) !== (Number(orig.rate) || 0)) mismatches.push("rate");
+      if (mismatches.length) {
+        return `Item "${orig.articleCode || "(no article)"}" is locked (dispatched invoices exist); cannot change ${mismatches.join(", ")}`;
+      }
+    }
+    // Detect removed locked originals
+    const presentIds = new Set(items.map((i) => i.id));
+    for (const [id, orig] of originalItems) {
+      if (presentIds.has(id)) continue;
+      if (dispatchedFor(id) > 0) {
+        return `Cannot remove item "${orig.articleCode || "(no article)"}" — dispatched invoices reference it`;
+      }
+    }
     return null;
   }
 
@@ -237,6 +298,12 @@ export function POForm({ existing }: { existing?: PurchaseOrder }) {
           </Button>
         </CardHeader>
         <CardContent>
+          {anyLocked && (
+            <div className="mb-3 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200 px-3 py-2 flex items-center gap-2">
+              <Lock className="h-3.5 w-3.5" />
+              Some items have dispatched invoices — their fields are locked. Quantity can only be increased (not below dispatched qty).
+            </div>
+          )}
           <div className="w-full">
             <Table style={{ tableLayout: "fixed", width: "100%" }} className="text-xs">
               <colgroup>
