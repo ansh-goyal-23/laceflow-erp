@@ -1,77 +1,37 @@
-## Root cause: editing a PO wipes `po_item_id` on existing invoice items
+## Goal
+Prevent editing/removing a PO line item once any invoice has dispatched quantity against it. New items can still be added, and items with zero dispatched qty remain fully editable.
 
-For a manually-created invoice, the form always sets `poItemId` from the selected PO line (`src/components/invoice-form.tsx`, `poItemId: it.id`). So the null didn't come from the create step. It came later, from a **PO update**.
+## Rules
+For each existing PO item, compute `dispatched = sum(invoice_items.dispatch_qty where po_item_id = it.id)` using the existing `dispatchedByPOItem(invoices)` helper.
 
-### The mechanism
+An item is **locked** when `dispatched > 0`. For locked items:
+- Fields locked (read-only): article code, lace type, material type, width, length, color, UOM, rate.
+- Quantity: editable but cannot go below `dispatched` (min = dispatched).
+- Delete button: disabled with tooltip "Item has dispatched invoices".
+- Attempting to bypass via bulk edit still blocked in save-time validation.
 
-`docs/invoices.sql` defines:
+Unlocked items (dispatched = 0) and brand-new rows behave as today.
 
-```sql
-po_item_id uuid REFERENCES public.purchase_order_items(id) ON DELETE SET NULL
-```
+## Changes
 
-So whenever a `purchase_order_items` row is deleted, every `invoice_items.po_item_id` pointing to it is silently set to `NULL` by Postgres. `po_id` stays, because the parent PO row is untouched.
+### 1. `src/components/po-form.tsx`
+- Accept invoices from the store: `const invoices = useStore(s => s.invoices)`.
+- Build `lockedMap = dispatchedByPOItem(invoices)` (only relevant when `existing` is set; for new POs, map is empty).
+- Helper `isLocked(itemId)` returns `dispatched > 0` for items that exist in the original PO.
+- In the line-items table row:
+  - Wrap each editable cell so locked fields render as disabled `Textarea`/`Input`/`Select` (add `disabled` prop + muted styling) with a small lock icon + tooltip on the article cell showing "Dispatched: X — fields locked".
+  - Quantity input: set `min={dispatched}`; on change, clamp; show helper text if user tries to go lower.
+  - Delete button: `disabled` when locked; tooltip explains why.
+- In `validate()` and `save()`:
+  - For every original item still present, re-check that immutable fields equal the original values and `quantity >= dispatched`. If not, `toast.error` with the specific item + reason and abort.
+  - Detect removed original items that were locked → block with error listing them.
 
-`src/lib/store.ts` deletes and re-inserts all PO line items on every edit:
+### 2. `src/routes/_authenticated/purchase-orders.$id.edit.tsx`
+- Add a subtle banner above the form when any item is locked: "Some items have dispatched invoices and are partially locked." (Computed via the same helper; small util shared with `po-form`.)
 
-```
-353:  async updatePO(id, po) {
-      ...
-367:    const del = await supabase.from("purchase_order_items").delete().eq("po_id", id);
-      ...   // then re-insert po.items with brand new UUIDs
-```
+### 3. Shared helper
+Add `poItemLockInfo(po, invoices)` in `src/lib/reports.ts` (or a small new `src/lib/po-locks.ts`) returning `Map<itemId, { dispatched: number; locked: boolean }>`. Use it in both the form and the edit page banner to avoid duplication.
 
-The bulk PO importer does the same in "update/replace" mode (line 616). Even editing a single field on the PO (delivery date, one line's color, adding a row) causes the whole set of PO items to be deleted and recreated with new UUIDs. All older UUIDs referenced by existing invoices become invalid → the FK fires `SET NULL` on every matching `invoice_items.po_item_id`.
-
-### Why one item on invoice 2026-27/0356 has `po_item_id` and the other doesn't
-
-Most likely sequence:
-
-1. Invoice was created against the PO — both items had `po_item_id` correctly.
-2. The PO was edited (or re-imported), which deleted+reinserted its line items with new IDs.
-3. Both invoice items got `po_item_id = NULL`.
-4. Later, the invoice was edited and one of its rows was re-selected from the current PO → that row got a fresh, valid `po_item_id`. The other row was left as-is → still `NULL`.
-
-Alternate but same-root path: a single PO line was deleted and re-added on the PO (say to fix a color), so only the one item that had linked to the deleted PO line lost its link; the other item's PO line was never touched.
-
-Either way the trigger is: **PO edits (or re-imports) drop and recreate `purchase_order_items` rows, and the FK's `ON DELETE SET NULL` breaks the invoice links.**
-
-### Consequence
-
-- PO-level pendency is still correct — `dispatchedByPO` falls back on `po_id`.
-- Item-level pendency (`reports.pendency-item`, PO drill-down) understates dispatched against the specific line that lost its link, because `dispatchedByPOItem` only counts rows with a `po_item_id`.
-- Auto-complete of PO status still works (it uses the po-level total via `poFulfillmentStatus`'s "extra" branch), so this bug is largely invisible until you look at per-item balances.
-
-### Fix options (pick one; I'll build after you choose)
-
-- **A. Stop deleting PO items on update (recommended).** Change `store.updatePO` and `bulkImport` "update" mode to diff the items: update existing rows in place, insert new rows, delete only rows the user actually removed. Existing UUIDs are preserved, invoice links stay intact. Most invasive but fixes the class of bug end-to-end.
-- **B. Re-link on update.** Keep the delete+reinsert, but before deleting, snapshot the old items, and after inserting the new ones, re-link `invoice_items.po_item_id` by matching on `(article_code, width, length, color)`. Cheaper change, but ambiguous when duplicates exist on the PO and doesn't help if a line was actually deleted.
-- **C. Backfill only.** One-off SQL/UI to relink historical `invoice_items` where `po_item_id IS NULL` but `po_id` is set, by matching article/width/length/color to the current PO items. Does not prevent future breakage.
-- **D. A + C combined.** Fix the write path and backfill the existing null rows in one go.
-
-### How to confirm on 2026-27/0356 before I change anything
-
-Run in Supabase SQL Editor:
-
-```sql
-select ii.id, ii.article_code, ii.width, ii.length, ii.color,
-       ii.po_id, ii.po_item_id,
-       (select count(*) from purchase_order_items poi
-         where poi.po_id = ii.po_id
-           and lower(coalesce(poi.article_code,'')) = lower(coalesce(ii.article_code,''))
-           and coalesce(poi.width,'')  = coalesce(ii.width,'')
-           and coalesce(poi.length,'') = coalesce(ii.length,'')
-           and lower(coalesce(poi.color,'')) = lower(coalesce(ii.color,''))
-       ) as matching_po_items_now
-from invoice_items ii
-join invoices i on i.id = ii.invoice_id
-where i.invoice_number = '2026-27/0356';
-```
-
-If the null-`po_item_id` row shows `matching_po_items_now >= 1`, the PO still has a corresponding line — confirming the link was severed by a PO edit, not by missing data. That result also tells us backfill (option C/D) is safe for this row.
-
-### Note on the Excel-import case (kept for reference, not the cause here)
-
-`src/routes/_authenticated/invoices.import.tsx` → `matchPOItem` only sets `po_item_id` when exactly one PO line matches on article/width/length/color, and silently stores `null` otherwise. Any fix for null links (B/C/D) should also cover imported invoices. Improving import to surface unmatched rows is a separate small change I can bundle in if you want.
-
-No code changes in this plan. Tell me which option (A / B / C / D, and whether to include the import-warning tweak) and I'll implement.
+## Out of scope
+- Bulk PO import / `replacePO` path (natural-key diff already preserves IDs; no schema/API changes needed here).
+- DB-level trigger enforcement. Client-side guard only, matching the pattern used elsewhere in the app.
