@@ -192,7 +192,7 @@ function ProductionIndex() {
                         )}
                         {tab === "in_production" && (
                           <Button variant="outline" size="sm" onClick={() => setReturning(po)}>
-                            <Undo2 className="h-3.5 w-3.5 mr-1" /> Return to Waiting
+                            <Undo2 className="h-3.5 w-3.5 mr-1" /> Return to Procurement
                           </Button>
                         )}
                         <Button variant="outline" size="sm" asChild>
@@ -237,10 +237,10 @@ function ProductionIndex() {
               production floor until it is released again.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReturn}>Return to Waiting</AlertDialogAction>
-          </AlertDialogFooter>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmReturn}>Return to Procurement</AlertDialogAction>
+            </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
