@@ -1,5 +1,5 @@
 import type { PurchaseOrder } from "@/lib/store";
-import type { YarnStoreShape } from "@/lib/yarn-store";
+import type { StoreShape as YarnStoreShape } from "@/lib/yarn-store";
 import { poItemShades, poRawMaterialSummary } from "@/lib/production-store";
 
 const esc = (v: unknown) =>
