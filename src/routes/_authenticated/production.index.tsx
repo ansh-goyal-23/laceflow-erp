@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, Search, Factory, PackageCheck, ClipboardList, Send, Undo2 } from "lucide-react";
+import { Eye, Search, Factory, PackageCheck, ClipboardList, Send, Undo2, Printer } from "lucide-react";
 import { useStore, type PurchaseOrder } from "@/lib/store";
 import { useYarnStore } from "@/lib/yarn-store";
 import {
@@ -21,6 +21,7 @@ import {
   type ProductionTab,
 } from "@/lib/production-store";
 import { toast } from "sonner";
+import { printProductionSlip } from "@/lib/production-slip";
 
 export const Route = createFileRoute("/_authenticated/production/")({
   component: ProductionIndex,
@@ -193,6 +194,22 @@ function ProductionIndex() {
                         {tab === "in_production" && (
                           <Button variant="outline" size="sm" onClick={() => setReturning(po)}>
                             <Undo2 className="h-3.5 w-3.5 mr-1" /> Return to Procurement
+                          </Button>
+                        )}
+                        {tab === "in_production" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              printProductionSlip({
+                                po,
+                                clientName: clientName(po.clientId),
+                                brandName: brandName(po.brandId),
+                                yarnState,
+                              })
+                            }
+                          >
+                            <Printer className="h-3.5 w-3.5 mr-1" /> Print Slip
                           </Button>
                         )}
                         <Button variant="outline" size="sm" asChild>
