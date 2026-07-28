@@ -151,6 +151,21 @@ export const productionStore = {
     if (error) throw error;
     await refresh();
   },
+
+  async returnToWaiting(poId: string) {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("po_production").upsert({
+      po_id: poId,
+      status: "waiting",
+      sent_to_production_at: null,
+      sent_by: null,
+      packed_at: null,
+      packed_by: null,
+      updated_at: now,
+    }, { onConflict: "po_id" });
+    if (error) throw error;
+    await refresh();
+  },
 };
 
 export function useProductionStore<T>(sel: (s: ProductionStoreShape) => T): T {
@@ -297,7 +312,7 @@ export function poRawMaterialSummary(
 }
 
 export const PROD_TAB_LABEL: Record<ProductionTab, string> = {
-  waiting: "Waiting for Production",
+  waiting: "In Yarn Procurement",
   in_production: "In Production",
   packed_ready: "Packed & Ready for Dispatch",
 };
