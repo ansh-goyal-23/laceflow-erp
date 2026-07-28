@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, Search, Factory, PackageCheck, ClipboardList, Send } from "lucide-react";
+import { Eye, Search, Factory, PackageCheck, ClipboardList, Send, Undo2 } from "lucide-react";
 import { useStore, type PurchaseOrder } from "@/lib/store";
 import { useYarnStore } from "@/lib/yarn-store";
 import {
@@ -35,6 +35,7 @@ function ProductionIndex() {
   const [tab, setTab] = useState<ProductionTab>("waiting");
   const [q, setQ] = useState("");
   const [releasing, setReleasing] = useState<PurchaseOrder | null>(null);
+  const [returning, setReturning] = useState<PurchaseOrder | null>(null);
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
@@ -78,6 +79,18 @@ function ProductionIndex() {
     }
   };
 
+  const confirmReturn = async () => {
+    if (!returning) return;
+    try {
+      await productionStore.returnToWaiting(returning.id);
+      toast.success(`${returning.poNumber} returned to In Yarn Procurement`);
+      setReturning(null);
+      setTab("waiting");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-7xl space-y-4">
       <PageHeader
@@ -87,7 +100,7 @@ function ProductionIndex() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <SummaryCard
-          label="Waiting for Production" count={bucketed.waiting.length}
+          label="In Yarn Procurement" count={bucketed.waiting.length}
           icon={ClipboardList} active={tab === "waiting"}
           onClick={() => setTab("waiting")}
           tone="bg-amber-500/10 text-amber-700 dark:text-amber-300"
@@ -177,6 +190,11 @@ function ProductionIndex() {
                             <Send className="h-3.5 w-3.5 mr-1" /> Send To Production
                           </Button>
                         )}
+                        {tab === "in_production" && (
+                          <Button variant="outline" size="sm" onClick={() => setReturning(po)}>
+                            <Undo2 className="h-3.5 w-3.5 mr-1" /> Return to Waiting
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" asChild>
                           <Link to="/production/$id" params={{ id: po.id }}>
                             <Eye className="h-3.5 w-3.5 mr-1" /> Open
@@ -204,6 +222,24 @@ function ProductionIndex() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmRelease}>Send To Production</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!returning} onOpenChange={(o) => !o && setReturning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return {returning?.poNumber} to In Yarn Procurement?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Use this if the PO was sent to production by mistake or yarn is still pending.
+              The PO will move back to the In Yarn Procurement tab. Any item completion marks
+              already recorded will be preserved but the PO will no longer be visible to the
+              production floor until it is released again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReturn}>Return to Waiting</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
