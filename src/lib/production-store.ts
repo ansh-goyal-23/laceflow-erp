@@ -151,6 +151,21 @@ export const productionStore = {
     if (error) throw error;
     await refresh();
   },
+
+  async returnToWaiting(poId: string) {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("po_production").upsert({
+      po_id: poId,
+      status: "waiting",
+      sent_to_production_at: null,
+      sent_by: null,
+      packed_at: null,
+      packed_by: null,
+      updated_at: now,
+    }, { onConflict: "po_id" });
+    if (error) throw error;
+    await refresh();
+  },
 };
 
 export function useProductionStore<T>(sel: (s: ProductionStoreShape) => T): T {
