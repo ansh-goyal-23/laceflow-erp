@@ -312,7 +312,7 @@ export function poRawMaterialSummary(
 }
 
 export const PROD_TAB_LABEL: Record<ProductionTab, string> = {
-  waiting: "Waiting for Production",
+  waiting: "In Yarn Procurement",
   in_production: "In Production",
   packed_ready: "Packed & Ready for Dispatch",
 };
