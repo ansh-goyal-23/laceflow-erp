@@ -37,6 +37,7 @@ function ProductionIndex() {
   const [q, setQ] = useState("");
   const [releasing, setReleasing] = useState<PurchaseOrder | null>(null);
   const [returning, setReturning] = useState<PurchaseOrder | null>(null);
+  const [packing, setPacking] = useState<PurchaseOrder | null>(null);
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
@@ -87,6 +88,18 @@ function ProductionIndex() {
       toast.success(`${returning.poNumber} returned to In Yarn Procurement`);
       setReturning(null);
       setTab("waiting");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const confirmPack = async () => {
+    if (!packing) return;
+    try {
+      await productionStore.markPacked(packing.id);
+      toast.success(`${packing.poNumber} marked Packed & Ready for Dispatch`);
+      setPacking(null);
+      setTab("packed_ready");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -198,6 +211,22 @@ function ProductionIndex() {
                         )}
                         {tab === "in_production" && (
                           <Button
+                            size="sm"
+                            disabled={prog.total === 0 || prog.completed !== prog.total}
+                            title={
+                              prog.total === 0
+                                ? "No production items"
+                                : prog.completed !== prog.total
+                                ? "Mark all items completed first"
+                                : "Move to Packed & Ready for Dispatch"
+                            }
+                            onClick={() => setPacking(po)}
+                          >
+                            <PackageCheck className="h-3.5 w-3.5 mr-1" /> Mark Packed
+                          </Button>
+                        )}
+                        {tab === "in_production" && (
+                          <Button
                             variant="outline"
                             size="sm"
                             onClick={() =>
@@ -258,6 +287,22 @@ function ProductionIndex() {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={confirmReturn}>Return to Procurement</AlertDialogAction>
             </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!packing} onOpenChange={(o) => !o && setPacking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark {packing?.poNumber} Packed & Ready for Dispatch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All production items are completed. The PO will move to the Packed & Ready
+              for Dispatch tab so Dispatch can begin invoicing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPack}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
