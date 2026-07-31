@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,19 @@ function EditSampleOrder() {
   const [remarks, setRemarks] = useState(order?.remarks ?? "");
   const [rows, setRows] = useState<Row[]>(initial?.rows ?? []);
   const [saving, setSaving] = useState(false);
+
+  const loadedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!order || !initial) return;
+    if (loadedId.current === order.id) return;
+    loadedId.current = order.id;
+    setSupplierId(order.supplierId);
+    setOrderDate(order.orderDate);
+    setLinkedPoId(order.linkedPoId ?? "");
+    setStatus(order.status);
+    setRemarks(order.remarks ?? "");
+    setRows(initial.rows);
+  }, [order, initial]);
 
   if (!order || !initial) {
     return <div className="p-6 text-sm text-muted-foreground">Not found. <button onClick={() => nav({ to: "/yarn/sample-orders" })} className="underline">Back</button></div>;
