@@ -48,7 +48,6 @@ function EditProductionOrder() {
     approvedShadeId: i.approvedShadeId ?? "",
     supplierShadeNumber: i.supplierShadeNumber ?? "",
     receivedQty: i.receivedQty,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   })), [order?.id]);
 
   const [orderDate, setOrderDate] = useState(order?.orderDate ?? "");
@@ -68,14 +67,6 @@ function EditProductionOrder() {
     return list.filter((p) => p.poNumber.toLowerCase().includes(q)).slice(0, 50);
   }, [pos, poQuery]);
 
-  if (!order) {
-    return <div className="p-6 text-sm text-muted-foreground">Not found. <button onClick={() => nav({ to: "/yarn/production-orders" })} className="underline">Back</button></div>;
-  }
-
-  const anyReceived = rows.some((r) => r.receivedQty > 0.0001);
-  const poNumber = (poId: string) => pos.find((p) => p.id === poId)?.poNumber ?? "—";
-  const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
-
   const pickedPo = pickedPoId ? pos.find((p) => p.id === pickedPoId) : undefined;
   const pickedColors = useMemo(() => {
     if (!pickedPo) return [] as Array<{ key: string; name: string; material: string; poItemId: string }>;
@@ -91,6 +82,14 @@ function EditProductionOrder() {
     }
     return out;
   }, [pickedPo]);
+
+  if (!order) {
+    return <div className="p-6 text-sm text-muted-foreground">Not found. <button onClick={() => nav({ to: "/yarn/production-orders" })} className="underline">Back</button></div>;
+  }
+
+  const anyReceived = rows.some((r) => r.receivedQty > 0.0001);
+  const poNumber = (poId: string) => pos.find((p) => p.id === poId)?.poNumber ?? "—";
+  const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
 
   const addLine = (c: { name: string; material: string; poItemId: string }) => {
     if (!pickedPo) return;
