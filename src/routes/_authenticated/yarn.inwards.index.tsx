@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Eye, Trash2, Pencil } from "lucide-react";
 import { useYarnStore, yarnStore, inwardItemContext, inwardItemUnallocatedQty } from "@/lib/yarn-store";
 import { toast } from "sonner";
 
