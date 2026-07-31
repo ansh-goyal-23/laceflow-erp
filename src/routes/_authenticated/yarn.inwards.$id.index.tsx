@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ChevronLeft, Pencil } from "lucide-react";
 import { useYarnStore, inwardItemAllocatedQty, inwardItemUnallocatedQty } from "@/lib/yarn-store";
 
-export const Route = createFileRoute("/_authenticated/yarn/inwards/$id")({
+export const Route = createFileRoute("/_authenticated/yarn/inwards/$id/")({
   component: InwardDetail,
 });
 

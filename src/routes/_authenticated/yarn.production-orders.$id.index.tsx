@@ -19,7 +19,7 @@ import { useYarnStore, yarnStore, type ProductionOrderStatus } from "@/lib/yarn-
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/yarn/production-orders/$id")({
+export const Route = createFileRoute("/_authenticated/yarn/production-orders/$id/")({
   component: ProdOrderDetail,
 });
 
