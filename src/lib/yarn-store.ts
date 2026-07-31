@@ -598,6 +598,56 @@ export const yarnStore = {
     throwIfError(await supabase.from("yarn_sample_orders").delete().eq("id", id));
     await refresh();
   },
+  /** Full edit: header + item rows (insert / update / delete diff). */
+  async updateSampleOrderFull(id: string, input: {
+    orderDate: string; supplierId: string; linkedPoId?: string | null;
+    remarks?: string; status?: SampleOrderStatus;
+    items: Array<{
+      id?: string; clientId: string; brandId: string;
+      colorName: string; material: string; approxQty: number;
+      pantone?: string; remarks?: string;
+    }>;
+  }) {
+    if (!hydrated) await hydrate();
+    const order = state.sampleOrders.find((o) => o.id === id);
+    if (!order) throw new Error("Sample order not found");
+    const keptIds = new Set(input.items.map((i) => i.id).filter(Boolean) as string[]);
+    const removed = order.items.filter((i) => !keptIds.has(i.id));
+    const locked = removed.find((i) => i.approvalStatus === "approved");
+    if (locked) throw new Error(`Cannot remove "${locked.colorName}" — it is already approved`);
+
+    const header: Record<string, unknown> = {
+      order_date: input.orderDate,
+      supplier_id: input.supplierId,
+      linked_po_id: input.linkedPoId ?? null,
+      remarks: input.remarks ?? null,
+    };
+    if (input.status !== undefined) header.status = input.status;
+    throwIfError(await supabase.from("yarn_sample_orders").update(header).eq("id", id));
+
+    if (removed.length) {
+      throwIfError(await supabase.from("yarn_sample_order_items")
+        .delete().in("id", removed.map((r) => r.id)));
+    }
+    for (let idx = 0; idx < input.items.length; idx++) {
+      const i = input.items[idx];
+      const payload = {
+        order_id: id,
+        client_id: i.clientId, brand_id: i.brandId,
+        color_name: i.colorName, material: i.material,
+        approx_qty: i.approxQty,
+        pantone: i.pantone || null, remarks: i.remarks || null,
+        sort_order: idx,
+      };
+      if (i.id) {
+        throwIfError(await supabase.from("yarn_sample_order_items").update(payload).eq("id", i.id));
+      } else {
+        throwIfError(await supabase.from("yarn_sample_order_items")
+          .insert({ ...payload, approval_status: "pending" }));
+      }
+    }
+    await refresh();
+  },
   async addSampleReceipt(orderId: string, r: Omit<SampleYarnReceipt, "id">) {
     throwIfError(await supabase.from("yarn_sample_receipts").insert({
       order_id: orderId,
@@ -679,6 +729,67 @@ export const yarnStore = {
   },
   async deleteProductionOrder(id: string) {
     throwIfError(await supabase.from("yarn_production_orders").delete().eq("id", id));
+    await refresh();
+  },
+  /** Full edit: header + item rows (insert / update / delete diff). */
+  async updateProductionOrderFull(id: string, input: {
+    orderDate: string; supplierId: string; remarks?: string; status?: ProductionOrderStatus;
+    items: Array<{
+      id?: string; poId: string; poItemId?: string | null;
+      clientId: string; brandId: string;
+      material: string; colorName: string; orderedQty: number;
+      approvedShadeId?: string | null; supplierShadeNumber: string;
+    }>;
+  }) {
+    if (!hydrated) await hydrate();
+    const order = state.productionOrders.find((o) => o.id === id);
+    if (!order) throw new Error("Production order not found");
+    const byId = new Map(order.items.map((i) => [i.id, i]));
+    const keptIds = new Set(input.items.map((i) => i.id).filter(Boolean) as string[]);
+    const removed = order.items.filter((i) => !keptIds.has(i.id));
+    const lockedRemoval = removed.find((i) => i.receivedQty > 0.0001);
+    if (lockedRemoval) {
+      throw new Error(`Cannot remove "${lockedRemoval.colorName}" — ${lockedRemoval.receivedQty} Kg already received`);
+    }
+    for (const i of input.items) {
+      const prev = i.id ? byId.get(i.id) : undefined;
+      if (prev && i.orderedQty + 0.0001 < prev.receivedQty) {
+        throw new Error(`"${prev.colorName}" ordered qty cannot be below received qty (${prev.receivedQty} Kg)`);
+      }
+    }
+
+    const header: Record<string, unknown> = {
+      order_date: input.orderDate,
+      supplier_id: input.supplierId,
+      remarks: input.remarks ?? null,
+    };
+    if (input.status !== undefined) header.status = input.status;
+    throwIfError(await supabase.from("yarn_production_orders").update(header).eq("id", id));
+
+    if (removed.length) {
+      throwIfError(await supabase.from("yarn_production_order_items")
+        .delete().in("id", removed.map((r) => r.id)));
+    }
+    for (let idx = 0; idx < input.items.length; idx++) {
+      const i = input.items[idx];
+      const payload = {
+        order_id: id,
+        po_id: i.poId,
+        po_item_id: i.poItemId ?? null,
+        client_id: i.clientId, brand_id: i.brandId,
+        material: i.material, color_name: i.colorName,
+        ordered_qty: i.orderedQty,
+        approved_shade_id: i.approvedShadeId || null,
+        supplier_shade_number: i.supplierShadeNumber,
+        sort_order: idx,
+      };
+      if (i.id) {
+        throwIfError(await supabase.from("yarn_production_order_items").update(payload).eq("id", i.id));
+      } else {
+        throwIfError(await supabase.from("yarn_production_order_items")
+          .insert({ ...payload, received_qty: 0 }));
+      }
+    }
     await refresh();
   },
 
