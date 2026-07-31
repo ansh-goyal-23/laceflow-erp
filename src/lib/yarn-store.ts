@@ -858,6 +858,104 @@ export const yarnStore = {
     return state.inwards.find((r) => r.id === header.id)!;
   },
 
+  /** Full edit of an inward: header + item rows, keeping allocations intact. */
+  async updateInwardFull(id: string, input: {
+    inwardDate: string; supplierId: string; supplierChallanNumber: string; remarks?: string;
+    items: Array<{
+      id?: string; supplierShadeNumber: string; lotNumber?: string;
+      grossWeight: number; cones: number; paperTubeWeight: number; remarks?: string;
+    }>;
+  }) {
+    if (!hydrated) await hydrate();
+    const rec = state.inwards.find((r) => r.id === id);
+    if (!rec) throw new Error("Inward not found");
+    if (!input.items.length) throw new Error("Add at least one inward item");
+
+    // Snapshot mirrored sample receipts BEFORE anything changes (matching is
+    // value-based on date / shade / lot / gross / cones).
+    const mirrored = new Map<string, { orderId: string; receiptId: string }>();
+    for (const it of rec.items) {
+      const { order, receipt } = matchSampleReceipt(state, rec, it);
+      if (order && receipt) mirrored.set(it.id, { orderId: order.id, receiptId: receipt.id });
+    }
+
+    const byId = new Map(rec.items.map((i) => [i.id, i]));
+    const keptIds = new Set(input.items.map((i) => i.id).filter(Boolean) as string[]);
+    const removed = rec.items.filter((i) => !keptIds.has(i.id));
+    const lockedRemoval = removed.find((i) => inwardItemAllocatedQty(i) > 0.0001);
+    if (lockedRemoval) {
+      throw new Error(`Row ${lockedRemoval.supplierShadeNumber} is already allocated — remove the allocation before deleting it`);
+    }
+    const anyLinked = rec.items.some((i) => inwardItemAllocatedQty(i) > 0.0001 || mirrored.has(i.id));
+    if (anyLinked && input.supplierId !== rec.supplierId) {
+      throw new Error("Supplier cannot be changed once rows are allocated or linked to a sample order");
+    }
+
+    const netOf = (i: { grossWeight: number; cones: number; paperTubeWeight: number }) =>
+      Math.max(0, (Number(i.grossWeight) || 0) - (Number(i.cones) || 0) * (Number(i.paperTubeWeight) || 0));
+
+    for (const i of input.items) {
+      const prev = i.id ? byId.get(i.id) : undefined;
+      if (!prev) continue;
+      const allocated = inwardItemAllocatedQty(prev);
+      if (netOf(i) + 0.0001 < allocated) {
+        throw new Error(`Row ${prev.supplierShadeNumber}: net weight cannot be below the allocated ${allocated.toFixed(2)} Kg`);
+      }
+      if (allocated > 0.0001 && i.supplierShadeNumber.trim() !== prev.supplierShadeNumber.trim()) {
+        throw new Error(`Row ${prev.supplierShadeNumber}: shade # cannot change once allocated`);
+      }
+    }
+
+    throwIfError(await supabase.from("yarn_inwards").update({
+      inward_date: input.inwardDate,
+      supplier_id: input.supplierId,
+      supplier_challan_number: input.supplierChallanNumber ?? "",
+      remarks: input.remarks ?? null,
+    }).eq("id", id));
+
+    if (removed.length) {
+      throwIfError(await supabase.from("yarn_inward_items")
+        .delete().in("id", removed.map((r) => r.id)));
+      const receiptIds = removed.map((r) => mirrored.get(r.id)?.receiptId).filter(Boolean) as string[];
+      if (receiptIds.length) {
+        throwIfError(await supabase.from("yarn_sample_receipts").delete().in("id", receiptIds));
+      }
+    }
+
+    for (let idx = 0; idx < input.items.length; idx++) {
+      const i = input.items[idx];
+      const payload = {
+        inward_id: id,
+        supplier_shade_number: i.supplierShadeNumber.trim(),
+        lot_number: i.lotNumber || null,
+        gross_weight: Number(i.grossWeight) || 0,
+        cones: Number(i.cones) || 0,
+        paper_tube_weight: Number(i.paperTubeWeight) || 0,
+        net_weight: netOf(i),
+        remarks: i.remarks || null,
+        sort_order: idx,
+      };
+      if (i.id) {
+        throwIfError(await supabase.from("yarn_inward_items").update(payload).eq("id", i.id));
+        // Keep the mirrored sample receipt in sync so the sample order and the
+        // Approvals tab keep matching this physical arrival.
+        const link = mirrored.get(i.id);
+        if (link) {
+          throwIfError(await supabase.from("yarn_sample_receipts").update({
+            receipt_date: input.inwardDate,
+            supplier_shade_number: payload.supplier_shade_number,
+            lot_number: payload.lot_number,
+            gross_weight: payload.gross_weight,
+            cones: payload.cones,
+          }).eq("id", link.receiptId));
+        }
+      } else {
+        throwIfError(await supabase.from("yarn_inward_items").insert(payload));
+      }
+    }
+    await refresh();
+  },
+
   async deleteInward(id: string) {
     const rec = state.inwards.find((r) => r.id === id);
     if (!rec) return;
