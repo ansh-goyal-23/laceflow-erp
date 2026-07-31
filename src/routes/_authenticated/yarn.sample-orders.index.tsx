@@ -151,7 +151,7 @@ function SampleOrdersList() {
       <PageHeader
         title="Sample Yarn Orders"
         subtitle="Develop new shades before production"
-        actions={<Button asChild><Link to="/yarn/sample-orders/new"><Plus className="h-4 w-4 mr-1" /> New Sample Order</Link></Button>}
+        actions={<Button asChild><Link to="/yarn/sample-orders/new" search={{ poId: undefined }}><Plus className="h-4 w-4 mr-1" /> New Sample Order</Link></Button>}
       />
       <Tabs defaultValue="all">
         <TabsList>

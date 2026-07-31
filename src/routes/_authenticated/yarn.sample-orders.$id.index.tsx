@@ -19,7 +19,7 @@ import { useYarnStore, yarnStore, sampleExpectedDelivery, sampleReceiptItemColor
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/yarn/sample-orders/$id")({
+export const Route = createFileRoute("/_authenticated/yarn/sample-orders/$id/")({
   component: SampleOrderDetail,
 });
 
