@@ -68,7 +68,8 @@ function ProdOrderDetail() {
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild><Link to="/yarn/production-orders"><ChevronLeft className="h-4 w-4 mr-1" /> Back</Link></Button>
-            <Button variant="outline" onClick={openEdit}><Pencil className="h-4 w-4 mr-1" /> Edit</Button>
+            <Button variant="outline" asChild><Link to="/yarn/production-orders/$id/edit" params={{ id: order.id }}><Pencil className="h-4 w-4 mr-1" /> Edit</Link></Button>
+            <Button variant="outline" onClick={openEdit}>Quick Edit</Button>
             <Button variant="outline" onClick={() => setDeleting(true)} className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4 mr-1" /> Delete</Button>
           </div>
         }

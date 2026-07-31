@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Pencil } from "lucide-react";
 import { useYarnStore, inwardItemAllocatedQty, inwardItemUnallocatedQty } from "@/lib/yarn-store";
 
 export const Route = createFileRoute("/_authenticated/yarn/inwards/$id")({
@@ -24,7 +24,10 @@ function InwardDetail() {
       <PageHeader
         title={`Yarn Inward ${inward.number}`}
         subtitle={supplier?.name}
-        actions={<Button variant="outline" asChild><Link to="/yarn/inwards"><ChevronLeft className="h-4 w-4 mr-1" /> Back</Link></Button>}
+        actions={<div className="flex gap-2">
+          <Button variant="outline" asChild><Link to="/yarn/inwards/$id/edit" params={{ id: inward.id }}><Pencil className="h-4 w-4 mr-1" /> Edit</Link></Button>
+          <Button variant="outline" asChild><Link to="/yarn/inwards"><ChevronLeft className="h-4 w-4 mr-1" /> Back</Link></Button>
+        </div>}
       />
       <Card className="p-4 grid md:grid-cols-4 gap-3 text-sm">
         <div><div className="text-muted-foreground">Inward Date</div><div className="font-medium">{inward.inwardDate}</div></div>

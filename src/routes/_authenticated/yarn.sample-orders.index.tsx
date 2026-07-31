@@ -14,7 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Eye, Pencil, Trash2, CheckCircle2, RefreshCw } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, CheckCircle2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useYarnStore, yarnStore, sampleExpectedDelivery, type SampleYarnOrder, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
@@ -203,7 +203,8 @@ function SampleOrdersList() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" asChild title="View"><Link to="/yarn/sample-orders/$id" params={{ id: o.id }}><Eye className="h-4 w-4" /></Link></Button>
-                        <Button variant="ghost" size="icon" title="Edit" onClick={() => openEdit(o)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" asChild title="Edit full order"><Link to="/yarn/sample-orders/$id/edit" params={{ id: o.id }}><Pencil className="h-4 w-4" /></Link></Button>
+                        <Button variant="ghost" size="icon" title="Quick edit (date / status)" onClick={() => openEdit(o)}><SlidersHorizontal className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" title="Delete" onClick={() => setDeleting(o)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </TableCell>
