@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, Lock, Search } from "lucide-react";
+import { Plus, Trash2, Search } from "lucide-react";
 import {
   useYarnStore, yarnStore, expandPoColors, type ProductionOrderStatus,
 } from "@/lib/yarn-store";
@@ -141,7 +141,7 @@ function EditProductionOrder() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl space-y-4">
-      <PageHeader title={`Edit Production Yarn Order ${order.number}`} subtitle="Received lines stay locked" />
+      <PageHeader title={`Edit Production Yarn Order ${order.number}`} subtitle="Received lines can be edited, but cannot be deleted and ordered quantity cannot be below received quantity" />
 
       <Card className="p-4 grid md:grid-cols-4 gap-3">
         <div><Label>Order Date</Label><Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></div>
@@ -189,10 +189,7 @@ function EditProductionOrder() {
                   <TableRow key={r.id ?? `new-${i}`}>
                     <TableCell className="font-mono text-xs">{poNumber(r.poId)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                        <Input value={r.colorName} disabled={locked} onChange={(e) => patch(i, { colorName: e.target.value })} />
-                      </div>
+                      <Input value={r.colorName} onChange={(e) => patch(i, { colorName: e.target.value })} />
                     </TableCell>
                     <TableCell><Input value={r.material} onChange={(e) => patch(i, { material: e.target.value })} /></TableCell>
                     <TableCell><Input type="number" step="0.01" className="w-28" value={r.orderedQty} onChange={(e) => patch(i, { orderedQty: e.target.value })} /></TableCell>

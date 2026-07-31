@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Lock } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useYarnStore, yarnStore, sampleExpectedDelivery, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
@@ -109,7 +109,7 @@ function EditSampleOrder() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl space-y-4">
-      <PageHeader title={`Edit Sample Yarn Order ${order.number}`} subtitle="Approved or received colors stay locked" />
+      <PageHeader title={`Edit Sample Yarn Order ${order.number}`} subtitle="Approved or received items can be edited, but cannot be deleted" />
 
       <Card className="p-4 grid md:grid-cols-4 gap-3">
         <div><Label>Order Date</Label><Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></div>
@@ -163,24 +163,21 @@ function EditSampleOrder() {
               {rows.map((r, i) => (
                 <TableRow key={r.id ?? `new-${i}`}>
                   <TableCell>
-                    <Select value={r.clientId} onValueChange={(v) => patch(i, { clientId: v })} disabled={r.locked}>
+                    <Select value={r.clientId} onValueChange={(v) => patch(i, { clientId: v })}>
                       <SelectTrigger><SelectValue placeholder="Client" /></SelectTrigger>
                       <SelectContent>{clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Select value={r.brandId} onValueChange={(v) => patch(i, { brandId: v })} disabled={r.locked}>
+                    <Select value={r.brandId} onValueChange={(v) => patch(i, { brandId: v })}>
                       <SelectTrigger><SelectValue placeholder="Brand" /></SelectTrigger>
                       <SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      {r.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                      <Input value={r.colorName} disabled={r.locked} onChange={(e) => patch(i, { colorName: e.target.value })} />
-                    </div>
+                    <Input value={r.colorName} onChange={(e) => patch(i, { colorName: e.target.value })} />
                   </TableCell>
-                  <TableCell><Input value={r.material} disabled={r.locked} onChange={(e) => patch(i, { material: e.target.value })} /></TableCell>
+                  <TableCell><Input value={r.material} onChange={(e) => patch(i, { material: e.target.value })} /></TableCell>
                   <TableCell><Input type="number" step="0.01" value={r.approxQty} onChange={(e) => patch(i, { approxQty: e.target.value })} /></TableCell>
                   <TableCell><Input value={r.pantone} onChange={(e) => patch(i, { pantone: e.target.value })} /></TableCell>
                   <TableCell><Input value={r.remarks} onChange={(e) => patch(i, { remarks: e.target.value })} /></TableCell>
