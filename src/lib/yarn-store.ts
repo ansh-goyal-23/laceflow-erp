@@ -1029,10 +1029,11 @@ export function poOverallStage(s: StoreShape, po: PurchaseOrder): ProcurementSta
 export function expandPoColors(raw: string): Array<{ name: string; kind: "base" | "line" | "single" }> {
   const s = (raw ?? "").trim();
   if (!s) return [];
-  const m = s.match(/^(.*?)\s*\/\s*LINE\s+(.+)$/i);
+  const clean = (v: string) => v.replace(/\s+/g, " ").trim();
+  const m = s.match(/^(.*?)\s*\/\s*LINE[\s\-:_]+(.+)$/i);
   if (!m) return [{ name: s, kind: "single" }];
-  const base = m[1].trim();
-  const line = m[2].trim();
+  const base = clean(m[1].replace(/^BASE[\s\-:_]+/i, ""));
+  const line = clean(m[2]);
   const out: Array<{ name: string; kind: "base" | "line" | "single" }> = [];
   if (base) out.push({ name: base, kind: "base" });
   if (line) out.push({ name: line, kind: "line" });

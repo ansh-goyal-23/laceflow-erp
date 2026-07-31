@@ -1,37 +1,43 @@
-## Goal
-Prevent editing/removing a PO line item once any invoice has dispatched quantity against it. New items can still be added, and items with zero dispatched qty remain fully editable.
+## Problem
 
-## Rules
-For each existing PO item, compute `dispatched = sum(invoice_items.dispatch_qty where po_item_id = it.id)` using the existing `dispatchedByPOItem(invoices)` helper.
+`expandPoColors` in `src/lib/yarn-store.ts` (line 1029) is the single place that splits a PO color into separate procurement colors. Its regex is:
 
-An item is **locked** when `dispatched > 0`. For locked items:
-- Fields locked (read-only): article code, lace type, material type, width, length, color, UOM, rate.
-- Quantity: editable but cannot go below `dispatched` (min = dispatched).
-- Delete button: disabled with tooltip "Item has dispatched invoices".
-- Attempting to bypass via bulk edit still blocked in save-time validation.
+```
+/^(.*?)\s*\/\s*LINE\s+(.+)$/i
+```
 
-Unlocked items (dispatched = 0) and brand-new rows behave as today.
+It requires whitespace after `LINE`, so the real-world PO formats fail:
 
-## Changes
+- `"BASE-ARUBA BLUE/LINE-PEACOCK BLUE"` — no match (hyphen after LINE) → treated as ONE color, and the `BASE-` prefix stays in the name.
+- `"BASE-WHITE/LINE-CENDRE BLUE"` — same failure.
+- `"LEMONADE/LINE-BLACK"` — same failure.
 
-### 1. `src/components/po-form.tsx`
-- Accept invoices from the store: `const invoices = useStore(s => s.invoices)`.
-- Build `lockedMap = dispatchedByPOItem(invoices)` (only relevant when `existing` is set; for new POs, map is empty).
-- Helper `isLocked(itemId)` returns `dispatched > 0` for items that exist in the original PO.
-- In the line-items table row:
-  - Wrap each editable cell so locked fields render as disabled `Textarea`/`Input`/`Select` (add `disabled` prop + muted styling) with a small lock icon + tooltip on the article cell showing "Dispatched: X — fields locked".
-  - Quantity input: set `min={dispatched}`; on change, clamp; show helper text if user tries to go lower.
-  - Delete button: `disabled` when locked; tooltip explains why.
-- In `validate()` and `save()`:
-  - For every original item still present, re-check that immutable fields equal the original values and `quantity >= dispatched`. If not, `toast.error` with the specific item + reason and abort.
-  - Detect removed original items that were locked → block with error listing them.
+Result: these lace items are ordered as a single compound color instead of two separate yarn colors.
 
-### 2. `src/routes/_authenticated/purchase-orders.$id.edit.tsx`
-- Add a subtle banner above the form when any item is locked: "Some items have dispatched invoices and are partially locked." (Computed via the same helper; small util shared with `po-form`.)
+## Fix
 
-### 3. Shared helper
-Add `poItemLockInfo(po, invoices)` in `src/lib/reports.ts` (or a small new `src/lib/po-locks.ts`) returning `Map<itemId, { dispatched: number; locked: boolean }>`. Use it in both the form and the edit page banner to avoid duplication.
+Rewrite `expandPoColors` to:
+
+1. Split on `/` when the right-hand side starts with the `LINE` marker, accepting any of `LINE-`, `LINE :`, `LINE_`, or `LINE ` (regex separator class `[\s\-:_]+`).
+2. Strip a leading `BASE` marker (`BASE-`, `BASE:`, `BASE `) from the left-hand side, so `"BASE-ARUBA BLUE"` becomes `"ARUBA BLUE"`.
+3. Collapse repeated whitespace and trim each resulting name.
+4. Keep the existing return shape `{ name, kind: "base" | "line" | "single" }` and the existing fallback (no marker → single entry with the original string).
+
+Examples after the fix:
+
+```text
+"BASE-ARUBA BLUE/LINE-PEACOCK BLUE"  -> ARUBA BLUE (base), PEACOCK BLUE (line)
+"BASE-WHITE/LINE-CENDRE BLUE"        -> WHITE (base), CENDRE BLUE (line)
+"LEMONADE/LINE-BLACK"                -> LEMONADE (base), BLACK (line)
+"LIMPET SHELL / LINE VIBRANT ORANGE" -> LIMPET SHELL (base), VIBRANT ORANGE (line)  (still works)
+"NAVY BLUE"                          -> NAVY BLUE (single)
+```
+
+## Scope
+
+Only `expandPoColors` changes. Every consumer already calls it — production yarn order creation, procurement stage calculation (`calculateProcurementStage`, `poItemStage`, `poOverallStage`), the pendency reports, and the production slip — so all of them pick up the corrected split automatically. No schema or data migration; existing production-order rows already saved with the compound name are untouched (they can be edited/deleted manually if needed).
 
 ## Out of scope
-- Bulk PO import / `replacePO` path (natural-key diff already preserves IDs; no schema/API changes needed here).
-- DB-level trigger enforcement. Client-side guard only, matching the pattern used elsewhere in the app.
+
+- Backfilling/rewriting already-created production yarn order lines that used the old compound color.
+- Any other separator conventions not seen in the POs above (can be added later if new formats appear).
