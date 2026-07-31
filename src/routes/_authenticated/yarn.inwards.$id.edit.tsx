@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +69,18 @@ function EditInward() {
   const [remarks, setRemarks] = useState(initial?.remarks ?? "");
   const [rows, setRows] = useState<Row[]>(initial?.rows ?? []);
   const [saving, setSaving] = useState(false);
+
+  const loadedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!inward || !initial) return;
+    if (loadedId.current === inward.id) return;
+    loadedId.current = inward.id;
+    setInwardDate(initial.inwardDate);
+    setSupplierId(initial.supplierId);
+    setChallan(initial.challan);
+    setRemarks(initial.remarks);
+    setRows(initial.rows);
+  }, [inward, initial]);
 
   if (!inward || !initial) {
     return <div className="p-6 text-sm text-muted-foreground">Not found. <button onClick={() => nav({ to: "/yarn/inwards" })} className="underline">Back</button></div>;
