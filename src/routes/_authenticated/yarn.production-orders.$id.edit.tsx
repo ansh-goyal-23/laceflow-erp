@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,18 @@ function EditProductionOrder() {
   const [pickOpen, setPickOpen] = useState(false);
   const [poQuery, setPoQuery] = useState("");
   const [pickedPoId, setPickedPoId] = useState<string | null>(null);
+
+  const loadedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!order) return;
+    if (loadedId.current === order.id) return;
+    loadedId.current = order.id;
+    setOrderDate(order.orderDate);
+    setSupplierId(order.supplierId);
+    setStatus(order.status);
+    setRemarks(order.remarks ?? "");
+    setRows(initialRows);
+  }, [order, initialRows]);
 
   const poList = useMemo(() => {
     const q = poQuery.trim().toLowerCase();
