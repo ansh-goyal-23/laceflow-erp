@@ -613,8 +613,12 @@ export const yarnStore = {
     if (!order) throw new Error("Sample order not found");
     const keptIds = new Set(input.items.map((i) => i.id).filter(Boolean) as string[]);
     const removed = order.items.filter((i) => !keptIds.has(i.id));
-    const locked = removed.find((i) => i.approvalStatus === "approved");
-    if (locked) throw new Error(`Cannot remove "${locked.colorName}" — it is already approved`);
+    const receivedItemIds = new Set(order.receipts.map((r) => r.sampleOrderItemId).filter(Boolean));
+    const locked = removed.find((i) => i.approvalStatus === "approved" || receivedItemIds.has(i.id));
+    if (locked) {
+      const reason = locked.approvalStatus === "approved" ? "it is already approved" : "yarn has already been received";
+      throw new Error(`Cannot remove "${locked.colorName}" — ${reason}`);
+    }
 
     const header: Record<string, unknown> = {
       order_date: input.orderDate,
