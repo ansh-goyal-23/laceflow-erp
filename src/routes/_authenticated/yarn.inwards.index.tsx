@@ -135,7 +135,8 @@ function InwardsList() {
                   <TableCell>{r.status}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" asChild><Link to="/yarn/inwards/$id" params={{ id: r.inwardId }}><Eye className="h-4 w-4" /></Link></Button>
+                      <Button variant="ghost" size="icon" asChild title="View"><Link to="/yarn/inwards/$id" params={{ id: r.inwardId }}><Eye className="h-4 w-4" /></Link></Button>
+                      <Button variant="ghost" size="icon" asChild title="Edit inward"><Link to="/yarn/inwards/$id/edit" params={{ id: r.inwardId }}><Pencil className="h-4 w-4" /></Link></Button>
                       <Button variant="ghost" size="icon" onClick={async () => {
                         if (!confirm("Delete this inward? Any allocations will be reversed and any linked sample receipts will remain (delete from the sample order if needed).")) return;
                         try { await yarnStore.deleteInward(r.inwardId); toast.success("Deleted"); }
