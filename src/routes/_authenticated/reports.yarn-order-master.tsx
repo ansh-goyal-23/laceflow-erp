@@ -11,6 +11,7 @@ import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X, 
 import { useYarnStore, sampleReceiptItemColor } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { exportCSV, exportXLSX } from "@/lib/export-table";
+import { daysRemaining, daysRemainingLabel, urgencyClass } from "@/lib/reports";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/reports/yarn-order-master")({
@@ -30,6 +31,8 @@ interface Row {
   client: string;
   poId: string;
   poNumber: string;
+  poDeliveryDate: string;
+  daysLeft: number | null;
   material: string;
   color: string;
   shade: string;
@@ -40,7 +43,7 @@ interface Row {
 
 type SortKey =
   | "type" | "orderNumber" | "orderDate" | "supplier" | "client" | "poNumber"
-  | "material" | "color" | "shade" | "ordered" | "received" | "pending";
+  | "material" | "color" | "shade" | "ordered" | "received" | "pending" | "daysLeft";
 
 const PAGE_SIZE = 25;
 
@@ -67,6 +70,7 @@ function YarnOrderMasterReport() {
   const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name ?? "—";
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
   const poNumber = (id: string) => (id ? pos.find((p) => p.id === id)?.poNumber ?? "—" : "—");
+  const poDelivery = (id: string) => (id ? pos.find((p) => p.id === id)?.deliveryDate ?? "" : "");
   const shadeNoOf = (id?: string | null) => (id ? shades.find((s) => s.id === id)?.supplierShadeNumber ?? "" : "");
 
   // ---- Build rows ----
@@ -113,6 +117,8 @@ function YarnOrderMasterReport() {
           client: clientName(it.clientId),
           poId: o.linkedPoId ?? "",
           poNumber: poNumber(o.linkedPoId ?? ""),
+          poDeliveryDate: poDelivery(o.linkedPoId ?? ""),
+          daysLeft: poDelivery(o.linkedPoId ?? "") ? daysRemaining(poDelivery(o.linkedPoId ?? "")) : null,
           material: it.material,
           color: it.colorName,
           shade: shadeNoOf(it.approvedShadeId),
@@ -137,6 +143,8 @@ function YarnOrderMasterReport() {
           client: clientName(it.clientId),
           poId: it.poId,
           poNumber: poNumber(it.poId),
+          poDeliveryDate: poDelivery(it.poId),
+          daysLeft: poDelivery(it.poId) ? daysRemaining(poDelivery(it.poId)) : null,
           material: it.material,
           color: it.colorName,
           shade: it.supplierShadeNumber || shadeNoOf(it.approvedShadeId),
@@ -157,6 +165,7 @@ function YarnOrderMasterReport() {
   const [clientF, setClientF] = useState("all");
   const [poF, setPoF] = useState("all");
   const [colorF, setColorF] = useState("");
+  const [pendingOnly, setPendingOnly] = useState<"all" | "pending">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("orderDate");
@@ -185,6 +194,7 @@ function YarnOrderMasterReport() {
       .filter((r) => clientF === "all" || r.clientId === clientF)
       .filter((r) => poF === "all" || r.poId === poF)
       .filter((r) => !c || r.color.toLowerCase().includes(c))
+      .filter((r) => pendingOnly === "all" || r.pending > 0)
       .filter((r) => !dateFrom || r.orderDate >= dateFrom)
       .filter((r) => !dateTo || r.orderDate <= dateTo)
       .filter((r) => !t || [r.type, r.orderNumber, r.supplier, r.client, r.poNumber, r.material, r.color, r.shade]
@@ -193,19 +203,34 @@ function YarnOrderMasterReport() {
     const s = dir === "asc" ? 1 : -1;
     filtered.sort((a, b) => {
       const va = a[sortKey]; const vb = b[sortKey];
+      if (sortKey === "daysLeft") {
+        const na = va === null ? Number.POSITIVE_INFINITY : (va as number);
+        const nb = vb === null ? Number.POSITIVE_INFINITY : (vb as number);
+        return (na - nb) * s;
+      }
       if (typeof va === "number" && typeof vb === "number") return (va - vb) * s;
       return String(va ?? "").localeCompare(String(vb ?? "")) * s;
     });
     return filtered;
-  }, [allRows, q, typeF, supplierF, clientF, poF, colorF, dateFrom, dateTo, sortKey, dir]);
+  }, [allRows, q, typeF, supplierF, clientF, poF, colorF, pendingOnly, dateFrom, dateTo, sortKey, dir]);
+
+  const totals = useMemo(() => rows.reduce(
+    (acc, r) => ({
+      ordered: acc.ordered + r.ordered,
+      received: acc.received + r.received,
+      pending: acc.pending + r.pending,
+    }),
+    { ordered: 0, received: 0, pending: 0 },
+  ), [rows]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const headers = ["Type", "Order #", "Order Date", "Supplier", "Client", "PO", "Material", "Color", "Shade #", "Ordered", "Received", "Pending"];
+  const headers = ["Type", "Order #", "Order Date", "Supplier", "Client", "PO", "Days Remaining", "Material", "Color", "Shade #", "Ordered", "Received", "Pending"];
   const exportRows = () => rows.map((r) => [
     r.type, r.orderNumber, r.orderDate, r.supplier, r.client, r.poNumber,
+    r.daysLeft === null ? "—" : daysRemainingLabel(r.daysLeft),
     r.material, r.color, r.shade, r.ordered, r.received, r.pending,
   ]);
 
@@ -266,6 +291,13 @@ function YarnOrderMasterReport() {
           </Select>
           <Input list="color-options" placeholder="Color contains…" value={colorF} onChange={(e) => { setColorF(e.target.value); setPage(1); }} />
           <datalist id="color-options">{colorOptions.map((c) => <option key={c} value={c} />)}</datalist>
+          <Select value={pendingOnly} onValueChange={(v) => { setPendingOnly(v as "all" | "pending"); setPage(1); }}>
+            <SelectTrigger><SelectValue placeholder="Pending" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Rows</SelectItem>
+              <SelectItem value="pending">Only Pending Qty</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex gap-2 items-center">
             <label className="text-xs text-muted-foreground w-24">Order from</label>
             <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
@@ -277,10 +309,25 @@ function YarnOrderMasterReport() {
           <div className="flex items-end">
             <Button variant="ghost" size="sm" onClick={() => {
               setQ(""); setTypeF("all"); setSupplierF("all"); setClientF("all"); setPoF("all");
-              setColorF(""); setDateFrom(""); setDateTo(""); setPage(1);
+              setColorF(""); setPendingOnly("all"); setDateFrom(""); setDateTo(""); setPage(1);
             }}>
               <X className="h-4 w-4 mr-1" /> Clear filters
             </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 mb-4 sm:grid-cols-3">
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">Total Ordered</div>
+            <div className="text-lg font-semibold">{Number(totals.ordered.toFixed(2))}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">Total Received</div>
+            <div className="text-lg font-semibold">{Number(totals.received.toFixed(2))}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">Total Pending</div>
+            <div className="text-lg font-semibold">{Number(totals.pending.toFixed(2))}</div>
           </div>
         </div>
 
@@ -294,6 +341,7 @@ function YarnOrderMasterReport() {
                 <TableHead><SortH label="Supplier" k="supplier" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead><SortH label="Client" k="client" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead><SortH label="PO" k="poNumber" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
+                <TableHead><SortH label="Days Remaining" k="daysLeft" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead><SortH label="Material" k="material" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead><SortH label="Color" k="color" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead><SortH label="Shade #" k="shade" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
@@ -304,7 +352,7 @@ function YarnOrderMasterReport() {
             </TableHeader>
             <TableBody>
               {pageRows.length === 0 ? (
-                <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">No matching yarn orders</TableCell></TableRow>
+                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">No matching yarn orders</TableCell></TableRow>
               ) : pageRows.map((r) => (
                 <TableRow key={r.key}>
                   <TableCell>
@@ -315,6 +363,9 @@ function YarnOrderMasterReport() {
                   <TableCell>{r.supplier}</TableCell>
                   <TableCell>{r.client}</TableCell>
                   <TableCell>{r.poNumber}</TableCell>
+                  <TableCell className={r.daysLeft === null ? "" : urgencyClass(r.daysLeft)}>
+                    {r.daysLeft === null ? "—" : daysRemainingLabel(r.daysLeft)}
+                  </TableCell>
                   <TableCell>{r.material || "—"}</TableCell>
                   <TableCell>{r.color || "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{r.shade || "—"}</TableCell>
