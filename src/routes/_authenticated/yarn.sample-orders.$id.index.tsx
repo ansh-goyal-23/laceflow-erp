@@ -46,14 +46,6 @@ function SampleOrderDetail() {
   const cName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
   const bName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
 
-  const doApprove = async () => {
-    if (!approveFor || !shadeNo.trim()) { toast.error("Enter supplier shade #"); return; }
-    try {
-      await yarnStore.approveSampleItem(order.id, approveFor, shadeNo.trim());
-      toast.success("Approved — shade added to library");
-      setApproveFor(null); setShadeNo("");
-    } catch (e) { toast.error((e as Error).message); }
-  };
 
   const saveReceipt = async () => {
     if (!rcp.grossWeight) { toast.error("Enter gross weight"); return; }
