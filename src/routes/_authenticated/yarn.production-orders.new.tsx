@@ -136,6 +136,7 @@ function NewProdOrder() {
     kind: "base" | "line" | "single";
     items: PurchaseOrder["items"];
     stage: ProcurementStage;
+    notRequired: boolean;   // every item in this group has this colour marked "Yarn Not Required"
     orderedQty: number;   // total ordered across all prod orders for this po+color+material
     receivedQty: number;
   }
@@ -154,11 +155,14 @@ function NewProdOrder() {
             kind: c.kind,
             items: [],
             stage: calculateProcurementStage(yarn, activePO.id, it.materialType, c.name),
+            notRequired: true,
             orderedQty: 0,
             receivedQty: 0,
           });
         }
-        map.get(k)!.items.push(it);
+        const g = map.get(k)!;
+        g.items.push(it);
+        if (!isColorOverridden(yarn, it.id, c.name)) g.notRequired = false;
       }
     }
     // sum ordered/received across production orders for this po+color+material
