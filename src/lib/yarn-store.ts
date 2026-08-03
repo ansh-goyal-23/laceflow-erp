@@ -973,7 +973,7 @@ export const yarnStore = {
     // sees the physical arrival and the two records can be matched later.
     const sampleRows = input.items.filter((i) => i.sampleOrderId);
     if (sampleRows.length) {
-      throwIfError(await supabase.from("yarn_sample_receipts").insert(
+      const inserted = throwIfError(await supabase.from("yarn_sample_receipts").insert(
         sampleRows.map((i) => ({
           order_id: i.sampleOrderId,
           receipt_date: input.inwardDate,
@@ -985,12 +985,36 @@ export const yarnStore = {
             ? `[[soi:${i.sampleOrderItemId}]]${i.remarks ? " " + i.remarks : ""}`
             : (i.remarks || null),
         })),
-      ));
+      ).select("id")) as Array<{ id: string }>;
       const orderIds = Array.from(new Set(sampleRows.map((i) => i.sampleOrderId!)));
       throwIfError(
         await supabase.from("yarn_sample_orders")
           .update({ status: "received" }).in("id", orderIds),
       );
+      // A re-dyed item that receives a fresh sample goes back into the
+      // Approvals Needed queue for the new round.
+      const redyeItemIds = sampleRows
+        .map((i) => i.sampleOrderItemId)
+        .filter((id): id is string => {
+          if (!id) return false;
+          const it = state.sampleOrders
+            .find((o) => o.items.some((x) => x.id === id))?.items.find((x) => x.id === id);
+          return it?.approvalStatus === "redye";
+        });
+      if (redyeItemIds.length) {
+        throwIfError(await supabase.from("yarn_sample_order_items").update({
+          approval_status: "pending", approved_shade_id: null, approved_at: null,
+        }).in("id", Array.from(new Set(redyeItemIds))));
+      }
+      await logSampleEvents(sampleRows.map((i, idx) => ({
+        orderId: i.sampleOrderId!,
+        itemId: i.sampleOrderItemId ?? null,
+        receiptId: inserted?.[idx]?.id ?? null,
+        event: "received" as const,
+        eventDate: input.inwardDate,
+        supplierShadeNumber: i.supplierShadeNumber,
+        lotNumber: i.lotNumber || undefined,
+      })));
     }
     await refresh();
     return state.inwards.find((r) => r.id === header.id)!;
