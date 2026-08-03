@@ -29,9 +29,10 @@ END $$;
 ALTER TABLE public.yarn_po_item_overrides
   ADD CONSTRAINT yarn_po_item_overrides_pkey PRIMARY KEY (id);
 
--- Uniqueness is now per (po_item_id, colour).
+-- Uniqueness is now per (po_item_id, colour). Plain columns (not an
+-- expression index) so ON CONFLICT (po_item_id, color_name) can match it.
 CREATE UNIQUE INDEX IF NOT EXISTS yarn_po_item_overrides_item_color_idx
-  ON public.yarn_po_item_overrides (po_item_id, lower(color_name));
+  ON public.yarn_po_item_overrides (po_item_id, color_name);
 
 CREATE INDEX IF NOT EXISTS yarn_po_item_overrides_item_idx
   ON public.yarn_po_item_overrides (po_item_id);
