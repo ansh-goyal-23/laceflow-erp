@@ -46,7 +46,6 @@ function SampleOrderDetail() {
   const cName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
   const bName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
 
-
   const saveReceipt = async () => {
     if (!rcp.grossWeight) { toast.error("Enter gross weight"); return; }
     try {
