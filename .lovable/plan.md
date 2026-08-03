@@ -1,60 +1,32 @@
-## Goal
+## Problem (verified in code)
 
-When a sample is rejected (**redye**), the dyer sends a fresh sample against the *same* sample order. Recording that Yarn Inward must:
+`yarn_po_item_overrides` is keyed only by `po_item_id` (`docs/yarn-management.sql:211`), and the store loads it as `overrides[po_item_id]` (`src/lib/yarn-store.ts:509`). The "Mark Yarn Not Required" toggle is rendered inside a colour group but writes against the whole item (`yarn.production-orders.new.tsx:352, 513-527`).
 
-1. Auto-link to the redyed item on that order (not create an orphan row),
-2. Put the item back into the **Approvals Needed** queue,
-3. Leave a permanent, readable history: every sample received (date, shade #, lot, weight) and every decision (approved / redye / undo) with dates, so anyone can later see how many rounds a colour took.
+So for a double-colour lace ("BASE-ARUBA BLUE/LINE-PEACOCK BLUE"), marking the base colour as not required also silently marks the line colour, and `poItemStage` short-circuits to `production_pending` for the entire item (`yarn-store.ts:1365`), which is why the statuses look wrong.
 
-## Current state (verified)
+## Fix: make the override colour-scoped
 
-- `yarn.inwards.new.tsx` already matches a sample row to any order item with `approvalStatus !== "approved"`, so a redyed item **is** linked and mirrored into `yarn_sample_receipts` with the `[[soi:<itemId>]]` marker. That part works today.
-- The gap: the **Approvals Needed** queue in `yarn.sample-orders.index.tsx` skips any item whose status isn't `pending`, so a redyed item with a brand-new receipt never resurfaces — it stays stuck as "redye".
-- The gap: nothing records *when* a redye/approval decision was made (`approved_at` only, set on approve), so no timeline is reconstructible.
+**1. Migration (new file `docs/yarn-po-item-color-overrides.sql`)**
+- Add `color_name text NOT NULL DEFAULT ''` to `yarn_po_item_overrides`.
+- Drop the existing single-column primary key and recreate it as `(po_item_id, lower(color_name))` (unique index + surrogate `id`), keeping the FK cascade to `purchase_order_items`.
+- Existing rows keep `color_name = ''`, which is interpreted as "all colours of this item" so nothing changes retroactively; new writes always carry an explicit colour.
+- Re-apply grants and the existing RLS policies to the reshaped table.
 
-## 1. Approval event log (new table)
+**2. Store (`src/lib/yarn-store.ts`)**
+- Change `overrides` to `Record<string, PoItemOverride>` keyed by `` `${poItemId}::${colorKey}` `` (colour lower-cased/trimmed; legacy blank-colour rows map to the item-wide key `` `${poItemId}::*` ``).
+- Add helpers `isColorOverridden(s, poItemId, color)` (true if the exact colour key or the legacy item-wide key exists) and `itemOverriddenColors(s, item)`.
+- `setOverride(poItemId, color, override|null)` writes/deletes the colour-scoped row.
+- `poItemStage`: skip overridden colours; the item's stage is the least-advanced of the remaining colours; if *every* expanded colour is overridden, return `yarn_not_required`.
+- `poOverallStage`: same per-colour skipping instead of skipping whole items.
 
-New file `docs/yarn-sample-timeline.sql` (run manually, like the other yarn migrations):
+**3. Procurement UI (`yarn.production-orders.new.tsx`)**
+- Move the toggle so it operates on the colour group's colour: `OverrideToggle` takes `poItemId` + `colorName` and shows "Mark Yarn Not Required" / "Clear override" for that colour only.
+- Show a small "Yarn Not Required" badge on the colour group header when every item in that group is overridden for that colour, and hide the "Order" button in that state.
 
-```
-yarn_sample_approval_events
-  id, order_id, item_id, event ('received'|'approved'|'redye'|'reverted'),
-  shade_id (nullable), supplier_shade_number, lot_number, note,
-  created_at, created_by
-```
-plus grants for `authenticated`/`service_role`, RLS enabled, permissive read + write policies matching the other yarn tables.
+**4. Downstream consumers of the override**
+- `src/lib/production-store.ts` (`poProgress`, `poRawMaterialSummary`) — exclude an item from progress only when *all* its colours are overridden; exclude individual colour lines from the raw-material summary.
+- `src/lib/production-slip.ts` and `src/routes/_authenticated/production.$id.tsx` — the item's "Yarn Not Required" marker becomes per-colour text (e.g. "Yarn Not Required: PEACOCK BLUE") instead of blanking the whole row.
 
-## 2. Store changes (`src/lib/yarn-store.ts`)
+## Notes
 
-- Load events in `hydrate()`/`refresh()`, attach to each sample order as `order.events`.
-- `addInward`: when a sample row links to an item whose status is `redye`, reset that item to `approval_status = 'pending'` (clear `approved_shade_id`/`approved_at`) so it re-enters the queue; log a `received` event carrying the shade #, lot and receipt date for every mirrored sample receipt.
-- `approveSampleItem` → log `approved` (with the shade id it created/reused).
-- `redyeSampleItem` → log `redye`.
-- `revertSampleItemApproval` (the Undo added earlier) → log `reverted`.
-- `deleteInward` → delete the `received` events tied to the removed sample receipts, and if the item was flipped back to pending by that inward, leave it pending (already the safest state).
-
-## 3. UI
-
-**`yarn.sample-orders.index.tsx`** — Approvals Needed queue: keep surfacing `pending` items, which now naturally includes redyed items that received a fresh sample. Add a small "Round 2/3…" indicator derived from the count of `received` events for that item, so approvers know it's a resample.
-
-**`yarn.sample-orders.$id.index.tsx`** —
-- Receipts table gains a **Round** column (nth receipt for that item) and an **Outcome** column (approved / redye / awaiting) resolved from the event immediately following that receipt.
-- New **Timeline** card below Receipts: one chronological list per item, e.g.
-  ```
-  ARUBA BLUE (Cotton)
-    12 Jul 2026  Sample received — shade AB-114, lot 22       (round 1)
-    14 Jul 2026  Re-dye requested
-    26 Jul 2026  Sample received — shade AB-119, lot 31       (round 2)
-    28 Jul 2026  Approved — added to Shade Library as AB-119
-  ```
-
-## Technical notes
-
-- Events are append-only and keyed to `item_id`, so re-dye rounds are countable without touching the existing status enum.
-- Existing orders have no events; the timeline falls back to showing receipts alone plus `approved_at` where present, so nothing breaks for historical data.
-
-## Verification
-
-- Redye an item → it leaves the queue. Record a new Yarn Inward for the same colour/supplier → it links to the same SYO, appears as a second receipt, and the item is back in Approvals Needed marked round 2.
-- Approve it → timeline shows received → redye → received → approved with dates.
-- Delete the second inward → its receipt and `received` event disappear; earlier history stays intact.
+The migration must be run in the Supabase SQL editor before the new UI behaves correctly; until then the app reads legacy item-wide rows and keeps working as today.
