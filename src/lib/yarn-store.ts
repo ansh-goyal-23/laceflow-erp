@@ -88,6 +88,18 @@ export function sampleExpectedDelivery(orderDate: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Display status for a sample order, derived from its item approvals. */
+export function sampleOrderDisplayStatus(o: SampleYarnOrder): string {
+  const items = o.items ?? [];
+  if (items.length > 0 && o.status !== "cancelled") {
+    if (items.every((i) => i.approvalStatus === "approved")) return "Approved";
+    const pending = items.some((i) => i.approvalStatus === "pending");
+    if (o.status === "received" && pending) return "Approval Needed";
+    if (!pending && items.some((i) => i.approvalStatus === "redye")) return "Redye Pending";
+  }
+  return o.status.charAt(0).toUpperCase() + o.status.slice(1);
+}
+
 export interface ProductionYarnOrderItem {
   id: string;
   poId: string;
