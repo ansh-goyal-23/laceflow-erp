@@ -53,26 +53,31 @@ function NewProdOrder() {
   const [pickPOOpen, setPickPOOpen] = useState(false);
   const [activePOId, setActivePOId] = useState<string | null>(null);
   const [poSearch, setPoSearch] = useState("");
+  const [onlyAwaiting, setOnlyAwaiting] = useState(false);
   const [addShadeOpen, setAddShadeOpen] = useState<number | null>(null);
   const [newShadeNo, setNewShadeNo] = useState("");
 
   const cName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
   const activePO = activePOId ? pos.find((p) => p.id === activePOId) : null;
 
-  // Eligible POs: overall stage ∈ {in_sampling, waiting_for_yarn_order}
   const eligiblePOs = useMemo(() => {
     const rows = pos
       .filter((p) => p.status === "open")
-      .map((p) => ({ po: p, stage: poOverallStage(yarn, p), days: daysRemaining(p.deliveryDate) }))
-      .filter((r) => r.stage === "waiting_for_yarn_order" || r.stage === "in_sampling");
+      .map((p) => ({ po: p, stage: poOverallStage(yarn, p), days: daysRemaining(p.deliveryDate) }));
+    const isAwaiting = (s: ProcurementStage) =>
+      s === "waiting_for_yarn_order" || s === "in_sampling";
     rows.sort((a, b) => {
+      const aa = isAwaiting(a.stage) ? 0 : 1;
+      const ba = isAwaiting(b.stage) ? 0 : 1;
+      if (aa !== ba) return aa - ba;
+      if (aa === 1) return (a.po.deliveryDate ?? "").localeCompare(b.po.deliveryDate ?? "");
       const ag = a.days < 0 ? 0 : a.days <= 10 ? 1 : 2;
       const bg = b.days < 0 ? 0 : b.days <= 10 ? 1 : 2;
       if (ag !== bg) return ag - bg;
       return a.days - b.days;
     });
-    return rows;
-  }, [pos, yarn]);
+    return onlyAwaiting ? rows.filter((r) => isAwaiting(r.stage)) : rows;
+  }, [pos, yarn, onlyAwaiting]);
 
   const filteredEligiblePOs = useMemo(() => {
     const q = poSearch.trim().toLowerCase();
@@ -473,13 +478,20 @@ function NewProdOrder() {
       {/* Pick PO dialog */}
       <Dialog open={pickPOOpen} onOpenChange={setPickPOOpen}>
         <DialogContent className="max-w-3xl">
-          <DialogHeader><DialogTitle>Add PO — eligible POs</DialogTitle></DialogHeader>
-          <Input
-            placeholder="Search by PO #, client, or date..."
-            value={poSearch}
-            onChange={(e) => setPoSearch(e.target.value)}
-            className="mb-2"
-          />
+          <DialogHeader><DialogTitle>Add PO — open POs</DialogTitle></DialogHeader>
+          <div className="flex items-center gap-3 mb-2">
+            <Input
+              placeholder="Search by PO #, client, or date..."
+              value={poSearch}
+              onChange={(e) => setPoSearch(e.target.value)}
+            />
+            <div className="flex items-center gap-2 shrink-0">
+              <Switch id="only-awaiting" checked={onlyAwaiting} onCheckedChange={setOnlyAwaiting} />
+              <Label htmlFor="only-awaiting" className="text-xs whitespace-nowrap">
+                Only POs awaiting yarn order
+              </Label>
+            </div>
+          </div>
           <div className="max-h-[500px] overflow-y-auto rounded-md border">
             <Table>
               <TableHeader className="sticky top-0 bg-background"><TableRow>
@@ -489,7 +501,7 @@ function NewProdOrder() {
               </TableRow></TableHeader>
               <TableBody>
                 {filteredEligiblePOs.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">No eligible POs.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">No POs found.</TableCell></TableRow>
                 ) : filteredEligiblePOs.map(({ po, stage, days }) => (
                   <TableRow key={po.id} className={days < 0 ? "bg-red-50 dark:bg-red-950/20" : days <= 10 ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
                     <TableCell>{cName(po.clientId)}</TableCell>
