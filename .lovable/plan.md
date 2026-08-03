@@ -1,47 +1,60 @@
 ## Goal
 
-1. Undo a mistaken Approve/Redye from the Sample Yarn Order detail page — including reverting the shade that approval created in the Shade Library, with warnings if that shade is referenced elsewhere.
-2. Show a Sample Yarn Order as **Approved** on the list page once every item in it is approved.
+When a sample is rejected (**redye**), the dyer sends a fresh sample against the *same* sample order. Recording that Yarn Inward must:
 
-## 1. Undo approve / redye (with shade revert)
+1. Auto-link to the redyed item on that order (not create an orphan row),
+2. Put the item back into the **Approvals Needed** queue,
+3. Leave a permanent, readable history: every sample received (date, shade #, lot, weight) and every decision (approved / redye / undo) with dates, so anyone can later see how many rounds a colour took.
 
-**Store (`src/lib/yarn-store.ts`)**
-- Add `sampleItemUndoInfo(orderId, itemId)` — a read-only helper returning:
-  - the shade linked via `approvedShadeId`
-  - whether that shade was created by this approval or pre-existed (matched by `ensureShade`'s key: client + brand + color + material + supplier + supplier shade #)
-  - a list of other references to that shade: other sample order items and production order items whose `approved_shade_id` points at it (both tables carry that column)
-- Add `revertSampleItemApproval(orderId, itemId, { deleteShade })`:
-  - set the item's `approval_status = 'pending'`, clear `approved_shade_id` and `approved_at`
-  - if `deleteShade` and no other rows reference the shade → delete it from `yarn_shades`
-  - if other references exist → never delete; leave the shade intact
-  - refresh state
-- Redye undo simply resets `approval_status` to `pending` (no shade involved).
+## Current state (verified)
 
-**Detail page (`src/routes/_authenticated/yarn.sample-orders.$id.index.tsx`)**
-- Next to the Approval badge, show an **Undo** button for items whose status is `approved` or `redye`.
-- Clicking opens a confirm dialog that, for approved items, states what will happen to the shade:
-  - shade unreferenced → "Shade `<supplier shade #>` will be removed from the Shade Library."
-  - shade referenced elsewhere → warning listing the referencing orders: "Shade `<...>` is used by PYO-0012, SYO-0007 and will be kept."
-- On confirm, call the store fn and toast the outcome; the item reappears in the Approvals Needed queue.
+- `yarn.inwards.new.tsx` already matches a sample row to any order item with `approvalStatus !== "approved"`, so a redyed item **is** linked and mirrored into `yarn_sample_receipts` with the `[[soi:<itemId>]]` marker. That part works today.
+- The gap: the **Approvals Needed** queue in `yarn.sample-orders.index.tsx` skips any item whose status isn't `pending`, so a redyed item with a brand-new receipt never resurfaces — it stays stuck as "redye".
+- The gap: nothing records *when* a redye/approval decision was made (`approved_at` only, set on approve), so no timeline is reconstructible.
 
-## 2. Order status reflects full approval
+## 1. Approval event log (new table)
 
-**Shared helper in `src/lib/yarn-store.ts`** — `sampleOrderDisplayStatus(order)`:
-- all items `approved` → **Approved**
-- stored status `received` with any item `pending` → **Approval Needed**
-- any item `redye`, none pending → **Redye Pending**
-- otherwise the existing label (Draft / Ordered / Completed / Cancelled)
+New file `docs/yarn-sample-timeline.sql` (run manually, like the other yarn migrations):
 
-Use it in `yarn.sample-orders.index.tsx` (replacing the local `statusLabel`) and in the detail header so both screens agree.
+```
+yarn_sample_approval_events
+  id, order_id, item_id, event ('received'|'approved'|'redye'|'reverted'),
+  shade_id (nullable), supplier_shade_number, lot_number, note,
+  created_at, created_by
+```
+plus grants for `authenticated`/`service_role`, RLS enabled, permissive read + write policies matching the other yarn tables.
+
+## 2. Store changes (`src/lib/yarn-store.ts`)
+
+- Load events in `hydrate()`/`refresh()`, attach to each sample order as `order.events`.
+- `addInward`: when a sample row links to an item whose status is `redye`, reset that item to `approval_status = 'pending'` (clear `approved_shade_id`/`approved_at`) so it re-enters the queue; log a `received` event carrying the shade #, lot and receipt date for every mirrored sample receipt.
+- `approveSampleItem` → log `approved` (with the shade id it created/reused).
+- `redyeSampleItem` → log `redye`.
+- `revertSampleItemApproval` (the Undo added earlier) → log `reverted`.
+- `deleteInward` → delete the `received` events tied to the removed sample receipts, and if the item was flipped back to pending by that inward, leave it pending (already the safest state).
+
+## 3. UI
+
+**`yarn.sample-orders.index.tsx`** — Approvals Needed queue: keep surfacing `pending` items, which now naturally includes redyed items that received a fresh sample. Add a small "Round 2/3…" indicator derived from the count of `received` events for that item, so approvers know it's a resample.
+
+**`yarn.sample-orders.$id.index.tsx`** —
+- Receipts table gains a **Round** column (nth receipt for that item) and an **Outcome** column (approved / redye / awaiting) resolved from the event immediately following that receipt.
+- New **Timeline** card below Receipts: one chronological list per item, e.g.
+  ```
+  ARUBA BLUE (Cotton)
+    12 Jul 2026  Sample received — shade AB-114, lot 22       (round 1)
+    14 Jul 2026  Re-dye requested
+    26 Jul 2026  Sample received — shade AB-119, lot 31       (round 2)
+    28 Jul 2026  Approved — added to Shade Library as AB-119
+  ```
 
 ## Technical notes
 
-- No schema change: "Approved" is derived from `yarn_sample_order_items.approval_status`, avoiding a Postgres enum alteration on `yarn_sample_orders.status`.
-- Both `yarn_sample_order_items.approved_shade_id` and `yarn_production_order_items.approved_shade_id` are `ON DELETE SET NULL`, so a stray delete would silently unlink other orders — hence the reference check gates deletion rather than relying on the FK.
+- Events are append-only and keyed to `item_id`, so re-dye rounds are countable without touching the existing status enum.
+- Existing orders have no events; the timeline falls back to showing receipts alone plus `approved_at` where present, so nothing breaks for historical data.
 
 ## Verification
 
-- Approve all items in an SYO → list badge reads "Approved".
-- Undo an approval whose shade is unused → item back to pending, shade gone from the Shade Library.
-- Undo an approval whose shade is used by another order → warning names that order, shade retained, item still reverted.
-- Undo a redye item → resets to pending and reappears in Approvals Needed.
+- Redye an item → it leaves the queue. Record a new Yarn Inward for the same colour/supplier → it links to the same SYO, appears as a second receipt, and the item is back in Approvals Needed marked round 2.
+- Approve it → timeline shows received → redye → received → approved with dates.
+- Delete the second inward → its receipt and `received` event disappear; earlier history stays intact.

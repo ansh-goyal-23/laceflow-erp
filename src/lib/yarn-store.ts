@@ -69,6 +69,22 @@ export interface SampleYarnReceipt {
 
 export type SampleOrderStatus = "draft" | "ordered" | "received" | "completed" | "cancelled";
 
+export type SampleEventType = "received" | "approved" | "redye" | "reverted";
+
+export interface SampleApprovalEvent {
+  id: string;
+  orderId: string;
+  itemId?: string | null;
+  receiptId?: string | null;
+  event: SampleEventType;
+  eventDate: string;
+  shadeId?: string | null;
+  supplierShadeNumber?: string;
+  lotNumber?: string;
+  note?: string;
+  createdAt: string;
+}
+
 export interface SampleYarnOrder {
   id: string;
   number: string;
@@ -79,6 +95,7 @@ export interface SampleYarnOrder {
   status: SampleOrderStatus;
   items: SampleYarnOrderItem[];
   receipts: SampleYarnReceipt[];
+  events: SampleApprovalEvent[];
   createdAt: string;
 }
 
@@ -284,6 +301,50 @@ function mapSampleReceipt(r: any): SampleYarnReceipt {
   };
 }
 
+function mapSampleEvent(r: any): SampleApprovalEvent {
+  return {
+    id: r.id,
+    orderId: r.order_id,
+    itemId: r.item_id ?? null,
+    receiptId: r.receipt_id ?? null,
+    event: r.event,
+    eventDate: r.event_date,
+    shadeId: r.shade_id ?? null,
+    supplierShadeNumber: r.supplier_shade_number ?? undefined,
+    lotNumber: r.lot_number ?? undefined,
+    note: r.note ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+/** Append to the sample approval timeline. Never fatal: the timeline is
+ *  additive history, so a missing table must not break the main workflow. */
+async function logSampleEvents(rows: Array<{
+  orderId: string; itemId?: string | null; receiptId?: string | null;
+  event: SampleEventType; eventDate?: string; shadeId?: string | null;
+  supplierShadeNumber?: string; lotNumber?: string; note?: string;
+}>): Promise<void> {
+  if (!rows.length) return;
+  try {
+    const { error } = await supabase.from("yarn_sample_approval_events").insert(
+      rows.map((r) => ({
+        order_id: r.orderId,
+        item_id: r.itemId ?? null,
+        receipt_id: r.receiptId ?? null,
+        event: r.event,
+        event_date: r.eventDate ?? todayISO(),
+        shade_id: r.shadeId ?? null,
+        supplier_shade_number: r.supplierShadeNumber ?? null,
+        lot_number: r.lotNumber ?? null,
+        note: r.note ?? null,
+      })),
+    );
+    if (error) console.warn("[yarn-store] sample event log failed:", error.message);
+  } catch (e) {
+    console.warn("[yarn-store] sample event log failed:", e);
+  }
+}
+
 function mapProdItem(r: any): ProductionYarnOrderItem {
   return {
     id: r.id,
@@ -375,6 +436,18 @@ async function hydrate(): Promise<void> {
       const arr = recByOrder.get(r.order_id) ?? [];
       arr.push(it); recByOrder.set(r.order_id, arr);
     }
+    // Timeline events live in a table that may not exist yet on older
+    // deployments — fetch separately and degrade to an empty timeline.
+    const evByOrder = new Map<string, SampleApprovalEvent[]>();
+    try {
+      const ev = await supabase.from("yarn_sample_approval_events").select("*")
+        .order("created_at", { ascending: true });
+      for (const r of ev.data ?? []) {
+        const it = mapSampleEvent(r);
+        const arr = evByOrder.get(r.order_id) ?? [];
+        arr.push(it); evByOrder.set(r.order_id, arr);
+      }
+    } catch { /* table missing — no timeline */ }
     const sampleOrders: SampleYarnOrder[] = (so.data ?? []).map((r: any) => ({
       id: r.id,
       number: r.number,
@@ -385,6 +458,7 @@ async function hydrate(): Promise<void> {
       status: r.status,
       items: itemsByOrder.get(r.id) ?? [],
       receipts: recByOrder.get(r.id) ?? [],
+      events: evByOrder.get(r.id) ?? [],
       createdAt: r.created_at,
     }));
 
@@ -692,12 +766,17 @@ export const yarnStore = {
       approved_shade_id: shade.id,
       approved_at: new Date().toISOString(),
     }).eq("id", itemId));
+    await logSampleEvents([{
+      orderId, itemId, event: "approved", shadeId: shade.id,
+      supplierShadeNumber,
+    }]);
     await refresh();
     return shade;
   },
-  async redyeSampleItem(_orderId: string, itemId: string) {
+  async redyeSampleItem(orderId: string, itemId: string) {
     throwIfError(await supabase.from("yarn_sample_order_items")
       .update({ approval_status: "redye" }).eq("id", itemId));
+    await logSampleEvents([{ orderId, itemId, event: "redye" }]);
     await refresh();
   },
   /** Read-only info about what undoing an approval would affect. */
@@ -736,6 +815,10 @@ export const yarnStore = {
       throwIfError(await supabase.from("yarn_shades").delete().eq("id", shade.id));
       shadeDeleted = true;
     }
+    await logSampleEvents([{
+      orderId, itemId, event: "reverted",
+      note: shadeDeleted ? `Shade ${shade?.supplierShadeNumber ?? ""} removed from library` : undefined,
+    }]);
     await refresh();
     return { shadeDeleted };
   },
@@ -890,7 +973,7 @@ export const yarnStore = {
     // sees the physical arrival and the two records can be matched later.
     const sampleRows = input.items.filter((i) => i.sampleOrderId);
     if (sampleRows.length) {
-      throwIfError(await supabase.from("yarn_sample_receipts").insert(
+      const inserted = throwIfError(await supabase.from("yarn_sample_receipts").insert(
         sampleRows.map((i) => ({
           order_id: i.sampleOrderId,
           receipt_date: input.inwardDate,
@@ -902,12 +985,36 @@ export const yarnStore = {
             ? `[[soi:${i.sampleOrderItemId}]]${i.remarks ? " " + i.remarks : ""}`
             : (i.remarks || null),
         })),
-      ));
+      ).select("id")) as Array<{ id: string }>;
       const orderIds = Array.from(new Set(sampleRows.map((i) => i.sampleOrderId!)));
       throwIfError(
         await supabase.from("yarn_sample_orders")
           .update({ status: "received" }).in("id", orderIds),
       );
+      // A re-dyed item that receives a fresh sample goes back into the
+      // Approvals Needed queue for the new round.
+      const redyeItemIds = sampleRows
+        .map((i) => i.sampleOrderItemId)
+        .filter((id): id is string => {
+          if (!id) return false;
+          const it = state.sampleOrders
+            .find((o) => o.items.some((x) => x.id === id))?.items.find((x) => x.id === id);
+          return it?.approvalStatus === "redye";
+        });
+      if (redyeItemIds.length) {
+        throwIfError(await supabase.from("yarn_sample_order_items").update({
+          approval_status: "pending", approved_shade_id: null, approved_at: null,
+        }).in("id", Array.from(new Set(redyeItemIds))));
+      }
+      await logSampleEvents(sampleRows.map((i, idx) => ({
+        orderId: i.sampleOrderId!,
+        itemId: i.sampleOrderItemId ?? null,
+        receiptId: inserted?.[idx]?.id ?? null,
+        event: "received" as const,
+        eventDate: input.inwardDate,
+        supplierShadeNumber: i.supplierShadeNumber,
+        lotNumber: i.lotNumber || undefined,
+      })));
     }
     await refresh();
     return state.inwards.find((r) => r.id === header.id)!;

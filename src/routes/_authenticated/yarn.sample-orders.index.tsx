@@ -89,6 +89,7 @@ function SampleOrdersList() {
       supplierShadeNumber: string;
       receiptDate: string; netWeight: number;
       daysSince: number;
+      round: number;
     }> = [];
     for (const o of orders) {
       if (o.status !== "received") continue;
@@ -102,8 +103,9 @@ function SampleOrdersList() {
           : undefined;
         if (!target && o.items.length === 1) target = o.items[0];
         if (!target || target.approvalStatus !== "pending") continue;
-        // Skip duplicates if the same item was already added from an earlier receipt.
-        if (list.some((r) => r.orderId === o.id && r.itemId === target!.id)) continue;
+        // Same item may have several receipts (re-dye rounds) — keep the latest.
+        const existingIdx = list.findIndex((r) => r.orderId === o.id && r.itemId === target!.id);
+        if (existingIdx >= 0 && list[existingIdx].receiptDate >= receipt.receiptDate) continue;
         // Prefer exact net from the mirrored inward item.
         let inwNet: number | undefined;
         for (const iw of inwards) {
@@ -117,7 +119,8 @@ function SampleOrdersList() {
           if (cand) { inwNet = cand.netWeight; break; }
         }
         const net = inwNet ?? Math.max(0, receipt.grossWeight - receipt.cones * tube);
-        list.push({
+        const round = (o.events ?? []).filter((e) => e.event === "received" && e.itemId === target!.id).length || 1;
+        const row = {
           orderId: o.id, orderNumber: o.number,
           supplier: sName(o.supplierId),
           client: cName(target.clientId), brand: bName(target.brandId),
@@ -127,7 +130,9 @@ function SampleOrdersList() {
           receiptDate: receipt.receiptDate,
           netWeight: net,
           daysSince: daysSince(receipt.receiptDate),
-        });
+          round,
+        };
+        if (existingIdx >= 0) list[existingIdx] = row; else list.push(row);
       }
     }
     return list.sort((a, b) => b.daysSince - a.daysSince);
@@ -230,6 +235,7 @@ function SampleOrdersList() {
                   <TableHead>Linked PO</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Material</TableHead>
+                  <TableHead>Round</TableHead>
                   <TableHead>Shade #</TableHead>
                   <TableHead>Receipt Date</TableHead>
                   <TableHead>Net (Kg)</TableHead>
@@ -238,7 +244,7 @@ function SampleOrdersList() {
                 </TableRow></TableHeader>
                 <TableBody>
                   {approvalRows.length === 0 ? (
-                    <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">No pending approvals.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={13} className="text-center py-8 text-muted-foreground">No pending approvals.</TableCell></TableRow>
                   ) : approvalRows.map((r) => (
                     <TableRow key={`${r.orderId}-${r.itemId}`}>
                       <TableCell className="font-mono">
@@ -250,6 +256,11 @@ function SampleOrdersList() {
                       <TableCell>{r.linkedPo}</TableCell>
                       <TableCell className="font-medium">{r.colorName}</TableCell>
                       <TableCell>{r.material}</TableCell>
+                      <TableCell>
+                        {r.round > 1
+                          ? <Badge variant="destructive">Round {r.round}</Badge>
+                          : <span className="text-muted-foreground">Round 1</span>}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{r.supplierShadeNumber || "—"}</TableCell>
                       <TableCell>{r.receiptDate}</TableCell>
                       <TableCell>{r.netWeight ? r.netWeight.toFixed(2) : "—"}</TableCell>
