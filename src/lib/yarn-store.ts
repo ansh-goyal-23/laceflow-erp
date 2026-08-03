@@ -766,12 +766,17 @@ export const yarnStore = {
       approved_shade_id: shade.id,
       approved_at: new Date().toISOString(),
     }).eq("id", itemId));
+    await logSampleEvents([{
+      orderId, itemId, event: "approved", shadeId: shade.id,
+      supplierShadeNumber,
+    }]);
     await refresh();
     return shade;
   },
-  async redyeSampleItem(_orderId: string, itemId: string) {
+  async redyeSampleItem(orderId: string, itemId: string) {
     throwIfError(await supabase.from("yarn_sample_order_items")
       .update({ approval_status: "redye" }).eq("id", itemId));
+    await logSampleEvents([{ orderId, itemId, event: "redye" }]);
     await refresh();
   },
   /** Read-only info about what undoing an approval would affect. */
@@ -810,6 +815,10 @@ export const yarnStore = {
       throwIfError(await supabase.from("yarn_shades").delete().eq("id", shade.id));
       shadeDeleted = true;
     }
+    await logSampleEvents([{
+      orderId, itemId, event: "reverted",
+      note: shadeDeleted ? `Shade ${shade?.supplierShadeNumber ?? ""} removed from library` : undefined,
+    }]);
     await refresh();
     return { shadeDeleted };
   },
