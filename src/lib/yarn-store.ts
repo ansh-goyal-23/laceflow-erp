@@ -1247,9 +1247,26 @@ export const yarnStore = {
         );
       }
     } else {
-      throwIfError(await supabase.from("yarn_po_item_overrides").upsert({
-        po_item_id: poItemId, color_name: color, override,
-      }, { onConflict: "po_item_id,color_name" }));
+      // No upsert here: the unique index may not exist yet on older databases,
+      // which makes ON CONFLICT fail. Check-then-write instead.
+      const rows = throwIfError(
+        await supabase.from("yarn_po_item_overrides").select("*").eq("po_item_id", poItemId),
+      ) as Array<{ po_item_id: string; color_name?: string | null }>;
+      const match = rows.find(
+        (r) => (r.color_name ?? "").trim().toLowerCase() === color.toLowerCase(),
+      );
+      if (match) {
+        throwIfError(
+          await supabase.from("yarn_po_item_overrides")
+            .update({ override })
+            .eq("po_item_id", poItemId)
+            .eq("color_name", match.color_name ?? ""),
+        );
+      } else {
+        throwIfError(await supabase.from("yarn_po_item_overrides").insert({
+          po_item_id: poItemId, color_name: color, override,
+        }));
+      }
     }
     await refresh();
   },
