@@ -320,7 +320,13 @@ function NewProdOrder() {
                               </Badge>
                             )}
                             <span className="text-xs text-muted-foreground">· {g.material}</span>
-                            <Badge className={STAGE_BADGE[g.stage]} variant="secondary">{STAGE_LABEL[g.stage]}</Badge>
+                            {g.notRequired ? (
+                              <Badge className={STAGE_BADGE["yarn_not_required"]} variant="secondary">
+                                {STAGE_LABEL["yarn_not_required"]}
+                              </Badge>
+                            ) : (
+                              <Badge className={STAGE_BADGE[g.stage]} variant="secondary">{STAGE_LABEL[g.stage]}</Badge>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             Ordered: <span className="font-medium text-foreground">{g.orderedQty.toFixed(2)} Kg</span>
@@ -330,9 +336,11 @@ function NewProdOrder() {
                             {g.items.length} item{g.items.length === 1 ? "" : "s"}
                           </div>
                         </div>
-                        <Button size="sm" variant="outline" onClick={() => addLine(activePO, g.color, g.material)}>
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Order
-                        </Button>
+                        {!g.notRequired && (
+                          <Button size="sm" variant="outline" onClick={() => addLine(activePO, g.color, g.material)}>
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Order
+                          </Button>
+                        )}
                       </div>
                       {isOpen && (
                         <div className="ml-7 mt-2 rounded-md border bg-muted/30">
