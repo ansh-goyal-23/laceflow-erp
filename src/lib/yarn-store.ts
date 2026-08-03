@@ -507,7 +507,10 @@ async function hydrate(): Promise<void> {
     }));
 
     const overrides: Record<string, PoItemOverride> = {};
-    for (const r of ov.data ?? []) overrides[r.po_item_id] = r.override;
+    for (const r of ov.data ?? []) {
+      const color = ((r as { color_name?: string | null }).color_name ?? "").trim();
+      overrides[overrideKey(r.po_item_id, color)] = r.override;
+    }
 
     set({
       suppliers: (sup.data ?? []).map(mapSupplier),
