@@ -140,21 +140,6 @@ function SampleOrderDetail() {
                       {it.approvalStatus}
                     </Badge>
                   </TableCell>
-                  <TableCell className="print:hidden">
-                    {it.approvalStatus === "pending" && (
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" onClick={() => { setApproveFor(it.id); setShadeNo(""); }}>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={async () => {
-                          try { await yarnStore.redyeSampleItem(order.id, it.id); toast.success("Marked for re-dye"); }
-                          catch (e) { toast.error((e as Error).message); }
-                        }}>
-                          <RefreshCw className="h-3.5 w-3.5 mr-1" /> Redye
-                        </Button>
-                      </div>
-                    )}
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
