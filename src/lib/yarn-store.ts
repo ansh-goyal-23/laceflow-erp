@@ -1208,13 +1208,46 @@ export const yarnStore = {
   },
 
   // ---------- Overrides ----------
-  async setOverride(poItemId: string, override: PoItemOverride | null) {
+  /**
+   * Set/clear the override for one colour of a PO item. Clearing also removes
+   * any legacy item-wide row so a single colour can be un-marked.
+   */
+  async setOverride(poItemId: string, colorName: string, override: PoItemOverride | null) {
+    const color = (colorName ?? "").trim();
     if (override === null) {
-      throwIfError(await supabase.from("yarn_po_item_overrides").delete().eq("po_item_id", poItemId));
+      const rows = throwIfError(
+        await supabase.from("yarn_po_item_overrides").select("*").eq("po_item_id", poItemId),
+      ) as Array<{ id?: string; po_item_id: string; color_name?: string | null }>;
+      const legacy = rows.filter((r) => !((r.color_name ?? "").trim()));
+      const exact = rows.filter(
+        (r) => (r.color_name ?? "").trim().toLowerCase() === color.toLowerCase(),
+      );
+      // Expand a legacy item-wide row into per-colour rows for the other colours.
+      if (legacy.length) {
+        const item = findPoItem(poItemId);
+        const others = item
+          ? expandPoColors(item.color)
+              .map((c) => c.name)
+              .filter((n) => n.trim().toLowerCase() !== color.toLowerCase())
+          : [];
+        throwIfError(
+          await supabase.from("yarn_po_item_overrides").delete().eq("po_item_id", poItemId).eq("color_name", ""),
+        );
+        if (others.length) {
+          throwIfError(await supabase.from("yarn_po_item_overrides").insert(
+            others.map((n) => ({ po_item_id: poItemId, color_name: n, override: "yarn_not_required" as const })),
+          ));
+        }
+      }
+      if (exact.length) {
+        throwIfError(
+          await supabase.from("yarn_po_item_overrides").delete().eq("po_item_id", poItemId).eq("color_name", (exact[0].color_name ?? "")),
+        );
+      }
     } else {
       throwIfError(await supabase.from("yarn_po_item_overrides").upsert({
-        po_item_id: poItemId, override,
-      }, { onConflict: "po_item_id" }));
+        po_item_id: poItemId, color_name: color, override,
+      }, { onConflict: "po_item_id,color_name" }));
     }
     await refresh();
   },
