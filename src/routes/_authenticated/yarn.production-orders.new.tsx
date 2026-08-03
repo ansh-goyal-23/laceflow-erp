@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, expandPoColors, type ProcurementStage } from "@/lib/yarn-store";
+import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, expandPoColors, isColorOverridden, type ProcurementStage } from "@/lib/yarn-store";
 import { useStore, type PurchaseOrder } from "@/lib/store";
 import { daysRemaining, daysRemainingLabel } from "@/lib/reports";
 import { toast } from "sonner";
@@ -349,7 +349,13 @@ function NewProdOrder() {
                                   <TableCell>{it.width}×{it.length}</TableCell>
                                   <TableCell>{it.quantity}</TableCell>
                                   <TableCell>{it.uom}</TableCell>
-                                  <TableCell><OverrideToggle poItemId={it.id} current={g.stage} /></TableCell>
+                                  <TableCell>
+                                    <OverrideToggle
+                                      poItemId={it.id}
+                                      colorName={g.color}
+                                      itemColors={expandPoColors(it.color).map((c) => c.name)}
+                                    />
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
