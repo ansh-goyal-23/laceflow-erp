@@ -205,20 +205,6 @@ function SampleOrderDetail() {
         </Card>
       )}
 
-      <Dialog open={!!approveFor} onOpenChange={(o) => !o && setApproveFor(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Approve Sample</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <Label>Supplier Shade # *</Label>
-            <Input value={shadeNo} onChange={(e) => setShadeNo(e.target.value)} placeholder="e.g. RED-2314" />
-            <p className="text-xs text-muted-foreground">Approving will add this shade to the Shade Library.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveFor(null)}>Cancel</Button>
-            <Button onClick={doApprove}>Approve</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={rcpOpen} onOpenChange={setRcpOpen}>
         <DialogContent>
