@@ -1406,27 +1406,49 @@ export function calculateProcurementStage(
   return "production_pending";
 }
 
+/** True when yarn is marked "not required" for this specific colour of a PO item. */
+export function isColorOverridden(s: StoreShape, poItemId: string, color: string): boolean {
+  return (
+    s.overrides[overrideKey(poItemId, color)] === "yarn_not_required" ||
+    s.overrides[overrideKey(poItemId, "")] === "yarn_not_required"
+  );
+}
+
+/** Colours of a PO item that are marked "yarn not required". */
+export function itemOverriddenColors(s: StoreShape, item: POLineItem): string[] {
+  return expandPoColors(item.color)
+    .map((c) => c.name)
+    .filter((n) => isColorOverridden(s, item.id, n));
+}
+
+/** True when every expanded colour of the item is overridden. */
+export function isItemFullyOverridden(s: StoreShape, item: POLineItem): boolean {
+  const colors = expandPoColors(item.color).map((c) => c.name);
+  return colors.length > 0 && colors.every((n) => isColorOverridden(s, item.id, n));
+}
+
 export function poItemStage(
   s: StoreShape, po: PurchaseOrder, item: POLineItem,
 ): ProcurementStage {
-  // "Yarn Not Required" means procurement is complete for this item — treat as In Production.
-  if (s.overrides[item.id] === "yarn_not_required") return "production_pending";
   // A single PO item may reference a base + line color (e.g. "LIMPET / LINE ORANGE").
-  // Its overall stage is the least-advanced of its expanded colors.
+  // Its overall stage is the least-advanced of its expanded colors, ignoring any
+  // colour explicitly marked "Yarn Not Required".
   let best = 999;
   for (const c of expandPoColors(item.color)) {
+    if (isColorOverridden(s, item.id, c.name)) continue;
     const st = calculateProcurementStage(s, po.id, item.materialType, c.name);
     const idx = STAGE_PRIORITY.indexOf(st);
     if (idx >= 0 && idx < best) best = idx;
   }
-  return best === 999 ? "waiting_for_yarn_order" : STAGE_PRIORITY[best];
+  if (best !== 999) return STAGE_PRIORITY[best];
+  return isItemFullyOverridden(s, item) ? "yarn_not_required" : "waiting_for_yarn_order";
 }
 
 export function poOverallStage(s: StoreShape, po: PurchaseOrder): ProcurementStage {
   let best = 999;
   for (const it of po.items) {
-    if (s.overrides[it.id] === "yarn_not_required") continue;
     for (const c of expandPoColors(it.color)) {
+      if (isColorOverridden(s, it.id, c.name)) continue;
       const st = calculateProcurementStage(s, po.id, it.materialType, c.name);
       const idx = STAGE_PRIORITY.indexOf(st);
       if (idx >= 0 && idx < best) best = idx;
