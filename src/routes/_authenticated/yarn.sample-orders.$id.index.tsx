@@ -96,6 +96,37 @@ function SampleOrderDetail() {
     } catch (e) { toast.error((e as Error).message); }
   };
 
+  const events = order.events ?? [];
+  const itemLabel = (itemId?: string | null) => {
+    const it = order.items.find((i) => i.id === itemId);
+    return it ? `${it.colorName} (${it.material})` : "—";
+  };
+  // Round = nth sample received for that item (1-based).
+  const roundOf = (receiptId: string): number | null => {
+    const ev = events.find((e) => e.event === "received" && e.receiptId === receiptId);
+    if (!ev) return null;
+    const sameItem = events.filter((e) => e.event === "received" && e.itemId === ev.itemId);
+    const idx = sameItem.findIndex((e) => e.receiptId === receiptId);
+    return idx >= 0 ? idx + 1 : null;
+  };
+  // Outcome = first decision recorded after that receipt for the same item.
+  const outcomeOf = (receiptId: string): "approved" | "redye" | "reverted" | null => {
+    const i = events.findIndex((e) => e.event === "received" && e.receiptId === receiptId);
+    if (i < 0) return null;
+    const ev = events[i];
+    const next = events.slice(i + 1).find((e) => e.itemId === ev.itemId && e.event !== "received");
+    return next ? (next.event as "approved" | "redye" | "reverted") : null;
+  };
+  const timelineByItem = order.items
+    .map((it) => ({ item: it, evs: events.filter((e) => e.itemId === it.id) }))
+    .filter((g) => g.evs.length > 0);
+  const eventText = (e: (typeof events)[number]) => {
+    if (e.event === "received") return `Sample received${e.supplierShadeNumber ? ` — shade ${e.supplierShadeNumber}` : ""}${e.lotNumber ? `, lot ${e.lotNumber}` : ""}`;
+    if (e.event === "approved") return `Approved${e.supplierShadeNumber ? ` — added to Shade Library as ${e.supplierShadeNumber}` : ""}`;
+    if (e.event === "redye") return "Re-dye requested";
+    return `Approval undone${e.note ? ` — ${e.note}` : ""}`;
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-6xl space-y-4 print:p-0 print:max-w-none">
       <div className="print:hidden">
@@ -175,11 +206,13 @@ function SampleOrderDetail() {
                 <TableHead>Receipt Date</TableHead>
                 <TableHead>Inward #</TableHead>
                 <TableHead>Color</TableHead>
+                <TableHead>Round</TableHead>
                 <TableHead>Shade #</TableHead>
                 <TableHead>Lot</TableHead>
                 <TableHead>Gross (Kg)</TableHead>
                 <TableHead>Cones</TableHead>
                 <TableHead>Net (Kg)</TableHead>
+                <TableHead>Outcome</TableHead>
                 <TableHead>Remarks</TableHead>
               </TableRow></TableHeader>
               <TableBody>
@@ -209,17 +242,48 @@ function SampleOrderDetail() {
                         {inw ? <Link to="/yarn/inwards/$id" params={{ id: inw.id }} className="hover:underline">{inw.number}</Link> : "—"}
                       </TableCell>
                       <TableCell className="font-medium">{colorName || "—"}</TableCell>
+                      <TableCell>{roundOf(r.id) ? `Round ${roundOf(r.id)}` : "—"}</TableCell>
                       <TableCell className="font-mono text-xs">{r.supplierShadeNumber || "—"}</TableCell>
                       <TableCell>{r.lotNumber || "—"}</TableCell>
                       <TableCell>{r.grossWeight}</TableCell>
                       <TableCell>{r.cones}</TableCell>
                       <TableCell>{inwItem ? inwItem.netWeight.toFixed(2) : "—"}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const o = outcomeOf(r.id);
+                          if (!o) return <Badge variant="secondary">awaiting</Badge>;
+                          if (o === "approved") return <Badge>approved</Badge>;
+                          if (o === "redye") return <Badge variant="destructive">redye</Badge>;
+                          return <Badge variant="outline">undone</Badge>;
+                        })()}
+                      </TableCell>
                       <TableCell>{r.remarks || "—"}</TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+          </div>
+        </Card>
+      )}
+
+      {timelineByItem.length > 0 && (
+        <Card className="p-4">
+          <h3 className="font-medium mb-3">Timeline</h3>
+          <div className="space-y-4">
+            {timelineByItem.map(({ item, evs }) => (
+              <div key={item.id}>
+                <div className="text-sm font-medium">{itemLabel(item.id)}</div>
+                <ul className="mt-1 space-y-1 border-l pl-4">
+                  {evs.map((e) => (
+                    <li key={e.id} className="text-sm flex gap-3">
+                      <span className="text-muted-foreground w-24 shrink-0">{e.eventDate}</span>
+                      <span>{eventText(e)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </Card>
       )}
