@@ -195,7 +195,7 @@ export function poProgress(
   items: Record<string, PoProductionItem>,
 ): PoProgress {
   const relevant = po.items.filter(
-    (it) => yarnState.overrides[it.id] !== "yarn_not_required",
+    (it) => !isItemFullyOverridden(yarnState, it),
   );
   const total = relevant.length;
   const completed = relevant.filter((it) => items[it.id]?.status === "completed").length;
@@ -278,9 +278,10 @@ export function poRawMaterialSummary(
 ): RawMaterialLine[] {
   const map = new Map<string, RawMaterialLine>();
   for (const it of po.items) {
-    if (yarnState.overrides[it.id] === "yarn_not_required") continue;
+    if (isItemFullyOverridden(yarnState, it)) continue;
     const shades = poItemShades(po, it, yarnState);
     for (const s of shades) {
+      if (isColorOverridden(yarnState, it.id, s.colorName)) continue;
       const key = `${it.materialType}||${s.colorName}||${s.supplierShadeNumber}`;
       if (map.has(key)) continue;
       // Received if some production order item for this (po, material, color) is fully received.
