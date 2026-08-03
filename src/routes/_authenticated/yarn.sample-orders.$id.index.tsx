@@ -124,7 +124,7 @@ function SampleOrderDetail() {
             <TableHeader><TableRow>
               <TableHead>Client</TableHead><TableHead>Brand</TableHead><TableHead>Color</TableHead>
               <TableHead>Material</TableHead><TableHead>Qty (Kg)</TableHead><TableHead>Pantone</TableHead>
-              <TableHead>Approval</TableHead><TableHead className="print:hidden">Actions</TableHead>
+              <TableHead>Approval</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {order.items.map((it) => (
