@@ -14,8 +14,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Printer, PackagePlus, Pencil, Trash2 } from "lucide-react";
-import { useYarnStore, yarnStore, sampleExpectedDelivery, sampleReceiptItemColor, type SampleOrderStatus } from "@/lib/yarn-store";
+import { ChevronLeft, Printer, PackagePlus, Pencil, Trash2, Undo2 } from "lucide-react";
+import { useYarnStore, yarnStore, sampleExpectedDelivery, sampleReceiptItemColor, sampleOrderDisplayStatus, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 
@@ -38,6 +38,7 @@ function SampleOrderDetail() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editForm, setEditForm] = useState({ orderDate: "", remarks: "", status: "ordered" as SampleOrderStatus });
+  const [undoFor, setUndoFor] = useState<string | null>(null);
 
   if (!order) return <div className="p-6 text-sm text-muted-foreground">Sample order not found. <button onClick={() => nav({ to: "/yarn/sample-orders" })} className="underline">Back</button></div>;
 
@@ -84,12 +85,23 @@ function SampleOrderDetail() {
     } catch (e) { toast.error((e as Error).message); }
   };
 
+  const undoItem = undoFor ? order.items.find((i) => i.id === undoFor) : null;
+  const undoInfo = undoFor ? yarnStore.sampleItemUndoInfo(order.id, undoFor) : null;
+  const confirmUndo = async () => {
+    if (!undoFor) return;
+    try {
+      const res = await yarnStore.revertSampleItemApproval(order.id, undoFor, { deleteShade: true });
+      toast.success(res.shadeDeleted ? "Reverted to pending — shade removed from library" : "Reverted to pending");
+      setUndoFor(null);
+    } catch (e) { toast.error((e as Error).message); }
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-6xl space-y-4 print:p-0 print:max-w-none">
       <div className="print:hidden">
         <PageHeader
           title={`Sample Order ${order.number}`}
-          subtitle={supplier?.name}
+          subtitle={`${supplier?.name ?? ""} · ${sampleOrderDisplayStatus(order)}`}
           actions={
             <div className="flex gap-2">
               <Button variant="outline" asChild><Link to="/yarn/sample-orders"><ChevronLeft className="h-4 w-4 mr-1" /> Back</Link></Button>
@@ -124,6 +136,7 @@ function SampleOrderDetail() {
               <TableHead>Client</TableHead><TableHead>Brand</TableHead><TableHead>Color</TableHead>
               <TableHead>Material</TableHead><TableHead>Qty (Kg)</TableHead><TableHead>Pantone</TableHead>
               <TableHead>Approval</TableHead>
+              <TableHead className="print:hidden"></TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {order.items.map((it) => (
@@ -138,6 +151,13 @@ function SampleOrderDetail() {
                     <Badge variant={it.approvalStatus === "approved" ? "default" : it.approvalStatus === "redye" ? "destructive" : "secondary"}>
                       {it.approvalStatus}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="print:hidden">
+                    {it.approvalStatus !== "pending" && (
+                      <Button size="sm" variant="ghost" onClick={() => setUndoFor(it.id)}>
+                        <Undo2 className="h-3.5 w-3.5 mr-1" /> Undo
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
