@@ -301,6 +301,50 @@ function mapSampleReceipt(r: any): SampleYarnReceipt {
   };
 }
 
+function mapSampleEvent(r: any): SampleApprovalEvent {
+  return {
+    id: r.id,
+    orderId: r.order_id,
+    itemId: r.item_id ?? null,
+    receiptId: r.receipt_id ?? null,
+    event: r.event,
+    eventDate: r.event_date,
+    shadeId: r.shade_id ?? null,
+    supplierShadeNumber: r.supplier_shade_number ?? undefined,
+    lotNumber: r.lot_number ?? undefined,
+    note: r.note ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+/** Append to the sample approval timeline. Never fatal: the timeline is
+ *  additive history, so a missing table must not break the main workflow. */
+async function logSampleEvents(rows: Array<{
+  orderId: string; itemId?: string | null; receiptId?: string | null;
+  event: SampleEventType; eventDate?: string; shadeId?: string | null;
+  supplierShadeNumber?: string; lotNumber?: string; note?: string;
+}>): Promise<void> {
+  if (!rows.length) return;
+  try {
+    const { error } = await supabase.from("yarn_sample_approval_events").insert(
+      rows.map((r) => ({
+        order_id: r.orderId,
+        item_id: r.itemId ?? null,
+        receipt_id: r.receiptId ?? null,
+        event: r.event,
+        event_date: r.eventDate ?? todayISO(),
+        shade_id: r.shadeId ?? null,
+        supplier_shade_number: r.supplierShadeNumber ?? null,
+        lot_number: r.lotNumber ?? null,
+        note: r.note ?? null,
+      })),
+    );
+    if (error) console.warn("[yarn-store] sample event log failed:", error.message);
+  } catch (e) {
+    console.warn("[yarn-store] sample event log failed:", e);
+  }
+}
+
 function mapProdItem(r: any): ProductionYarnOrderItem {
   return {
     id: r.id,
