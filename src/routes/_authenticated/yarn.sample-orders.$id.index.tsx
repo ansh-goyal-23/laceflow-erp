@@ -33,8 +33,6 @@ function SampleOrderDetail() {
   const clients = useStore((s) => s.clients);
   const brands = useStore((s) => s.brands);
   const pos = useStore((s) => s.purchaseOrders);
-  const [approveFor, setApproveFor] = useState<string | null>(null);
-  const [shadeNo, setShadeNo] = useState("");
   const [rcpOpen, setRcpOpen] = useState(false);
   const [rcp, setRcp] = useState({ receiptDate: new Date().toISOString().slice(0, 10), supplierShadeNumber: "", lotNumber: "", grossWeight: "", cones: "", remarks: "" });
   const [editing, setEditing] = useState(false);
