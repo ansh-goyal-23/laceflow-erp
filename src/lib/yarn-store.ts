@@ -1212,7 +1212,12 @@ export const yarnStore = {
    * Set/clear the override for one colour of a PO item. Clearing also removes
    * any legacy item-wide row so a single colour can be un-marked.
    */
-  async setOverride(poItemId: string, colorName: string, override: PoItemOverride | null) {
+  async setOverride(
+    poItemId: string,
+    colorName: string,
+    override: PoItemOverride | null,
+    itemColors: string[] = [],
+  ) {
     const color = (colorName ?? "").trim();
     if (override === null) {
       const rows = throwIfError(
@@ -1224,12 +1229,9 @@ export const yarnStore = {
       );
       // Expand a legacy item-wide row into per-colour rows for the other colours.
       if (legacy.length) {
-        const item = findPoItem(poItemId);
-        const others = item
-          ? expandPoColors(item.color)
-              .map((c) => c.name)
-              .filter((n) => n.trim().toLowerCase() !== color.toLowerCase())
-          : [];
+        const others = itemColors.filter(
+          (n) => n.trim().toLowerCase() !== color.toLowerCase(),
+        );
         throwIfError(
           await supabase.from("yarn_po_item_overrides").delete().eq("po_item_id", poItemId).eq("color_name", ""),
         );
