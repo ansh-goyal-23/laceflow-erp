@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, expandPoColors, type ProcurementStage } from "@/lib/yarn-store";
+import { useYarnStore, yarnStore, STAGE_LABEL, STAGE_BADGE, poOverallStage, calculateProcurementStage, expandPoColors, isColorOverridden, type ProcurementStage } from "@/lib/yarn-store";
 import { useStore, type PurchaseOrder } from "@/lib/store";
 import { daysRemaining, daysRemainingLabel } from "@/lib/reports";
 import { toast } from "sonner";
@@ -136,6 +136,7 @@ function NewProdOrder() {
     kind: "base" | "line" | "single";
     items: PurchaseOrder["items"];
     stage: ProcurementStage;
+    notRequired: boolean;   // every item in this group has this colour marked "Yarn Not Required"
     orderedQty: number;   // total ordered across all prod orders for this po+color+material
     receivedQty: number;
   }
@@ -154,11 +155,14 @@ function NewProdOrder() {
             kind: c.kind,
             items: [],
             stage: calculateProcurementStage(yarn, activePO.id, it.materialType, c.name),
+            notRequired: true,
             orderedQty: 0,
             receivedQty: 0,
           });
         }
-        map.get(k)!.items.push(it);
+        const g = map.get(k)!;
+        g.items.push(it);
+        if (!isColorOverridden(yarn, it.id, c.name)) g.notRequired = false;
       }
     }
     // sum ordered/received across production orders for this po+color+material
@@ -316,7 +320,13 @@ function NewProdOrder() {
                               </Badge>
                             )}
                             <span className="text-xs text-muted-foreground">· {g.material}</span>
-                            <Badge className={STAGE_BADGE[g.stage]} variant="secondary">{STAGE_LABEL[g.stage]}</Badge>
+                            {g.notRequired ? (
+                              <Badge className={STAGE_BADGE["yarn_not_required"]} variant="secondary">
+                                {STAGE_LABEL["yarn_not_required"]}
+                              </Badge>
+                            ) : (
+                              <Badge className={STAGE_BADGE[g.stage]} variant="secondary">{STAGE_LABEL[g.stage]}</Badge>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             Ordered: <span className="font-medium text-foreground">{g.orderedQty.toFixed(2)} Kg</span>
@@ -326,9 +336,11 @@ function NewProdOrder() {
                             {g.items.length} item{g.items.length === 1 ? "" : "s"}
                           </div>
                         </div>
-                        <Button size="sm" variant="outline" onClick={() => addLine(activePO, g.color, g.material)}>
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Order
-                        </Button>
+                        {!g.notRequired && (
+                          <Button size="sm" variant="outline" onClick={() => addLine(activePO, g.color, g.material)}>
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Order
+                          </Button>
+                        )}
                       </div>
                       {isOpen && (
                         <div className="ml-7 mt-2 rounded-md border bg-muted/30">
@@ -349,7 +361,13 @@ function NewProdOrder() {
                                   <TableCell>{it.width}×{it.length}</TableCell>
                                   <TableCell>{it.quantity}</TableCell>
                                   <TableCell>{it.uom}</TableCell>
-                                  <TableCell><OverrideToggle poItemId={it.id} current={g.stage} /></TableCell>
+                                  <TableCell>
+                                    <OverrideToggle
+                                      poItemId={it.id}
+                                      colorName={g.color}
+                                      itemColors={expandPoColors(it.color).map((c) => c.name)}
+                                    />
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -510,18 +528,23 @@ function NewProdOrder() {
   );
 }
 
-function OverrideToggle({ poItemId, current }: { poItemId: string; current: ProcurementStage }) {
-  const override = useYarnStore((s) => s.overrides[poItemId] ?? null);
-  const isYNR = override === "yarn_not_required" || current === "yarn_not_required";
+function OverrideToggle({
+  poItemId, colorName, itemColors,
+}: { poItemId: string; colorName: string; itemColors: string[] }) {
+  const isYNR = useYarnStore((s) => isColorOverridden(s, poItemId, colorName));
   return (
     <button
       className="text-xs text-muted-foreground underline hover:text-foreground text-left"
       onClick={async () => {
-        try { await yarnStore.setOverride(poItemId, isYNR ? null : "yarn_not_required"); }
+        try {
+          await yarnStore.setOverride(
+            poItemId, colorName, isYNR ? null : "yarn_not_required", itemColors,
+          );
+        }
         catch (e) { toast.error((e as Error).message); }
       }}
     >
-      {isYNR ? "Clear override" : "Mark Yarn Not Required"}
+      {isYNR ? "Yarn Not Required — clear" : "Mark Yarn Not Required"}
     </button>
   );
 }

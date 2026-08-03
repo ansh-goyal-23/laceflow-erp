@@ -1,5 +1,5 @@
 import type { PurchaseOrder } from "@/lib/store";
-import type { StoreShape as YarnStoreShape } from "@/lib/yarn-store";
+import { isItemFullyOverridden, itemOverriddenColors, type StoreShape as YarnStoreShape } from "@/lib/yarn-store";
 import { poItemShades, poRawMaterialSummary } from "@/lib/production-store";
 
 const esc = (v: unknown) =>
@@ -19,7 +19,8 @@ export function printProductionSlip(opts: {
 
   const itemRows = po.items
     .map((it) => {
-      const override = yarnState.overrides[it.id] === "yarn_not_required";
+      const notRequiredColors = itemOverriddenColors(yarnState, it);
+      const override = isItemFullyOverridden(yarnState, it);
       const shades = poItemShades(po, it, yarnState);
       const base =
         shades.find((s) => s.kind === "base" || s.kind === "single")
@@ -37,7 +38,13 @@ export function printProductionSlip(opts: {
           <td class="num">${esc(it.quantity)}</td>
           <td class="mono">${esc(base)}</td>
           <td class="mono">${esc(line)}</td>
-          <td>${override ? "Yarn Not Required" : ""}</td>
+          <td>${
+            override
+              ? "Yarn Not Required"
+              : notRequiredColors.length
+                ? `Yarn Not Required: ${esc(notRequiredColors.join(", "))}`
+                : ""
+          }</td>
         </tr>`;
     })
     .join("");
