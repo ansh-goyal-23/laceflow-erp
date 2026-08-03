@@ -275,6 +275,26 @@ function SampleOrderDetail() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={!!undoFor} onOpenChange={(o) => !o && setUndoFor(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Undo approval for {undoItem?.colorName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The item goes back to <strong>pending</strong> and reappears in the Approvals Needed queue.
+              {undoInfo?.shade ? (
+                undoInfo.references.length > 0
+                  ? ` Shade ${undoInfo.shade.supplierShadeNumber} is also used by ${undoInfo.references.join(", ")} and will be kept in the Shade Library.`
+                  : ` Shade ${undoInfo.shade.supplierShadeNumber} will be removed from the Shade Library.`
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmUndo}>Undo</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={deleting} onOpenChange={setDeleting}>
         <AlertDialogContent>
           <AlertDialogHeader>
