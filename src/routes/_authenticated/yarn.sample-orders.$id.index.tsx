@@ -14,7 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Printer, CheckCircle2, RefreshCw, PackagePlus, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, Printer, PackagePlus, Pencil, Trash2 } from "lucide-react";
 import { useYarnStore, yarnStore, sampleExpectedDelivery, sampleReceiptItemColor, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
