@@ -88,6 +88,18 @@ export function sampleExpectedDelivery(orderDate: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Display status for a sample order, derived from its item approvals. */
+export function sampleOrderDisplayStatus(o: SampleYarnOrder): string {
+  const items = o.items ?? [];
+  if (items.length > 0 && o.status !== "cancelled") {
+    if (items.every((i) => i.approvalStatus === "approved")) return "Approved";
+    const pending = items.some((i) => i.approvalStatus === "pending");
+    if (o.status === "received" && pending) return "Approval Needed";
+    if (!pending && items.some((i) => i.approvalStatus === "redye")) return "Redye Pending";
+  }
+  return o.status.charAt(0).toUpperCase() + o.status.slice(1);
+}
+
 export interface ProductionYarnOrderItem {
   id: string;
   poId: string;
@@ -687,6 +699,45 @@ export const yarnStore = {
     throwIfError(await supabase.from("yarn_sample_order_items")
       .update({ approval_status: "redye" }).eq("id", itemId));
     await refresh();
+  },
+  /** Read-only info about what undoing an approval would affect. */
+  sampleItemUndoInfo(orderId: string, itemId: string): {
+    shade: YarnShade | null;
+    references: string[];
+  } {
+    const order = state.sampleOrders.find((o) => o.id === orderId);
+    const item = order?.items.find((i) => i.id === itemId);
+    const shadeId = item?.approvedShadeId ?? null;
+    if (!shadeId) return { shade: null, references: [] };
+    const shade = state.shades.find((s) => s.id === shadeId) ?? null;
+    const references: string[] = [];
+    for (const o of state.sampleOrders) {
+      for (const i of o.items) {
+        if (i.approvedShadeId === shadeId && i.id !== itemId) references.push(o.number);
+      }
+    }
+    for (const o of state.productionOrders) {
+      for (const i of o.items) {
+        if (i.approvedShadeId === shadeId) references.push(o.number);
+      }
+    }
+    return { shade, references: Array.from(new Set(references)) };
+  },
+  /** Reset a sample item back to pending, optionally removing the shade it created. */
+  async revertSampleItemApproval(orderId: string, itemId: string, opts?: { deleteShade?: boolean }) {
+    const { shade, references } = this.sampleItemUndoInfo(orderId, itemId);
+    throwIfError(await supabase.from("yarn_sample_order_items").update({
+      approval_status: "pending",
+      approved_shade_id: null,
+      approved_at: null,
+    }).eq("id", itemId));
+    let shadeDeleted = false;
+    if (opts?.deleteShade && shade && references.length === 0) {
+      throwIfError(await supabase.from("yarn_shades").delete().eq("id", shade.id));
+      shadeDeleted = true;
+    }
+    await refresh();
+    return { shadeDeleted };
   },
 
   // ---------- Production Yarn Orders ----------
