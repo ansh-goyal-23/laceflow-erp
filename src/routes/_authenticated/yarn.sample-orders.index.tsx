@@ -15,14 +15,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Eye, Pencil, Trash2, CheckCircle2, RefreshCw, SlidersHorizontal } from "lucide-react";
-import { useYarnStore, yarnStore, sampleExpectedDelivery, type SampleYarnOrder, type SampleOrderStatus } from "@/lib/yarn-store";
+import { useYarnStore, yarnStore, sampleExpectedDelivery, sampleOrderDisplayStatus, type SampleYarnOrder, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-
-function statusLabel(s: SampleOrderStatus): string {
-  return s === "received" ? "Approval Needed" : s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 function daysSince(dateISO: string): number {
   const d = new Date(dateISO).getTime();
@@ -186,6 +182,7 @@ function SampleOrdersList() {
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No sample orders.</TableCell></TableRow>
               ) : filtered.map((o) => {
                 const approvedCount = o.items.filter((i) => i.approvalStatus === "approved").length;
+                const label = sampleOrderDisplayStatus(o);
                 return (
                   <TableRow key={o.id}>
                     <TableCell className="font-mono">{o.number}</TableCell>
@@ -195,9 +192,13 @@ function SampleOrdersList() {
                     <TableCell>{poNum(o.linkedPoId)}</TableCell>
                     <TableCell>{approvedCount}/{o.items.length} approved</TableCell>
                     <TableCell>
-                      <Badge variant={o.status === "received" ? "default" : "secondary"}
-                        className={o.status === "received" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25" : ""}>
-                        {statusLabel(o.status)}
+                      <Badge variant={label === "Approval Needed" || label === "Approved" ? "default" : "secondary"}
+                        className={
+                          label === "Approval Needed" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25"
+                          : label === "Approved" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
+                          : label === "Redye Pending" ? "bg-destructive/15 text-destructive" : ""
+                        }>
+                        {label}
                       </Badge>
                     </TableCell>
                     <TableCell>
