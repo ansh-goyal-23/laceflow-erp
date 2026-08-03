@@ -177,6 +177,16 @@ export interface YarnInward {
 
 export type PoItemOverride = "yarn_not_required";
 
+/**
+ * Overrides are colour-scoped: a double-colour lace can have yarn marked as
+ * "not required" for one of its colours only. An empty colour means the legacy
+ * item-wide override (applies to every colour of that PO item).
+ */
+export function overrideKey(poItemId: string, color: string): string {
+  const c = (color ?? "").trim().toLowerCase();
+  return `${poItemId}::${c || "*"}`;
+}
+
 export interface StoreShape {
   suppliers: YarnSupplier[];
   shades: YarnShade[];
