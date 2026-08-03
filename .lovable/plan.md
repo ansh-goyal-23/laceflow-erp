@@ -1,25 +1,47 @@
-Plan: Remove redundant Approve/Redye actions from the Sample Order detail view
+## Goal
 
-Background
-- The Sample Order detail page (`src/routes/_authenticated/yarn.sample-orders.$id.index.tsx`) shows an Actions column with Approve/Redye buttons for every pending item.
-- The same two actions already exist in the dedicated Approvals Needed queue on the Sample Orders list page (`src/routes/_authenticated/yarn.sample-orders.index.tsx`), which is the intended single approval/rejection path.
-- Both places call `yarnStore.approveSampleItem` and `yarnStore.redyeSampleItem`.
+1. Undo a mistaken Approve/Redye from the Sample Yarn Order detail page — including reverting the shade that approval created in the Shade Library, with warnings if that shade is referenced elsewhere.
+2. Show a Sample Yarn Order as **Approved** on the list page once every item in it is approved.
 
-Changes
-1. Detail view cleanup
-   - Remove the Actions column for item rows in the detail view.
-   - Remove the Approve and Redye buttons.
-   - Remove the local state used only for the detail-view approval dialog (`approveFor`, `shadeNo`, `doApprove`, `setApproveFor`).
-   - Remove the Approve Sample Dialog from the detail view.
-   - Remove the direct handler that calls `yarnStore.redyeSampleItem` from the detail view.
-2. Preserve read-only status
-   - Keep the Approval Status badge column (pending / approved / redye) so the detail view still shows the outcome.
-   - Keep the Receipts table unchanged.
-3. Keep the dedicated queue intact
-   - Leave the Approvals Needed tab, its approval/redye buttons, and its Approve dialog in the list page as-is.
-   - Leave the `yarnStore` functions unchanged.
+## 1. Undo approve / redye (with shade revert)
 
-Verification
-- Open a Sample Order with a pending item; confirm there are no Approve/Redye buttons on the detail page.
-- Confirm the Approval Status badge still renders correctly.
-- Confirm the Approvals Needed tab still shows the same item and can approve/redye it successfully.
+**Store (`src/lib/yarn-store.ts`)**
+- Add `sampleItemUndoInfo(orderId, itemId)` — a read-only helper returning:
+  - the shade linked via `approvedShadeId`
+  - whether that shade was created by this approval or pre-existed (matched by `ensureShade`'s key: client + brand + color + material + supplier + supplier shade #)
+  - a list of other references to that shade: other sample order items and production order items whose `approved_shade_id` points at it (both tables carry that column)
+- Add `revertSampleItemApproval(orderId, itemId, { deleteShade })`:
+  - set the item's `approval_status = 'pending'`, clear `approved_shade_id` and `approved_at`
+  - if `deleteShade` and no other rows reference the shade → delete it from `yarn_shades`
+  - if other references exist → never delete; leave the shade intact
+  - refresh state
+- Redye undo simply resets `approval_status` to `pending` (no shade involved).
+
+**Detail page (`src/routes/_authenticated/yarn.sample-orders.$id.index.tsx`)**
+- Next to the Approval badge, show an **Undo** button for items whose status is `approved` or `redye`.
+- Clicking opens a confirm dialog that, for approved items, states what will happen to the shade:
+  - shade unreferenced → "Shade `<supplier shade #>` will be removed from the Shade Library."
+  - shade referenced elsewhere → warning listing the referencing orders: "Shade `<...>` is used by PYO-0012, SYO-0007 and will be kept."
+- On confirm, call the store fn and toast the outcome; the item reappears in the Approvals Needed queue.
+
+## 2. Order status reflects full approval
+
+**Shared helper in `src/lib/yarn-store.ts`** — `sampleOrderDisplayStatus(order)`:
+- all items `approved` → **Approved**
+- stored status `received` with any item `pending` → **Approval Needed**
+- any item `redye`, none pending → **Redye Pending**
+- otherwise the existing label (Draft / Ordered / Completed / Cancelled)
+
+Use it in `yarn.sample-orders.index.tsx` (replacing the local `statusLabel`) and in the detail header so both screens agree.
+
+## Technical notes
+
+- No schema change: "Approved" is derived from `yarn_sample_order_items.approval_status`, avoiding a Postgres enum alteration on `yarn_sample_orders.status`.
+- Both `yarn_sample_order_items.approved_shade_id` and `yarn_production_order_items.approved_shade_id` are `ON DELETE SET NULL`, so a stray delete would silently unlink other orders — hence the reference check gates deletion rather than relying on the FK.
+
+## Verification
+
+- Approve all items in an SYO → list badge reads "Approved".
+- Undo an approval whose shade is unused → item back to pending, shade gone from the Shade Library.
+- Undo an approval whose shade is used by another order → warning names that order, shade retained, item still reverted.
+- Undo a redye item → resets to pending and reappears in Approvals Needed.
