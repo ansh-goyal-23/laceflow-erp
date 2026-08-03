@@ -69,6 +69,22 @@ export interface SampleYarnReceipt {
 
 export type SampleOrderStatus = "draft" | "ordered" | "received" | "completed" | "cancelled";
 
+export type SampleEventType = "received" | "approved" | "redye" | "reverted";
+
+export interface SampleApprovalEvent {
+  id: string;
+  orderId: string;
+  itemId?: string | null;
+  receiptId?: string | null;
+  event: SampleEventType;
+  eventDate: string;
+  shadeId?: string | null;
+  supplierShadeNumber?: string;
+  lotNumber?: string;
+  note?: string;
+  createdAt: string;
+}
+
 export interface SampleYarnOrder {
   id: string;
   number: string;
@@ -79,6 +95,7 @@ export interface SampleYarnOrder {
   status: SampleOrderStatus;
   items: SampleYarnOrderItem[];
   receipts: SampleYarnReceipt[];
+  events: SampleApprovalEvent[];
   createdAt: string;
 }
 
