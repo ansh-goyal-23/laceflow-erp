@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ChevronLeft, PackageCheck, CheckCircle2, Send, RotateCcw } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useYarnStore } from "@/lib/yarn-store";
+import { useYarnStore, isItemFullyOverridden, itemOverriddenColors } from "@/lib/yarn-store";
 import {
   useProductionStore, productionStore,
   poProgress, poItemShades, poRawMaterialSummary, daysRemaining,
@@ -201,7 +201,8 @@ function ProductionDetail() {
             </TableRow></TableHeader>
             <TableBody>
               {po.items.map((it) => {
-                const override = yarnState.overrides[it.id] === "yarn_not_required";
+                const override = isItemFullyOverridden(yarnState, it);
+                const notRequiredColors = itemOverriddenColors(yarnState, it);
                 const shades = poItemShades(po, it, yarnState);
                 const base = shades.find((s) => s.kind === "base" || s.kind === "single")?.supplierShadeNumber;
                 const line = shades.find((s) => s.kind === "line")?.supplierShadeNumber;
