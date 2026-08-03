@@ -436,6 +436,18 @@ async function hydrate(): Promise<void> {
       const arr = recByOrder.get(r.order_id) ?? [];
       arr.push(it); recByOrder.set(r.order_id, arr);
     }
+    // Timeline events live in a table that may not exist yet on older
+    // deployments — fetch separately and degrade to an empty timeline.
+    const evByOrder = new Map<string, SampleApprovalEvent[]>();
+    try {
+      const ev = await supabase.from("yarn_sample_approval_events").select("*")
+        .order("created_at", { ascending: true });
+      for (const r of ev.data ?? []) {
+        const it = mapSampleEvent(r);
+        const arr = evByOrder.get(r.order_id) ?? [];
+        arr.push(it); evByOrder.set(r.order_id, arr);
+      }
+    } catch { /* table missing — no timeline */ }
     const sampleOrders: SampleYarnOrder[] = (so.data ?? []).map((r: any) => ({
       id: r.id,
       number: r.number,
@@ -446,6 +458,7 @@ async function hydrate(): Promise<void> {
       status: r.status,
       items: itemsByOrder.get(r.id) ?? [],
       receipts: recByOrder.get(r.id) ?? [],
+      events: evByOrder.get(r.id) ?? [],
       createdAt: r.created_at,
     }));
 
