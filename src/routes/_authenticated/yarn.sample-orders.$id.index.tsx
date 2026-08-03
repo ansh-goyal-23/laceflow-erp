@@ -204,7 +204,6 @@ function SampleOrderDetail() {
         </Card>
       )}
 
-
       <Dialog open={rcpOpen} onOpenChange={setRcpOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Sample Receipt</DialogTitle></DialogHeader>
