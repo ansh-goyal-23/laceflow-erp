@@ -510,18 +510,23 @@ function NewProdOrder() {
   );
 }
 
-function OverrideToggle({ poItemId, current }: { poItemId: string; current: ProcurementStage }) {
-  const override = useYarnStore((s) => s.overrides[poItemId] ?? null);
-  const isYNR = override === "yarn_not_required" || current === "yarn_not_required";
+function OverrideToggle({
+  poItemId, colorName, itemColors,
+}: { poItemId: string; colorName: string; itemColors: string[] }) {
+  const isYNR = useYarnStore((s) => isColorOverridden(s, poItemId, colorName));
   return (
     <button
       className="text-xs text-muted-foreground underline hover:text-foreground text-left"
       onClick={async () => {
-        try { await yarnStore.setOverride(poItemId, isYNR ? null : "yarn_not_required"); }
+        try {
+          await yarnStore.setOverride(
+            poItemId, colorName, isYNR ? null : "yarn_not_required", itemColors,
+          );
+        }
         catch (e) { toast.error((e as Error).message); }
       }}
     >
-      {isYNR ? "Clear override" : "Mark Yarn Not Required"}
+      {isYNR ? "Yarn Not Required — clear" : "Mark Yarn Not Required"}
     </button>
   );
 }
