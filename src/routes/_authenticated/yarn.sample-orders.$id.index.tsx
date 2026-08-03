@@ -14,7 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Printer, CheckCircle2, RefreshCw, PackagePlus, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, Printer, PackagePlus, Pencil, Trash2 } from "lucide-react";
 import { useYarnStore, yarnStore, sampleExpectedDelivery, sampleReceiptItemColor, type SampleOrderStatus } from "@/lib/yarn-store";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
@@ -33,8 +33,6 @@ function SampleOrderDetail() {
   const clients = useStore((s) => s.clients);
   const brands = useStore((s) => s.brands);
   const pos = useStore((s) => s.purchaseOrders);
-  const [approveFor, setApproveFor] = useState<string | null>(null);
-  const [shadeNo, setShadeNo] = useState("");
   const [rcpOpen, setRcpOpen] = useState(false);
   const [rcp, setRcp] = useState({ receiptDate: new Date().toISOString().slice(0, 10), supplierShadeNumber: "", lotNumber: "", grossWeight: "", cones: "", remarks: "" });
   const [editing, setEditing] = useState(false);
@@ -47,15 +45,6 @@ function SampleOrderDetail() {
   const po = order.linkedPoId ? pos.find((p) => p.id === order.linkedPoId) : null;
   const cName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
   const bName = (id: string) => brands.find((b) => b.id === id)?.name ?? "—";
-
-  const doApprove = async () => {
-    if (!approveFor || !shadeNo.trim()) { toast.error("Enter supplier shade #"); return; }
-    try {
-      await yarnStore.approveSampleItem(order.id, approveFor, shadeNo.trim());
-      toast.success("Approved — shade added to library");
-      setApproveFor(null); setShadeNo("");
-    } catch (e) { toast.error((e as Error).message); }
-  };
 
   const saveReceipt = async () => {
     if (!rcp.grossWeight) { toast.error("Enter gross weight"); return; }
@@ -134,7 +123,7 @@ function SampleOrderDetail() {
             <TableHeader><TableRow>
               <TableHead>Client</TableHead><TableHead>Brand</TableHead><TableHead>Color</TableHead>
               <TableHead>Material</TableHead><TableHead>Qty (Kg)</TableHead><TableHead>Pantone</TableHead>
-              <TableHead>Approval</TableHead><TableHead className="print:hidden">Actions</TableHead>
+              <TableHead>Approval</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {order.items.map((it) => (
@@ -149,21 +138,6 @@ function SampleOrderDetail() {
                     <Badge variant={it.approvalStatus === "approved" ? "default" : it.approvalStatus === "redye" ? "destructive" : "secondary"}>
                       {it.approvalStatus}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="print:hidden">
-                    {it.approvalStatus === "pending" && (
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" onClick={() => { setApproveFor(it.id); setShadeNo(""); }}>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={async () => {
-                          try { await yarnStore.redyeSampleItem(order.id, it.id); toast.success("Marked for re-dye"); }
-                          catch (e) { toast.error((e as Error).message); }
-                        }}>
-                          <RefreshCw className="h-3.5 w-3.5 mr-1" /> Redye
-                        </Button>
-                      </div>
-                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -229,21 +203,6 @@ function SampleOrderDetail() {
           </div>
         </Card>
       )}
-
-      <Dialog open={!!approveFor} onOpenChange={(o) => !o && setApproveFor(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Approve Sample</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <Label>Supplier Shade # *</Label>
-            <Input value={shadeNo} onChange={(e) => setShadeNo(e.target.value)} placeholder="e.g. RED-2314" />
-            <p className="text-xs text-muted-foreground">Approving will add this shade to the Shade Library.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveFor(null)}>Cancel</Button>
-            <Button onClick={doApprove}>Approve</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={rcpOpen} onOpenChange={setRcpOpen}>
         <DialogContent>
