@@ -24,6 +24,8 @@ const dispatchNav: { to: string; label: string; icon: typeof Plus; exact?: boole
   { to: "/invoices/new", label: "Create Invoice", icon: Plus },
   { to: "/invoices", label: "Invoice List", icon: List, exact: true },
   { to: "/invoices/import", label: "Import Dispatch Excel", icon: Upload },
+  { to: "/sales-returns/new", label: "Create Sales Return", icon: Plus },
+  { to: "/sales-returns", label: "Sales Returns", icon: Undo2, exact: true },
 ];
 
 const reportsNav: { to: string; label: string; icon: typeof Plus }[] = [
@@ -59,7 +61,8 @@ export function AppSidebar() {
   const [poOpen, setPoOpen] = useState(true);
   const poActive = pathname === "/purchase-orders" || pathname.startsWith("/purchase-orders/");
   const [dispatchOpen, setDispatchOpen] = useState(true);
-  const dispatchActive = pathname === "/invoices" || pathname.startsWith("/invoices/");
+  const dispatchActive = pathname === "/invoices" || pathname.startsWith("/invoices/")
+    || pathname === "/sales-returns" || pathname.startsWith("/sales-returns/");
   const [reportsOpen, setReportsOpen] = useState(true);
   const reportsActive = pathname.startsWith("/reports/");
   const [yarnOpen, setYarnOpen] = useState(true);

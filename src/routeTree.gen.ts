@@ -16,6 +16,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated/brands'
 import { Route as AuthenticatedAiLearningRouteImport } from './routes/_authenticated/ai-learning'
+import { Route as AuthenticatedSalesReturnsIndexRouteImport } from './routes/_authenticated/sales-returns.index'
 import { Route as AuthenticatedPurchaseOrdersIndexRouteImport } from './routes/_authenticated/purchase-orders.index'
 import { Route as AuthenticatedProductionIndexRouteImport } from './routes/_authenticated/production.index'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
@@ -89,6 +90,12 @@ const AuthenticatedAiLearningRoute = AuthenticatedAiLearningRouteImport.update({
   path: '/ai-learning',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSalesReturnsIndexRoute =
+  AuthenticatedSalesReturnsIndexRouteImport.update({
+    id: '/sales-returns/',
+    path: '/sales-returns/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPurchaseOrdersIndexRoute =
   AuthenticatedPurchaseOrdersIndexRouteImport.update({
     id: '/purchase-orders/',
@@ -346,6 +353,7 @@ export interface FileRoutesByFullPath {
   '/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/production/': typeof AuthenticatedProductionIndexRoute
   '/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
+  '/sales-returns/': typeof AuthenticatedSalesReturnsIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
   '/sales-returns/$id/edit': typeof AuthenticatedSalesReturnsIdEditRoute
@@ -392,6 +400,7 @@ export interface FileRoutesByTo {
   '/invoices': typeof AuthenticatedInvoicesIndexRoute
   '/production': typeof AuthenticatedProductionIndexRoute
   '/purchase-orders': typeof AuthenticatedPurchaseOrdersIndexRoute
+  '/sales-returns': typeof AuthenticatedSalesReturnsIndexRoute
   '/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
   '/sales-returns/$id/edit': typeof AuthenticatedSalesReturnsIdEditRoute
@@ -440,6 +449,7 @@ export interface FileRoutesById {
   '/_authenticated/invoices/': typeof AuthenticatedInvoicesIndexRoute
   '/_authenticated/production/': typeof AuthenticatedProductionIndexRoute
   '/_authenticated/purchase-orders/': typeof AuthenticatedPurchaseOrdersIndexRoute
+  '/_authenticated/sales-returns/': typeof AuthenticatedSalesReturnsIndexRoute
   '/_authenticated/invoices/$id/edit': typeof AuthenticatedInvoicesIdEditRoute
   '/_authenticated/purchase-orders/$id/edit': typeof AuthenticatedPurchaseOrdersIdEditRoute
   '/_authenticated/sales-returns/$id/edit': typeof AuthenticatedSalesReturnsIdEditRoute
@@ -488,6 +498,7 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/production/'
     | '/purchase-orders/'
+    | '/sales-returns/'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
     | '/sales-returns/$id/edit'
@@ -534,6 +545,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/production'
     | '/purchase-orders'
+    | '/sales-returns'
     | '/invoices/$id/edit'
     | '/purchase-orders/$id/edit'
     | '/sales-returns/$id/edit'
@@ -581,6 +593,7 @@ export interface FileRouteTypes {
     | '/_authenticated/invoices/'
     | '/_authenticated/production/'
     | '/_authenticated/purchase-orders/'
+    | '/_authenticated/sales-returns/'
     | '/_authenticated/invoices/$id/edit'
     | '/_authenticated/purchase-orders/$id/edit'
     | '/_authenticated/sales-returns/$id/edit'
@@ -653,6 +666,13 @@ declare module '@tanstack/react-router' {
       path: '/ai-learning'
       fullPath: '/ai-learning'
       preLoaderRoute: typeof AuthenticatedAiLearningRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sales-returns/': {
+      id: '/_authenticated/sales-returns/'
+      path: '/sales-returns'
+      fullPath: '/sales-returns/'
+      preLoaderRoute: typeof AuthenticatedSalesReturnsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/purchase-orders/': {
@@ -952,6 +972,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInvoicesIndexRoute: typeof AuthenticatedInvoicesIndexRoute
   AuthenticatedProductionIndexRoute: typeof AuthenticatedProductionIndexRoute
   AuthenticatedPurchaseOrdersIndexRoute: typeof AuthenticatedPurchaseOrdersIndexRoute
+  AuthenticatedSalesReturnsIndexRoute: typeof AuthenticatedSalesReturnsIndexRoute
   AuthenticatedInvoicesIdEditRoute: typeof AuthenticatedInvoicesIdEditRoute
   AuthenticatedPurchaseOrdersIdEditRoute: typeof AuthenticatedPurchaseOrdersIdEditRoute
   AuthenticatedSalesReturnsIdEditRoute: typeof AuthenticatedSalesReturnsIdEditRoute
@@ -1003,6 +1024,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInvoicesIndexRoute: AuthenticatedInvoicesIndexRoute,
   AuthenticatedProductionIndexRoute: AuthenticatedProductionIndexRoute,
   AuthenticatedPurchaseOrdersIndexRoute: AuthenticatedPurchaseOrdersIndexRoute,
+  AuthenticatedSalesReturnsIndexRoute: AuthenticatedSalesReturnsIndexRoute,
   AuthenticatedInvoicesIdEditRoute: AuthenticatedInvoicesIdEditRoute,
   AuthenticatedPurchaseOrdersIdEditRoute:
     AuthenticatedPurchaseOrdersIdEditRoute,
