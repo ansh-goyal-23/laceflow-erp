@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "@/lib/audit";
-import { dispatchedByPOItem, dispatchedByPO, poFulfillmentStatus } from "@/lib/dispatch";
+import { netDispatchedByPOItem, netDispatchedByPO, poFulfillmentStatus } from "@/lib/dispatch";
 
 export interface Brand {
   id: string;
@@ -714,6 +714,68 @@ async function insertInvoiceItems(invoiceId: string, items: Omit<InvoiceItem, "i
 }
 
 async function refreshInvoice(id: string) {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("*, invoice_items(*)")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  const inv = toInvoice(data as InvoiceRow);
+  const existing = state.invoices.find((i) => i.id === id);
+  set({
+    ...state,
+    invoices: existing
+      ? state.invoices.map((i) => (i.id === id ? inv : i))
+      : [inv, ...state.invoices],
+  });
+}
+
+async function insertReturnItems(returnId: string, items: Omit<SalesReturnItem, "id" | "returnId">[]) {
+  if (!items.length) return;
+  const rows = items.map((i, idx) => ({
+    return_id: returnId,
+    invoice_id: i.invoiceId,
+    invoice_item_id: i.invoiceItemId,
+    invoice_number: i.invoiceNumber || null,
+    po_id: i.poId,
+    po_item_id: i.poItemId,
+    po_number: i.poNumber || null,
+    article_code: i.articleCode,
+    lace_type: i.laceType,
+    material_type: i.materialType,
+    width: i.width,
+    length: i.length,
+    color: i.color,
+    uom: i.uom,
+    return_qty: i.returnQty,
+    rate: i.rate,
+    reason: i.reason || null,
+    settled: i.settled,
+    settled_qty: i.settledQty,
+    sort_order: idx,
+  }));
+  const { error } = await supabase.from("sales_return_items").insert(rows);
+  if (error) throw error;
+}
+
+async function refreshSalesReturn(id: string) {
+  const { data, error } = await supabase
+    .from("sales_returns")
+    .select("*, sales_return_items(*)")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  const r = toSalesReturn(data as unknown as SalesReturnRow);
+  const existing = state.salesReturns.find((x) => x.id === id);
+  set({
+    ...state,
+    salesReturns: existing
+      ? state.salesReturns.map((x) => (x.id === id ? r : x))
+      : [r, ...state.salesReturns],
+  });
+}
+
+async function refreshInvoiceUnused(id: string) {
   const { data, error } = await supabase
     .from("invoices")
     .select("*, invoice_items(*)")
