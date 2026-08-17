@@ -37,10 +37,12 @@ function SortH({ label, k, sortKey, dir, onClick }: { label: string; k: SortKey;
 function PendencyItemReport() {
   const pos = useStore((s) => s.purchaseOrders);
   const invoices = useStore((s) => s.invoices);
+  const salesReturns = useStore((s) => s.salesReturns);
   const clients = useStore((s) => s.clients);
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
   const yarn = useYarnStore((s) => s);
   const stageForItem = (r: ItemPendency) => {
+    if (r.returnRef) return "waiting_for_yarn_order" as const;
     const item = r.po.items.find((i) => i.id === r.itemId);
     return item ? poItemStage(yarn, r.po, item) : "waiting_for_yarn_order" as const;
   };
@@ -63,7 +65,7 @@ function PendencyItemReport() {
   const toggle = (k: SortKey) => { if (sortKey === k) setDir((d) => d === "asc" ? "desc" : "asc"); else { setSortKey(k); setDir("asc"); } setPage(1); };
 
   const rows = useMemo(() => {
-    const base = computeItemPendencies(pos, invoices);
+    const base = computeItemPendencies(pos, invoices, salesReturns);
     const t = q.toLowerCase();
     const mn = minP === "" ? -Infinity : Number(minP);
     const mx = maxP === "" ? Infinity : Number(maxP);
@@ -99,7 +101,7 @@ function PendencyItemReport() {
           case "color": return a.color.localeCompare(b.color) * s;
           case "uom": return a.uom.localeCompare(b.uom) * s;
           case "pending": return (a.pending - b.pending) * s;
-          case "stage": return STAGE_LABEL[stageForItem(a)].localeCompare(STAGE_LABEL[stageForItem(b)]) * s;
+          case "stage": return (a.returnRef ? "Client Return" : STAGE_LABEL[stageForItem(a)]).localeCompare(b.returnRef ? "Client Return" : STAGE_LABEL[stageForItem(b)]) * s;
         }
       });
     } else {
@@ -112,16 +114,17 @@ function PendencyItemReport() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos, invoices, q, clientF, poF, article, lace, material, width, color, minP, maxP, daysF, sortKey, dir, clients, yarn]);
+  }, [pos, invoices, salesReturns, q, clientF, poF, article, lace, material, width, color, minP, maxP, daysF, sortKey, dir, clients, yarn]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const headers = ["Client", "PO Number", "Days Remaining", "Article Code", "Lace Type", "Material Type", "Width", "Length", "Color", "UOM", "Pending Qty", "Procurement Stage"];
+  const headers = ["Client", "PO Number", "Days Remaining", "Article Code", "Lace Type", "Material Type", "Width", "Length", "Color", "UOM", "Returned Qty", "Pending Qty", "Procurement Stage"];
   const exportRows = () => rows.map((r) => [
     clientName(r.po.clientId), r.po.poNumber, daysRemainingLabel(r.daysLeft),
-    r.articleCode, r.laceType, r.materialType, r.width, r.length, r.color, r.uom, r.pending, STAGE_LABEL[stageForItem(r)],
+    r.articleCode, r.laceType, r.materialType, r.width, r.length, r.color, r.uom, r.returned || 0, r.pending,
+    r.returnRef ? "Client Return" : STAGE_LABEL[stageForItem(r)],
   ]);
 
   return (
@@ -201,13 +204,14 @@ function PendencyItemReport() {
                 <TableHead><SortH label="Length" k="length" sortKey={sortKey ?? "client"} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead><SortH label="Color" k="color" sortKey={sortKey ?? "client"} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead><SortH label="UOM" k="uom" sortKey={sortKey ?? "client"} dir={dir} onClick={toggle} /></TableHead>
+                <TableHead className="text-right">Returned Qty</TableHead>
                 <TableHead className="text-right"><SortH label="Pending Qty" k="pending" sortKey={sortKey ?? "client"} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="w-52"><SortH label="Procurement Stage" k="stage" sortKey={sortKey ?? "client"} dir={dir} onClick={toggle} /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.length === 0 ? (
-                <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">No pending items</TableCell></TableRow>
+                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">No pending items</TableCell></TableRow>
               ) : pageRows.map((r: ItemPendency) => (
                 <TableRow key={r.itemId} className={urgencyClass(r.daysLeft)}>
                   <TableCell>{clientName(r.po.clientId)}</TableCell>
@@ -220,9 +224,12 @@ function PendencyItemReport() {
                   <TableCell>{r.length || "—"}</TableCell>
                   <TableCell>{r.color || "—"}</TableCell>
                   <TableCell>{r.uom}</TableCell>
+                  <TableCell className="text-right">{r.returned || 0}</TableCell>
                   <TableCell className="text-right font-medium">{r.pending}</TableCell>
                   <TableCell>
-                    {(() => { const st = stageForItem(r); return <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>; })()}
+                    {r.returnRef
+                      ? <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300" variant="secondary">Client Return</Badge>
+                      : (() => { const st = stageForItem(r); return <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>; })()}
                   </TableCell>
                 </TableRow>
               ))}
