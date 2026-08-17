@@ -76,14 +76,54 @@ export interface Invoice {
   items: InvoiceItem[];
 }
 
+export type SalesReturnDocType = "debit_note" | "return_challan";
+
+export interface SalesReturnItem {
+  id: string;
+  returnId: string;
+  invoiceId: string | null;
+  invoiceItemId: string | null;
+  invoiceNumber: string;
+  poId: string | null;
+  poItemId: string | null;
+  poNumber: string;
+  articleCode: string;
+  laceType: string;
+  materialType: string;
+  width: string;
+  length: string;
+  color: string;
+  uom: string;
+  returnQty: number;
+  rate: number;
+  reason: string;
+  settled: boolean;
+  settledQty: number;
+}
+
+export interface SalesReturn {
+  id: string;
+  returnNumber: string;
+  returnDate: string;
+  clientId: string;
+  docType: SalesReturnDocType;
+  referenceNumber: string;
+  dueDate: string;
+  remarks: string;
+  createdAt: string;
+  createdBy: string | null;
+  items: SalesReturnItem[];
+}
+
 type StoreShape = {
   brands: Brand[];
   clients: Client[];
   purchaseOrders: PurchaseOrder[];
   invoices: Invoice[];
+  salesReturns: SalesReturn[];
 };
 
-const empty: StoreShape = { brands: [], clients: [], purchaseOrders: [], invoices: [] };
+const empty: StoreShape = { brands: [], clients: [], purchaseOrders: [], invoices: [], salesReturns: [] };
 let state: StoreShape = empty;
 const listeners = new Set<() => void>();
 
