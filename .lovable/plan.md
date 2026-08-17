@@ -11,6 +11,7 @@ Clients sometimes send back defective material after it has already been invoice
   - Header: return number, return date, client, document type (Debit Note or Return Challan), reference document number, remarks.
   - Line items: pick an invoice of that client, then pick one of its lines — article code, specs, colour and rate auto-fill, and the return qty is capped at what was dispatched on that line (minus what was already returned).
   - Unlinked lines are allowed: choose a PO (or nothing) and type the item details and qty manually, for cases where the original invoice can't be traced.
+  - A return line with no invoice and no PO becomes a standalone pendency for that client — the returned item shows up in the pendency reports as something still owed to the client, with a due date you set on the return (defaults to the return date).
 - Delete a return: reverses its effect on pendency.
 
 **Pendency behaviour**
@@ -18,6 +19,7 @@ Clients sometimes send back defective material after it has already been invoice
 - Pendency (item-wise and PO-wise reports), the PO fulfilment status badge, and the auto-close rule all use the net figure, so a return re-opens pending qty and flips a Completed PO back to Open automatically.
 - Returned material must be re-dispatched to close the PO again; the invoice form's "already dispatched" cap also uses the net figure so you can re-invoice the returned quantity.
 - Both pendency reports gain a "Returned" column next to Dispatched so the difference is visible.
+- Untraceable returns appear as their own rows in the item-wise pendency report (and as a client-level group in the PO-wise report) marked "Return — no PO", with the same urgency colouring and days-remaining logic as normal lines. Once you dispatch against them you tick them off from the return itself, which closes the pendency.
 
 **Permissions**: same role matrix as invoices — admins edit anything, editors edit what they created, viewers read-only.
 
@@ -28,4 +30,4 @@ Clients sometimes send back defective material after it has already been invoice
 - `src/lib/dispatch.ts`: add `returnedByPOItem` / `returnedByPO` and a `netDispatchedByPOItem` helper; existing callers (`reports.ts`, `store.ts`, `invoice-form.tsx`, `po-form.tsx`) switch to the net map.
 - `src/lib/reports.ts`: `computePOPendencies` / `computeItemPendencies` / `poItemBreakdown` return `returned` alongside `dispatched`, pending computed from net.
 - New routes: `sales-returns.index.tsx`, `sales-returns.new.tsx`, `sales-returns.$id.edit.tsx` under `_authenticated`, plus a shared `sales-return-form.tsx` component mirroring `invoice-form.tsx` (including its double-submit guard).
-- Unlinked return lines only affect PO-level pendency when a PO is chosen; with no PO they are recorded for the register and exports only.
+- Unlinked return lines: when a PO is chosen they reduce that PO's net dispatched; with no PO at all they are emitted by `computeItemPendencies` as synthetic pendency rows keyed by the return item id (client, item specs, qty, due date), so filters, sorting and exports work unchanged. The return item carries a `settled` flag (plus settled qty) that removes it from pendency when fulfilled.
