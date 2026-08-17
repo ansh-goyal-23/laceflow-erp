@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useStore, store, type Invoice, type InvoiceItem, type PurchaseOrder, type POLineItem } from "@/lib/store";
-import { dispatchedByPOItem } from "@/lib/dispatch";
+import { netDispatchedByPOItem } from "@/lib/dispatch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
   const clients = useStore((s) => s.clients);
   const pos = useStore((s) => s.purchaseOrders);
   const invoices = useStore((s) => s.invoices);
+  const salesReturns = useStore((s) => s.salesReturns);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -40,7 +41,10 @@ export function InvoiceForm({ existing }: { existing?: Invoice }) {
   const [saving, setSaving] = useState(false);
 
   // Dispatched map excludes current invoice when editing so balances reflect "other invoices"
-  const dispByItem = useMemo(() => dispatchedByPOItem(invoices, existing?.id), [invoices, existing?.id]);
+  const dispByItem = useMemo(
+    () => netDispatchedByPOItem(invoices, salesReturns, existing?.id),
+    [invoices, salesReturns, existing?.id],
+  );
 
   // Open POs for the chosen client (status Open only; do not hide based on dispatched quantity)
   const clientPOs = useMemo(() => {

@@ -1,4 +1,4 @@
-import type { Invoice, PurchaseOrder } from "@/lib/store";
+import type { Invoice, PurchaseOrder, SalesReturn } from "@/lib/store";
 
 export type FulfillmentStatus = "Pending" | "Partially Dispatched" | "Completed";
 
@@ -24,6 +24,62 @@ export function dispatchedByPO(invoices: Invoice[], excludeInvoiceId?: string): 
       if (!it.poId) continue;
       m.set(it.poId, (m.get(it.poId) ?? 0) + (Number(it.dispatchQty) || 0));
     }
+  }
+  return m;
+}
+
+/** Map: po_item_id -> total returned qty across all sales returns */
+export function returnedByPOItem(returns: SalesReturn[], excludeReturnId?: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of returns) {
+    if (excludeReturnId && r.id === excludeReturnId) continue;
+    for (const it of r.items) {
+      if (!it.poItemId) continue;
+      m.set(it.poItemId, (m.get(it.poItemId) ?? 0) + (Number(it.returnQty) || 0));
+    }
+  }
+  return m;
+}
+
+/** Map: po_id -> total returned qty (rows linked to a PO but not a specific PO item included too) */
+export function returnedByPO(returns: SalesReturn[], excludeReturnId?: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of returns) {
+    if (excludeReturnId && r.id === excludeReturnId) continue;
+    for (const it of r.items) {
+      if (!it.poId) continue;
+      m.set(it.poId, (m.get(it.poId) ?? 0) + (Number(it.returnQty) || 0));
+    }
+  }
+  return m;
+}
+
+/** Dispatched net of client returns: po_item_id -> max(0, dispatched - returned) */
+export function netDispatchedByPOItem(
+  invoices: Invoice[],
+  returns: SalesReturn[],
+  excludeInvoiceId?: string,
+): Map<string, number> {
+  const disp = dispatchedByPOItem(invoices, excludeInvoiceId);
+  const ret = returnedByPOItem(returns);
+  const m = new Map(disp);
+  for (const [k, v] of ret) {
+    m.set(k, Math.max(0, (disp.get(k) ?? 0) - v));
+  }
+  return m;
+}
+
+/** Dispatched net of client returns at PO level */
+export function netDispatchedByPO(
+  invoices: Invoice[],
+  returns: SalesReturn[],
+  excludeInvoiceId?: string,
+): Map<string, number> {
+  const disp = dispatchedByPO(invoices, excludeInvoiceId);
+  const ret = returnedByPO(returns);
+  const m = new Map(disp);
+  for (const [k, v] of ret) {
+    m.set(k, Math.max(0, (disp.get(k) ?? 0) - v));
   }
   return m;
 }

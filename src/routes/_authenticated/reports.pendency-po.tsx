@@ -39,6 +39,7 @@ function SortH({ label, k, sortKey, dir, onClick }: { label: string; k: SortKey;
 function PendencyPOReport() {
   const pos = useStore((s) => s.purchaseOrders);
   const invoices = useStore((s) => s.invoices);
+  const salesReturns = useStore((s) => s.salesReturns);
   const brands = useStore((s) => s.brands);
   const clients = useStore((s) => s.clients);
   const yarn = useYarnStore((s) => s);
@@ -64,7 +65,7 @@ function PendencyPOReport() {
   const toggle = (k: SortKey) => { if (sortKey === k) setDir((d) => d === "asc" ? "desc" : "asc"); else { setSortKey(k); setDir("asc"); } setPage(1); };
 
   const rows = useMemo(() => {
-    const base = computePOPendencies(pos, invoices);
+    const base = computePOPendencies(pos, invoices, salesReturns);
     const t = q.toLowerCase();
     const poT = poF.toLowerCase();
     const minP = minPending === "" ? -Infinity : Number(minPending);
@@ -82,7 +83,7 @@ function PendencyPOReport() {
         return true;
       })
       .filter((r) => r.pending >= minP && r.pending <= maxP)
-      .filter((r) => !t || [r.po.poNumber, brandName(r.po.brandId), clientName(r.po.clientId), STAGE_LABEL[stageFor(r.po)]].some((v) => v.toLowerCase().includes(t)))
+      .filter((r) => !t || [r.po.poNumber, brandName(r.po.brandId), clientName(r.po.clientId), r.returnRef ? "Client Return" : STAGE_LABEL[stageFor(r.po)]].some((v) => v.toLowerCase().includes(t)))
       .sort((a, b) => {
         const s = dir === "asc" ? 1 : -1;
         switch (sortKey) {
@@ -95,11 +96,11 @@ function PendencyPOReport() {
           case "ordered": return (a.ordered - b.ordered) * s;
           case "dispatched": return (a.dispatched - b.dispatched) * s;
           case "pending": return (a.pending - b.pending) * s;
-          case "stage": return STAGE_LABEL[stageFor(a.po)].localeCompare(STAGE_LABEL[stageFor(b.po)]) * s;
+          case "stage": return (a.returnRef ? "Client Return" : STAGE_LABEL[stageFor(a.po)]).localeCompare(b.returnRef ? "Client Return" : STAGE_LABEL[stageFor(b.po)]) * s;
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos, invoices, q, brandF, clientF, poF, dueFrom, dueTo, daysF, minPending, maxPending, sortKey, dir, brands, clients, yarn]);
+  }, [pos, invoices, salesReturns, q, brandF, clientF, poF, dueFrom, dueTo, daysF, minPending, maxPending, sortKey, dir, brands, clients, yarn]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -107,9 +108,10 @@ function PendencyPOReport() {
 
   const exportRows = () => rows.map((r) => [
     brandName(r.po.brandId), clientName(r.po.clientId), r.po.poNumber, r.po.poDate, r.po.deliveryDate,
-    daysRemainingLabel(r.daysLeft), r.ordered, r.dispatched, r.pending, STAGE_LABEL[stageFor(r.po)],
+    daysRemainingLabel(r.daysLeft), r.ordered, r.dispatched, r.returned, r.pending,
+    r.returnRef ? "Client Return" : STAGE_LABEL[stageFor(r.po)],
   ]);
-  const headers = ["Brand", "Client", "PO Number", "PO Date", "Delivery Date", "Days Remaining", "Ordered Qty", "Dispatched Qty", "Pending Qty", "Procurement Stage"];
+  const headers = ["Brand", "Client", "PO Number", "PO Date", "Delivery Date", "Days Remaining", "Ordered Qty", "Dispatched Qty (Net)", "Returned Qty", "Pending Qty", "Procurement Stage"];
 
   return (
     <div className="p-6 lg:p-8 max-w-[1600px]">
@@ -196,28 +198,36 @@ function PendencyPOReport() {
                 <TableHead><SortH label="Days Remaining" k="daysLeft" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="text-right"><SortH label="Ordered Qty" k="ordered" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="text-right"><SortH label="Dispatched Qty" k="dispatched" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
+                <TableHead className="text-right">Returned Qty</TableHead>
                 <TableHead className="text-right"><SortH label="Pending Qty" k="pending" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
                 <TableHead className="w-52"><SortH label="Procurement Stage" k="stage" sortKey={sortKey} dir={dir} onClick={toggle} /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.length === 0 ? (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No pending POs</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No pending POs</TableCell></TableRow>
               ) : pageRows.map((r: POPendency) => (
                 <TableRow key={r.po.id} className={urgencyClass(r.daysLeft)}>
                   <TableCell>{brandName(r.po.brandId)}</TableCell>
                   <TableCell>{clientName(r.po.clientId)}</TableCell>
                   <TableCell>
-                    <button className="font-medium text-primary hover:underline" onClick={() => setViewing(r.po)}>{r.po.poNumber}</button>
+                    {r.returnRef ? (
+                      <span className="font-medium">{r.po.poNumber}</span>
+                    ) : (
+                      <button className="font-medium text-primary hover:underline" onClick={() => setViewing(r.po)}>{r.po.poNumber}</button>
+                    )}
                   </TableCell>
                   <TableCell>{r.po.poDate}</TableCell>
                   <TableCell>{r.po.deliveryDate}</TableCell>
                   <TableCell className="whitespace-nowrap">{daysRemainingLabel(r.daysLeft)}</TableCell>
                   <TableCell className="text-right">{r.ordered}</TableCell>
                   <TableCell className="text-right">{r.dispatched}</TableCell>
+                  <TableCell className="text-right">{r.returned || 0}</TableCell>
                   <TableCell className="text-right font-medium">{r.pending}</TableCell>
                   <TableCell>
-                    {(() => { const st = stageFor(r.po); return <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>; })()}
+                    {r.returnRef
+                      ? <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300" variant="secondary">Client Return</Badge>
+                      : (() => { const st = stageFor(r.po); return <Badge className={STAGE_BADGE[st]} variant="secondary">{STAGE_LABEL[st]}</Badge>; })()}
                   </TableCell>
                 </TableRow>
               ))}
@@ -252,13 +262,14 @@ function PendencyPOReport() {
                     <TableHead>UOM</TableHead>
                     <TableHead className="text-right">Ordered</TableHead>
                     <TableHead className="text-right">Dispatched</TableHead>
+                    <TableHead className="text-right">Returned</TableHead>
                     <TableHead className="text-right">Pending</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
                     <TableHead>Procurement Stage</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {poItemBreakdown(viewing, invoices).map((i) => (
+                  {poItemBreakdown(viewing, invoices, salesReturns).map((i) => (
                     <TableRow key={i.id}>
                       <TableCell>{i.articleCode || "—"}</TableCell>
                       <TableCell>{i.laceType || "—"}</TableCell>
@@ -269,6 +280,7 @@ function PendencyPOReport() {
                       <TableCell>{i.uom}</TableCell>
                       <TableCell className="text-right">{i.ordered}</TableCell>
                       <TableCell className="text-right">{i.dispatched}</TableCell>
+                      <TableCell className="text-right">{i.returned || 0}</TableCell>
                       <TableCell className="text-right font-medium">{i.pending}</TableCell>
                       <TableCell className="text-right">{i.rate}</TableCell>
                       <TableCell>
