@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo, UserCog, HardHat } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo, UserCog, HardHat, Undo2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
