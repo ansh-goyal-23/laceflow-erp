@@ -775,23 +775,6 @@ async function refreshSalesReturn(id: string) {
   });
 }
 
-async function refreshInvoiceUnused(id: string) {
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("*, invoice_items(*)")
-    .eq("id", id)
-    .single();
-  if (error) throw error;
-  const inv = toInvoice(data as InvoiceRow);
-  const existing = state.invoices.find((i) => i.id === id);
-  set({
-    ...state,
-    invoices: existing
-      ? state.invoices.map((i) => (i.id === id ? inv : i))
-      : [inv, ...state.invoices],
-  });
-}
-
 // ---- Bulk import helpers ----
 
 export type DuplicateStrategy = "skip" | "update" | "replace";
