@@ -591,13 +591,94 @@ export const store = {
     void logActivity("Invoices", "DELETE", "Invoice", existing?.invoiceNumber ?? id);
     await syncPOStatuses(affected);
   },
+
+  // ---- Sales Returns ----
+  async addSalesReturn(
+    r: Omit<SalesReturn, "id" | "createdAt" | "createdBy" | "items"> & { items: Omit<SalesReturnItem, "id" | "returnId">[] },
+  ): Promise<SalesReturn> {
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    const { data, error } = await supabase
+      .from("sales_returns")
+      .insert({
+        return_number: r.returnNumber.trim(),
+        return_date: r.returnDate,
+        client_id: r.clientId,
+        doc_type: r.docType,
+        reference_number: r.referenceNumber || null,
+        due_date: r.dueDate || null,
+        remarks: r.remarks || null,
+        created_by: uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    const rid = (data as { id: string }).id;
+    await insertReturnItems(rid, r.items);
+    await refreshSalesReturn(rid);
+    void logActivity("Sales Returns", "CREATE", "Sales Return", r.returnNumber);
+    await syncPOStatuses(r.items.map((i) => i.poId).filter(Boolean) as string[]);
+    return state.salesReturns.find((x) => x.id === rid)!;
+  },
+  async updateSalesReturn(
+    id: string,
+    r: Omit<SalesReturn, "id" | "createdAt" | "createdBy" | "items"> & { items: Omit<SalesReturnItem, "id" | "returnId">[] },
+  ) {
+    const prev = state.salesReturns.find((x) => x.id === id);
+    const prevPoIds = prev ? (prev.items.map((i) => i.poId).filter(Boolean) as string[]) : [];
+    const { error } = await supabase
+      .from("sales_returns")
+      .update({
+        return_number: r.returnNumber.trim(),
+        return_date: r.returnDate,
+        client_id: r.clientId,
+        doc_type: r.docType,
+        reference_number: r.referenceNumber || null,
+        due_date: r.dueDate || null,
+        remarks: r.remarks || null,
+      })
+      .eq("id", id);
+    if (error) throw error;
+    const del = await supabase.from("sales_return_items").delete().eq("return_id", id);
+    if (del.error) throw del.error;
+    await insertReturnItems(id, r.items);
+    await refreshSalesReturn(id);
+    void logActivity("Sales Returns", "EDIT", "Sales Return", r.returnNumber);
+    await syncPOStatuses([...prevPoIds, ...(r.items.map((i) => i.poId).filter(Boolean) as string[])]);
+  },
+  async deleteSalesReturn(id: string) {
+    const existing = state.salesReturns.find((x) => x.id === id);
+    const affected = existing ? (existing.items.map((i) => i.poId).filter(Boolean) as string[]) : [];
+    const { error } = await supabase.from("sales_returns").delete().eq("id", id);
+    if (error) throw error;
+    set({ ...state, salesReturns: state.salesReturns.filter((x) => x.id !== id) });
+    void logActivity("Sales Returns", "DELETE", "Sales Return", existing?.returnNumber ?? id);
+    await syncPOStatuses(affected);
+  },
+  /** Mark an untraceable (standalone) return line as settled / unsettled. */
+  async setReturnItemSettled(returnId: string, itemId: string, settled: boolean) {
+    const item = state.salesReturns.find((r) => r.id === returnId)?.items.find((i) => i.id === itemId);
+    const { error } = await supabase
+      .from("sales_return_items")
+      .update({ settled, settled_qty: settled ? (item?.returnQty ?? 0) : 0 })
+      .eq("id", itemId);
+    if (error) throw error;
+    set({
+      ...state,
+      salesReturns: state.salesReturns.map((r) =>
+        r.id !== returnId ? r : {
+          ...r,
+          items: r.items.map((i) => (i.id === itemId ? { ...i, settled, settledQty: settled ? i.returnQty : 0 } : i)),
+        },
+      ),
+    });
+  },
 };
 
 async function syncPOStatuses(poIds: string[]) {
   const unique = Array.from(new Set(poIds));
   if (!unique.length) return;
-  const byItem = dispatchedByPOItem(state.invoices);
-  const byPo = dispatchedByPO(state.invoices);
+  const byItem = netDispatchedByPOItem(state.invoices, state.salesReturns);
+  const byPo = netDispatchedByPO(state.invoices, state.salesReturns);
   for (const poId of unique) {
     const po = state.purchaseOrders.find((p) => p.id === poId);
     if (!po) continue;
