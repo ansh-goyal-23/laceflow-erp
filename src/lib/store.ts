@@ -265,6 +265,80 @@ const toInvoice = (r: InvoiceRow): Invoice => ({
   items: (r.invoice_items ?? []).map(toInvoiceItem),
 });
 
+type SalesReturnItemRow = {
+  id: string;
+  return_id: string;
+  invoice_id: string | null;
+  invoice_item_id: string | null;
+  invoice_number: string | null;
+  po_id: string | null;
+  po_item_id: string | null;
+  po_number: string | null;
+  article_code: string | null;
+  lace_type: string | null;
+  material_type: string | null;
+  width: string | null;
+  length: string | null;
+  color: string | null;
+  uom: string;
+  return_qty: number | string;
+  rate: number | string;
+  reason: string | null;
+  settled: boolean;
+  settled_qty: number | string;
+  sort_order?: number;
+};
+type SalesReturnRow = {
+  id: string;
+  return_number: string;
+  return_date: string;
+  client_id: string;
+  doc_type: string;
+  reference_number: string | null;
+  due_date: string | null;
+  remarks: string | null;
+  created_at: string;
+  created_by: string | null;
+  sales_return_items: SalesReturnItemRow[];
+};
+const toSalesReturnItem = (r: SalesReturnItemRow): SalesReturnItem => ({
+  id: r.id,
+  returnId: r.return_id,
+  invoiceId: r.invoice_id,
+  invoiceItemId: r.invoice_item_id,
+  invoiceNumber: r.invoice_number ?? "",
+  poId: r.po_id,
+  poItemId: r.po_item_id,
+  poNumber: r.po_number ?? "",
+  articleCode: r.article_code ?? "",
+  laceType: r.lace_type ?? "",
+  materialType: r.material_type ?? "",
+  width: r.width ?? "",
+  length: r.length ?? "",
+  color: r.color ?? "",
+  uom: r.uom,
+  returnQty: Number(r.return_qty) || 0,
+  rate: Number(r.rate) || 0,
+  reason: r.reason ?? "",
+  settled: !!r.settled,
+  settledQty: Number(r.settled_qty) || 0,
+});
+const toSalesReturn = (r: SalesReturnRow): SalesReturn => ({
+  id: r.id,
+  returnNumber: r.return_number,
+  returnDate: r.return_date,
+  clientId: r.client_id,
+  docType: (r.doc_type === "return_challan" ? "return_challan" : "debit_note"),
+  referenceNumber: r.reference_number ?? "",
+  dueDate: r.due_date ?? "",
+  remarks: r.remarks ?? "",
+  createdAt: r.created_at,
+  createdBy: r.created_by ?? null,
+  items: [...(r.sales_return_items ?? [])]
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map(toSalesReturnItem),
+});
+
 // ---------- store ----------
 
 export const store = {
@@ -274,7 +348,7 @@ export const store = {
     set(empty);
   },
   async hydrate() {
-    const [b, c, p, inv] = await Promise.all([
+    const [b, c, p, inv, sr] = await Promise.all([
       supabase.from("brands").select("*").order("created_at"),
       supabase.from("clients").select("*").order("created_at"),
       supabase
@@ -285,16 +359,23 @@ export const store = {
         .from("invoices")
         .select("*, invoice_items(*)")
         .order("created_at", { ascending: false }),
+      supabase
+        .from("sales_returns")
+        .select("*, sales_return_items(*)")
+        .order("created_at", { ascending: false }),
     ]);
     if (b.error) throw b.error;
     if (c.error) throw c.error;
     if (p.error) throw p.error;
     if (inv.error) throw inv.error;
+    // Sales returns table may not exist yet (migration not run) — degrade gracefully.
+    if (sr.error) console.warn("Sales returns unavailable:", sr.error.message);
     set({
       brands: (b.data as BrandRow[]).map(toBrand),
       clients: (c.data as ClientRow[]).map(toClient),
       purchaseOrders: (p.data as PORow[]).map(toPO),
       invoices: (inv.data as InvoiceRow[]).map(toInvoice),
+      salesReturns: sr.error ? [] : ((sr.data ?? []) as unknown as SalesReturnRow[]).map(toSalesReturn),
     });
   },
 
