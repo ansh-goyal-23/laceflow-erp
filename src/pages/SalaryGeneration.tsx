@@ -14,7 +14,7 @@ import { calcMonth, fmtHMZero, type MonthSummary, type SalarySettings } from '@/
 import {
   useSalaryEmployees, useSalaryUploadedMonths, useSalaryPunches, useSalaryOverrides, useSalaryHolidays,
   useSalaryPayments, useUpdateSalaryEmployee, useUploadAttendance, useMarkSalaryPaid, useUnmarkSalaryPaid,
-  useSaveHoliday, useDeleteHoliday, type SalaryEmployee,
+  useSaveHoliday, useDeleteHoliday, useSalaryAdvances, useAddSalaryAdvance, useDeleteSalaryAdvance, type SalaryEmployee,
 } from '@/hooks/useSalary';
 
 const inr = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -39,6 +39,9 @@ const SalaryGeneration: React.FC = () => {
   const { data: overrides = {} } = useSalaryOverrides(month);
   const { data: holidayRows = [] } = useSalaryHolidays();
   const { data: payments = {} } = useSalaryPayments(month);
+  const { data: advancesBy = {} } = useSalaryAdvances(month);
+  const addAdvance = useAddSalaryAdvance();
+  const deleteAdvance = useDeleteSalaryAdvance();
   const holidays = useMemo(() => Object.fromEntries(holidayRows.map(h => [h.holiday_date, h.name])), [holidayRows]);
 
   const upload = useUploadAttendance();
@@ -55,6 +58,8 @@ const SalaryGeneration: React.FC = () => {
   const [form, setForm] = useState({ salary: '', hours: '', lunchIncluded: false, active: true });
   const [payEmp, setPayEmp] = useState<{ emp: SalaryEmployee; amount: number } | null>(null);
   const [payForm, setPayForm] = useState({ paidOn: today(), remarks: '' });
+  const [advEmpId, setAdvEmpId] = useState<string | null>(null);
+  const [advForm, setAdvForm] = useState({ amount: '', givenOn: today(), note: '' });
   const [holidaysOpen, setHolidaysOpen] = useState(false);
   const [newHoliday, setNewHoliday] = useState({ date: '', name: '' });
 
@@ -66,18 +71,20 @@ const SalaryGeneration: React.FC = () => {
         const summary: MonthSummary | null = s
           ? calcMonth({ month, punchesByDate: punches[e.id] || {}, overridesByDate: overrides[e.id] || {}, holidays }, s)
           : null;
-        return { e, s, summary, payment: payments[e.id] };
+        const advance = (advancesBy[e.id] || []).reduce((a, x) => a + x.amount, 0);
+        return { e, s, summary, payment: payments[e.id], advance };
       });
-  }, [employees, punches, overrides, holidays, payments, month, showAll]);
+  }, [employees, punches, overrides, holidays, payments, advancesBy, month, showAll]);
 
   const totals = useMemo(() => {
-    let salary = 0, paid = 0, due = 0, missing = 0;
+    let salary = 0, advance = 0, net = 0, paid = 0, due = 0, missing = 0;
     rows.forEach(r => {
       if (!r.summary) { missing++; return; }
-      salary += r.summary.salary;
-      if (r.payment) paid += r.payment.amount; else due += r.summary.salary;
+      const n = r.summary.salary - r.advance;
+      salary += r.summary.salary; advance += r.advance; net += n;
+      if (r.payment) paid += r.payment.amount; else due += n;
     });
-    return { salary, paid, due, missing };
+    return { salary, advance, net, paid, due, missing };
   }, [rows]);
 
   const onFile = async (file: File | undefined) => {
@@ -194,17 +201,19 @@ const SalaryGeneration: React.FC = () => {
                 <TableHead className="text-right">Total Overtime</TableHead>
                 <TableHead className="text-right">Total Paid Hours</TableHead>
                 <TableHead className="text-right">Salary Calculated</TableHead>
+                <TableHead className="text-right">Advance</TableHead>
+                <TableHead className="text-right">Net Payable</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Card</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                   No attendance for {monthLabel(month)}. Upload that month's sheet, or pick another month.
                 </TableCell></TableRow>
               )}
-              {rows.map(({ e, s, summary, payment }) => (
+              {rows.map(({ e, s, summary, payment, advance }) => (
                 <TableRow key={e.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -224,10 +233,16 @@ const SalaryGeneration: React.FC = () => {
                       <TableCell className="text-right">{summary.daysPresent}</TableCell>
                       <TableCell className="text-right">{fmtHMZero(summary.otMin)}</TableCell>
                       <TableCell className="text-right">{summary.paidHours.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-semibold">{inr(summary.salary)}</TableCell>
+                      <TableCell className="text-right">{inr(summary.salary)}</TableCell>
+                      <TableCell className="text-right">
+                        <button className="underline-offset-2 hover:underline" title="Add or view salary advances" onClick={() => { setAdvEmpId(e.id); setAdvForm({ amount: '', givenOn: today(), note: '' }); }}>
+                          {advance > 0 ? inr(advance) : <span className="text-muted-foreground">+ Add</span>}
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">{inr(summary.salary - advance)}</TableCell>
                     </>
                   ) : (
-                    <TableCell colSpan={4} className="text-center">
+                    <TableCell colSpan={6} className="text-center">
                       <Button variant="outline" size="sm" onClick={() => openSettings(e)}>Set salary and working hours</Button>
                     </TableCell>
                   )}
@@ -236,15 +251,15 @@ const SalaryGeneration: React.FC = () => {
                       : payment ? (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <Badge className="bg-emerald-600 hover:bg-emerald-600">Paid</Badge>
-                          {payment.amount !== summary.salary && (
-                            <Badge variant="outline" className="text-amber-600 border-amber-400" title={`Paid ${inr(payment.amount)}, calculated now ${inr(summary.salary)}`}>Changed since paid</Badge>
+                          {payment.amount !== summary.salary - advance && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-400" title={`Paid ${inr(payment.amount)}, payable now ${inr(summary.salary - advance)}`}>Changed since paid</Badge>
                           )}
                           <button className="text-xs text-muted-foreground hover:underline" onClick={() => undoPaid(e)}>undo</button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-amber-600 border-amber-400">Yet to be paid</Badge>
-                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => { setPayEmp({ emp: e, amount: summary.salary }); setPayForm({ paidOn: today(), remarks: '' }); }}>Mark paid</Button>
+                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => { setPayEmp({ emp: e, amount: summary.salary - advance }); setPayForm({ paidOn: today(), remarks: '' }); }}>Mark paid</Button>
                         </div>
                       )}
                   </TableCell>
@@ -259,6 +274,8 @@ const SalaryGeneration: React.FC = () => {
                 <TableRow>
                   <TableCell colSpan={6} className="text-right font-semibold">Total ({monthLabel(month)})</TableCell>
                   <TableCell className="text-right font-bold">{inr(totals.salary)}</TableCell>
+                  <TableCell className="text-right font-bold">{inr(totals.advance)}</TableCell>
+                  <TableCell className="text-right font-bold">{inr(totals.net)}</TableCell>
                   <TableCell colSpan={2} className="text-xs text-muted-foreground">
                     Paid {inr(totals.paid)}. Yet to be paid {inr(totals.due)}.
                     {totals.missing > 0 && ` ${totals.missing} employee(s) have no salary set.`}
@@ -279,10 +296,12 @@ const SalaryGeneration: React.FC = () => {
           overridesByDate={overrides[cardRow.e.id] || {}}
           holidays={holidays}
           payment={payments[cardRow.e.id]}
+          advances={advancesBy[cardRow.e.id] || []}
+          onManageAdvances={() => { setAdvEmpId(cardRow.e.id); setAdvForm({ amount: '', givenOn: today(), note: '' }); }}
           onClose={() => setCardEmpId(null)}
           onMarkPaid={() => {
             const sm = calcMonth({ month, punchesByDate: punches[cardRow.e.id] || {}, overridesByDate: overrides[cardRow.e.id] || {}, holidays }, cardRow.s!);
-            setPayEmp({ emp: cardRow.e, amount: sm.salary }); setPayForm({ paidOn: today(), remarks: '' });
+            setPayEmp({ emp: cardRow.e, amount: sm.salary - (advancesBy[cardRow.e.id] || []).reduce((a, x) => a + x.amount, 0) }); setPayForm({ paidOn: today(), remarks: '' });
           }}
           onUndoPaid={() => undoPaid(cardRow.e)}
         />
@@ -338,6 +357,43 @@ const SalaryGeneration: React.FC = () => {
             <Button variant="outline" onClick={() => setPayEmp(null)}>Cancel</Button>
             <Button onClick={confirmPay} disabled={markPaid.isPending}>Confirm paid</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Salary advances */}
+      <Dialog open={!!advEmpId} onOpenChange={o => { if (!o) setAdvEmpId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Salary advance: {employees.find(x => x.id === advEmpId)?.name}</DialogTitle>
+            <DialogDescription>Advances given against {monthLabel(month)} salary. The total is deducted to give the net payable.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-[7rem_9rem_1fr_auto] gap-2 items-end">
+            <div><Label className="text-xs">Amount (₹)</Label><Input inputMode="decimal" value={advForm.amount} onChange={e => setAdvForm({ ...advForm, amount: e.target.value })} /></div>
+            <div><Label className="text-xs">Given on</Label><Input type="date" value={advForm.givenOn} onChange={e => setAdvForm({ ...advForm, givenOn: e.target.value })} /></div>
+            <div><Label className="text-xs">Note</Label><Input value={advForm.note} onChange={e => setAdvForm({ ...advForm, note: e.target.value })} /></div>
+            <Button disabled={addAdvance.isPending} onClick={async () => {
+              const amt = Number(advForm.amount);
+              if (!advEmpId || !Number.isFinite(amt) || amt <= 0) { toast.error('Enter a valid advance amount.'); return; }
+              if (!advForm.givenOn) { toast.error('Pick the date it was given.'); return; }
+              try {
+                await addAdvance.mutateAsync({ employeeId: advEmpId, month, amount: amt, givenOn: advForm.givenOn, note: advForm.note });
+                setAdvForm({ amount: '', givenOn: today(), note: '' });
+              } catch (err: any) { toast.error(err?.message || 'Could not save.'); }
+            }}>Add</Button>
+          </div>
+          <div className="max-h-56 overflow-y-auto border rounded-md divide-y">
+            {(advancesBy[advEmpId || ''] || []).length === 0 && <div className="p-3 text-sm text-muted-foreground">No advance for {monthLabel(month)}.</div>}
+            {(advancesBy[advEmpId || ''] || []).map(a => (
+              <div key={a.id} className="flex items-center justify-between p-2 text-sm">
+                <span>{new Date(a.given_on + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}: <b>{inr(a.amount)}</b>{a.note ? ` (${a.note})` : ''}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
+                  if (!window.confirm('Delete this advance?')) return;
+                  try { await deleteAdvance.mutateAsync(a.id); } catch (err: any) { toast.error(err?.message || 'Could not delete.'); }
+                }}><Trash2 className="h-3.5 w-3.5" /></Button>
+              </div>
+            ))}
+          </div>
+          <div className="text-sm font-medium text-right">Total advance: {inr((advancesBy[advEmpId || ''] || []).reduce((a, x) => a + x.amount, 0))}</div>
         </DialogContent>
       </Dialog>
 

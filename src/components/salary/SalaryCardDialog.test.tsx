@@ -28,7 +28,7 @@ describe('SalaryCardDialog', () => {
 
   it('shows the header totals and one row per day', () => {
     mount();
-    expect(screen.getByText('₹14,761')).toBeInTheDocument();
+    expect(screen.getAllByText('₹14,761').length).toBeGreaterThan(0);
     expect(screen.getByText('95h 0m')).toBeInTheDocument();
     expect(screen.getByText('323.00')).toBeInTheDocument();
     const rows = screen.getAllByRole('row');

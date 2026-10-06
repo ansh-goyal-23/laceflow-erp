@@ -26,6 +26,16 @@ export interface SalaryPayment {
   paid_by: string | null;
 }
 
+export interface SalaryAdvance {
+  id: number;
+  employee_id: string;
+  month: string;
+  amount: number;
+  given_on: string;
+  note: string | null;
+  created_by: string | null;
+}
+
 export interface SalaryEditRow {
   id: number;
   employee_id: string;
@@ -308,6 +318,46 @@ export function useDeleteHoliday() {
   return useMutation({
     mutationFn: async (date: string) => {
       const { error } = await sb.from('salary_holidays').delete().eq('holiday_date', date);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+/** employeeId -> advances given for that salary month */
+export function useSalaryAdvances(month: string) {
+  return useQuery({
+    queryKey: ['salary_advances', month],
+    queryFn: async (): Promise<Record<string, SalaryAdvance[]>> => {
+      const { data, error } = await sb.from('salary_advances').select('*').eq('month', month).order('given_on').order('id');
+      if (error) throw error;
+      const out: Record<string, SalaryAdvance[]> = {};
+      (data || []).forEach((r: any) => { (out[r.employee_id] ||= []).push({ ...r, amount: Number(r.amount) }); });
+      return out;
+    },
+  });
+}
+
+export function useAddSalaryAdvance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { employeeId: string; month: string; amount: number; givenOn: string; note: string }) => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error } = await sb.from('salary_advances').insert({
+        employee_id: input.employeeId, month: input.month, amount: input.amount,
+        given_on: input.givenOn, note: input.note.trim() || null, created_by: u?.user?.email || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+export function useDeleteSalaryAdvance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await sb.from('salary_advances').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => invalidateSalary(qc),

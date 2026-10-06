@@ -160,3 +160,21 @@ insert into public.salary_holidays (holiday_date, name) values
   ('2026-08-15', 'Independence Day'),
   ('2026-08-28', 'Raksha Bandhan')
 on conflict (holiday_date) do nothing;
+
+-- Salary advances (added later): per employee, per salary month; deducted from net payable.
+create table if not exists public.salary_advances (
+  id bigint generated always as identity primary key,
+  employee_id uuid not null references public.salary_employees(id) on delete cascade,
+  month text not null check (month ~ '^[0-9]{4}-[0-9]{2}$'),
+  amount numeric(12,2) not null check (amount > 0),
+  given_on date not null default current_date,
+  note text,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists salary_advances_emp_month_idx on public.salary_advances (employee_id, month);
+revoke all on public.salary_advances from anon;
+grant select, insert, update, delete on public.salary_advances to authenticated;
+grant all on public.salary_advances to service_role;
+alter table public.salary_advances enable row level security;
+create policy "salary_advances_admin_all" on public.salary_advances for all to authenticated using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));

@@ -12,7 +12,7 @@ import {
   calcMonth, fmtHM, fmtHMZero, type DayResult, type SalarySettings, type TimeOverride,
 } from '@/lib/salaryCalc';
 import {
-  useSalaryEdits, useSaveTimeEdit, type SalaryEmployee, type SalaryPayment,
+  useSalaryEdits, useSaveTimeEdit, type SalaryEmployee, type SalaryPayment, type SalaryAdvance,
 } from '@/hooks/useSalary';
 
 const inr = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -32,6 +32,8 @@ interface Props {
   overridesByDate: Record<string, TimeOverride>;
   holidays: Record<string, string>;
   payment?: SalaryPayment;
+  advances?: SalaryAdvance[];
+  onManageAdvances?: () => void;
   onClose: () => void;
   onMarkPaid: () => void;
   onUndoPaid: () => void;
@@ -47,7 +49,7 @@ const Tile: React.FC<{ label: string; value: string; strong?: boolean }> = ({ la
 );
 
 const SalaryCardDialog: React.FC<Props> = ({
-  employee, month, settings, punchesByDate, overridesByDate, holidays, payment, onClose, onMarkPaid, onUndoPaid,
+  employee, month, settings, punchesByDate, overridesByDate, holidays, payment, advances = [], onManageAdvances, onClose, onMarkPaid, onUndoPaid,
 }) => {
   const summary = useMemo(
     () => calcMonth({ month, punchesByDate, overridesByDate, holidays }, settings),
@@ -85,7 +87,9 @@ const SalaryCardDialog: React.FC<Props> = ({
     }
   };
 
-  const paidDiffers = payment && payment.amount !== summary.salary;
+  const advanceTotal = advances.reduce((a, x) => a + x.amount, 0);
+  const netPayable = summary.salary - advanceTotal;
+  const paidDiffers = payment && payment.amount !== netPayable;
 
   const timeCell = (day: DayResult, field: 'in' | 'out') => {
     const t = field === 'in' ? day.inTime : day.outTime;
@@ -171,7 +175,9 @@ const SalaryCardDialog: React.FC<Props> = ({
             <Tile label="Regular Hours Worked (excl. holidays)" value={hoursStr(summary.regularMin)} />
             <Tile label="Holiday Hours (paid)" value={hoursStr(summary.holidayMin)} />
             <Tile label="Total Paid Hours" value={summary.paidHours.toFixed(2)} />
-            <Tile label="Total Salary Calculated" value={inr(summary.salary)} strong />
+            <Tile label="Total Salary Calculated" value={inr(summary.salary)} />
+            <Tile label="Salary Advance (this month)" value={inr(advanceTotal)} />
+            <Tile label="Net Payable (salary - advance)" value={inr(netPayable)} strong />
           </div>
           <div className="text-xs text-muted-foreground">
             Salary = monthly salary / ({summary.daysInMonth} days x {settings.workingHours} hrs) x total paid hours
@@ -179,7 +185,7 @@ const SalaryCardDialog: React.FC<Props> = ({
             {payment && (
               <span className={paidDiffers ? ' text-amber-600 font-medium' : ''}>
                 {' '}Paid {inr(payment.amount)} on {dayLabel(payment.paid_on)}
-                {paidDiffers ? ` (the calculated salary is now ${inr(summary.salary)}, a difference of ${inr(summary.salary - payment.amount)})` : ''}.
+                {paidDiffers ? ` (the net payable is now ${inr(netPayable)}, a difference of ${inr(netPayable - payment.amount)})` : ''}.
               </span>
             )}
           </div>
@@ -225,7 +231,8 @@ const SalaryCardDialog: React.FC<Props> = ({
           <DialogFooter className="gap-2 sm:gap-2">
             {payment
               ? <Button variant="outline" onClick={onUndoPaid}>Undo "Paid"</Button>
-              : <Button onClick={onMarkPaid}>Mark as paid ({inr(summary.salary)})</Button>}
+              : <Button onClick={onMarkPaid}>Mark as paid ({inr(netPayable)})</Button>}
+            {onManageAdvances && <Button variant="outline" onClick={onManageAdvances}>Salary advances ({advances.length})</Button>}
             <Button variant="outline" onClick={onClose}>Close</Button>
           </DialogFooter>
         </DialogContent>
