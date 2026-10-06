@@ -255,3 +255,18 @@ $$;
 DROP TRIGGER IF EXISTS attendance_edits_append_only ON public.attendance_edits;
 CREATE TRIGGER attendance_edits_append_only BEFORE UPDATE OR DELETE ON public.attendance_edits
 FOR EACH ROW EXECUTE FUNCTION public.reject_attendance_edit_mutation();
+
+CREATE OR REPLACE FUNCTION public.flag_salary_changed_after_attendance_edit()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE public.salary_payments
+     SET status = 'Unpaid', changed_after_payment = true, updated_at = now()
+   WHERE employee_id = NEW.employee_id
+     AND salary_month = to_char(NEW.date, 'YYYY-MM')
+     AND status = 'Paid';
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS attendance_edit_reopen_salary ON public.attendance_edits;
+CREATE TRIGGER attendance_edit_reopen_salary AFTER INSERT ON public.attendance_edits
+FOR EACH ROW EXECUTE FUNCTION public.flag_salary_changed_after_attendance_edit();
