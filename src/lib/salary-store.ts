@@ -57,7 +57,7 @@ function mapRules(row: Record<string, unknown> | null): SalaryRules {
 }
 
 function rulesToRow(rules: SalaryRules) {
-  return { id: true, ot_grace_minutes: rules.otGraceMinutes, min_ot_minutes: rules.minOtMinutes,
+  return { id: "global", ot_grace_minutes: rules.otGraceMinutes, min_ot_minutes: rules.minOtMinutes,
     hours_rounding_minutes: rules.hoursRoundingMinutes, ignore_punches_before: rules.ignorePunchesBefore,
     lunch_window_start: rules.lunchWindowStart, lunch_window_end: rules.lunchWindowEnd,
     holidays_are_paid: rules.holidaysArePaid, holiday_hours_equal_working_hours: rules.holidayHoursEqualWorkingHours,
@@ -127,18 +127,24 @@ export async function saveAttendanceUpload(file: File, parsed: ParsedAttendance,
   for (const emp of parsed.employees) {
     const employeeId = idByNo.get(emp.machineNo);
     if (!employeeId) continue;
-    for (const [date, punches] of Object.entries(emp.punches)) {
+    const daysInMonth = new Date(Number(parsed.month.slice(0, 4)), Number(parsed.month.slice(5, 7)), 0).getDate();
+    for (let index = 1; index <= daysInMonth; index += 1) {
+      const date = `${parsed.month}-${String(index).padStart(2, "0")}`;
+      const punches = emp.punches[date] ?? [];
       for (const punchTime of punches) punchRows.push({ upload_id: uploadId, employee_id: employeeId, date, punch_time: punchTime });
       const priorDay = keepEdits.get(`${employeeId}|${date}`);
       dayRows.push({ employee_id: employeeId, month: parsed.month, date, raw_punches: punches,
         in_time_edited: priorDay?.inTimeEdited ?? null, out_time_edited: priorDay?.outTimeEdited ?? null,
         is_edited: Boolean(priorDay?.inTimeEdited || priorDay?.outTimeEdited) });
     }
-    for (const dayRow of Object.values(emp.punches).flatMap(() => [])) void dayRow;
   }
   throwIf((await supabase.from("attendance_days").delete().eq("month", parsed.month)).error);
   if (punchRows.length) throwIf((await supabase.from("punch_logs").insert(punchRows)).error);
-  if (dayRows.length) throwIf((await supabase.from("attendance_days").upsert(dayRows, { onConflict: "employee_id,date" })).error);
+  if (dayRows.length) {
+    for (let offset = 0; offset < dayRows.length; offset += 500) {
+      throwIf((await supabase.from("attendance_days").upsert(dayRows.slice(offset, offset + 500), { onConflict: "employee_id,date" })).error);
+    }
+  }
   await logActivity("Salary Generation", "IMPORT", "Attendance", parsed.month);
 }
 
