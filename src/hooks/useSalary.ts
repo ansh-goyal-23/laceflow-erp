@@ -15,6 +15,33 @@ export interface SalaryEmployee {
   monthly_salary: number | null;
   working_hours: number | null;
   lunch_included: boolean;
+  joined_on: string | null;
+  left_on: string | null;
+}
+
+export interface SalaryHoliday { holiday_date: string; name: string; confirmed: boolean }
+
+export interface SalaryRun {
+  employee_id: string;
+  month: string;
+  monthly_salary: number;
+  working_hours: number;
+  lunch_included: boolean;
+  holidays: Record<string, string>;
+  days_present: number;
+  overtime_minutes: number;
+  paid_hours: number;
+  salary: number;
+  advance_balance_before: number;
+  advance_recovered: number;
+  net_payable: number;
+  generated_at: string;
+  generated_by: string | null;
+}
+
+export interface SalaryRunLogRow {
+  id: number; employee_id: string; month: string; action: 'generate' | 'reopen';
+  reason: string | null; amount: number | null; by_email: string | null; at: string;
 }
 
 export interface SalaryPayment {
@@ -132,10 +159,10 @@ export function useSalaryOverrides(month: string) {
 export function useSalaryHolidays() {
   return useQuery({
     queryKey: ['salary_holidays'],
-    queryFn: async (): Promise<{ holiday_date: string; name: string }[]> => {
+    queryFn: async (): Promise<SalaryHoliday[]> => {
       const { data, error } = await sb.from('salary_holidays').select('*').order('holiday_date');
       if (error) throw error;
-      return data || [];
+      return (data || []).map((r: any) => ({ ...r, confirmed: r.confirmed !== false }));
     },
   });
 }
@@ -172,7 +199,7 @@ export function useUpdateSalaryEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      id: string; monthly_salary: number | null; working_hours: number | null; lunch_included: boolean; is_active: boolean;
+      id: string; monthly_salary: number | null; working_hours: number | null; lunch_included: boolean; is_active: boolean; left_on: string | null;
     }) => {
       const { id, ...patch } = input;
       const { error } = await sb.from('salary_employees').update(patch).eq('id', id);
@@ -190,6 +217,10 @@ export function useUploadAttendance() {
     mutationFn: async (input: { parsed: ParsedAttendance; fileName: string }): Promise<UploadResult> => {
       const { parsed, fileName } = input;
       const { data: u } = await supabase.auth.getUser();
+
+      const { count: locked, error: eLock } = await sb.from('salary_runs').select('employee_id', { count: 'exact', head: true }).eq('month', parsed.month);
+      if (eLock) throw eLock;
+      if (locked) throw new Error(`Salary for ${parsed.month} is already generated for ${locked} employee(s). Reopen those first, then upload again.`);
 
       // 1. Add employees we have not seen before (never overwrite salary settings).
       const { data: existing, error: e0 } = await sb.from('salary_employees').select('machine_no');
@@ -306,7 +337,20 @@ export function useSaveHoliday() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { holiday_date: string; name: string }) => {
-      const { error } = await sb.from('salary_holidays').upsert(input, { onConflict: 'holiday_date' });
+      const { error } = await sb.from('salary_holidays').upsert({ ...input, confirmed: true }, { onConflict: 'holiday_date' });
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+/** Edit a holiday's date and/or name (also confirms a carried-forward date). */
+export function useUpdateHoliday() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { oldDate: string; newDate: string; name: string }) => {
+      const { error } = await sb.from('salary_holidays')
+        .update({ holiday_date: input.newDate, name: input.name, confirmed: true }).eq('holiday_date', input.oldDate);
       if (error) throw error;
     },
     onSuccess: () => invalidateSalary(qc),
@@ -324,16 +368,36 @@ export function useDeleteHoliday() {
   });
 }
 
-/** employeeId -> advances given for that salary month */
-export function useSalaryAdvances(month: string) {
-  return useQuery({
-    queryKey: ['salary_advances', month],
-    queryFn: async (): Promise<Record<string, SalaryAdvance[]>> => {
-      const { data, error } = await sb.from('salary_advances').select('*').eq('month', month).order('given_on').order('id');
+/** Copy a year's holiday names into the next year as "date to confirm" (does not count in salary until confirmed). */
+export function useCarryHolidaysForward() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (fromYear: number): Promise<number> => {
+      const { data, error } = await sb.from('salary_holidays').select('*')
+        .gte('holiday_date', `${fromYear}-01-01`).lte('holiday_date', `${fromYear}-12-31`).eq('confirmed', true);
       if (error) throw error;
-      const out: Record<string, SalaryAdvance[]> = {};
-      (data || []).forEach((r: any) => { (out[r.employee_id] ||= []).push({ ...r, amount: Number(r.amount) }); });
-      return out;
+      const rows = (data || []).map((r: any) => {
+        const [, m, d] = String(r.holiday_date).split('-').map(Number);
+        const dt = new Date(fromYear + 1, m - 1, Math.min(d, new Date(fromYear + 1, m, 0).getDate()));
+        const date = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        return { holiday_date: date, name: r.name, confirmed: false };
+      });
+      if (!rows.length) return 0;
+      const { error: e2 } = await sb.from('salary_holidays').upsert(rows, { onConflict: 'holiday_date', ignoreDuplicates: true });
+      if (e2) throw e2;
+      return rows.length;
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+/** Whole advance ledger (all months). Balance = sum(given) - sum(recovered in generated salaries). */
+export function useSalaryAdvanceLedger() {
+  return useQuery({
+    queryKey: ['salary_advances'],
+    queryFn: async (): Promise<SalaryAdvance[]> => {
+      const rows = await fetchAll(() => sb.from('salary_advances').select('*').order('given_on').order('id'));
+      return rows.map((r: any) => ({ ...r, amount: Number(r.amount) }));
     },
   });
 }
@@ -341,10 +405,10 @@ export function useSalaryAdvances(month: string) {
 export function useAddSalaryAdvance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { employeeId: string; month: string; amount: number; givenOn: string; note: string }) => {
+    mutationFn: async (input: { employeeId: string; amount: number; givenOn: string; note: string }) => {
       const { data: u } = await supabase.auth.getUser();
       const { error } = await sb.from('salary_advances').insert({
-        employee_id: input.employeeId, month: input.month, amount: input.amount,
+        employee_id: input.employeeId, month: input.givenOn.slice(0, 7), amount: input.amount,
         given_on: input.givenOn, note: input.note.trim() || null, created_by: u?.user?.email || null,
       });
       if (error) throw error;
@@ -361,5 +425,106 @@ export function useDeleteSalaryAdvance() {
       if (error) throw error;
     },
     onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+const mapRun = (r: any): SalaryRun => ({
+  ...r,
+  monthly_salary: Number(r.monthly_salary), working_hours: Number(r.working_hours), paid_hours: Number(r.paid_hours),
+  salary: Number(r.salary), advance_balance_before: Number(r.advance_balance_before),
+  advance_recovered: Number(r.advance_recovered), net_payable: Number(r.net_payable),
+  holidays: r.holidays || {},
+});
+
+/** Generated salaries for one month, by employee. */
+export function useSalaryRuns(month: string) {
+  return useQuery({
+    queryKey: ['salary_runs', month],
+    queryFn: async (): Promise<Record<string, SalaryRun>> => {
+      const { data, error } = await sb.from('salary_runs').select('*').eq('month', month);
+      if (error) throw error;
+      const out: Record<string, SalaryRun> = {};
+      (data || []).forEach((r: any) => { out[r.employee_id] = mapRun(r); });
+      return out;
+    },
+  });
+}
+
+/** Every generated salary's advance recovery (for balances and the ledger). */
+export function useSalaryRecoveries() {
+  return useQuery({
+    queryKey: ['salary_runs_recoveries'],
+    queryFn: async (): Promise<{ employee_id: string; month: string; amount: number }[]> => {
+      const rows = await fetchAll(() => sb.from('salary_runs').select('employee_id, month, advance_recovered').gt('advance_recovered', 0).order('month'));
+      return rows.map((r: any) => ({ employee_id: r.employee_id, month: r.month, amount: Number(r.advance_recovered) }));
+    },
+  });
+}
+
+export function useGenerateSalary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: Omit<SalaryRun, 'generated_at' | 'generated_by'>[]) => {
+      const { data: u } = await supabase.auth.getUser();
+      const email = u?.user?.email || null;
+      const { error } = await sb.from('salary_runs').insert(rows.map(r => ({ ...r, generated_by: email })));
+      if (error) throw error;
+      const { error: e2 } = await sb.from('salary_run_log').insert(rows.map(r => ({
+        employee_id: r.employee_id, month: r.month, action: 'generate', amount: r.net_payable,
+        reason: r.advance_recovered > 0 ? `Advance recovered: ${r.advance_recovered}` : null, by_email: email,
+      })));
+      if (e2) throw e2;
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+export function useReopenSalary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { employeeId: string; month: string; reason: string; amount: number }) => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error: e1 } = await sb.from('salary_run_log').insert({
+        employee_id: input.employeeId, month: input.month, action: 'reopen', reason: input.reason.trim(),
+        amount: input.amount, by_email: u?.user?.email || null,
+      });
+      if (e1) throw e1;
+      const { error } = await sb.from('salary_runs').delete().eq('employee_id', input.employeeId).eq('month', input.month);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+export function useSalaryUploadsList() {
+  return useQuery({
+    queryKey: ['salary_uploads_list'],
+    queryFn: async (): Promise<{ id: string; month: string; file_name: string | null; uploaded_by: string | null; uploaded_at: string }[]> => {
+      const { data, error } = await sb.from('salary_uploads').select('*').order('uploaded_at', { ascending: false }).limit(100);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
+export function useSalaryAuditEdits() {
+  return useQuery({
+    queryKey: ['salary_audit_edits'],
+    queryFn: async (): Promise<(SalaryEditRow)[]> => {
+      const { data, error } = await sb.from('salary_time_edits').select('*').order('edited_at', { ascending: false }).limit(300);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
+export function useSalaryRunLog() {
+  return useQuery({
+    queryKey: ['salary_run_log'],
+    queryFn: async (): Promise<SalaryRunLogRow[]> => {
+      const { data, error } = await sb.from('salary_run_log').select('*').order('at', { ascending: false }).limit(300);
+      if (error) throw error;
+      return (data || []).map((r: any) => ({ ...r, amount: r.amount == null ? null : Number(r.amount) }));
+    },
   });
 }

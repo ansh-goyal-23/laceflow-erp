@@ -11,8 +11,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import {
   calcMonth, fmtHM, fmtHMZero, type DayResult, type SalarySettings, type TimeOverride,
 } from '@/lib/salaryCalc';
+import { downloadSalaryCardPdf, downloadSalaryCardXlsx } from '@/lib/salaryCardExport';
 import {
-  useSalaryEdits, useSaveTimeEdit, type SalaryEmployee, type SalaryPayment, type SalaryAdvance,
+  useSalaryEdits, useSaveTimeEdit, type SalaryEmployee, type SalaryPayment,
 } from '@/hooks/useSalary';
 
 const inr = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -32,8 +33,10 @@ interface Props {
   overridesByDate: Record<string, TimeOverride>;
   holidays: Record<string, string>;
   payment?: SalaryPayment;
-  advances?: SalaryAdvance[];
-  onManageAdvances?: () => void;
+  /** Advance deducted from this month's salary (shown in the totals). */
+  advanceRecovered?: number;
+  /** Month is generated: times cannot be edited until it is reopened. */
+  locked?: boolean;
   onClose: () => void;
   onMarkPaid: () => void;
   onUndoPaid: () => void;
@@ -49,7 +52,7 @@ const Tile: React.FC<{ label: string; value: string; strong?: boolean }> = ({ la
 );
 
 const SalaryCardDialog: React.FC<Props> = ({
-  employee, month, settings, punchesByDate, overridesByDate, holidays, payment, advances = [], onManageAdvances, onClose, onMarkPaid, onUndoPaid,
+  employee, month, settings, punchesByDate, overridesByDate, holidays, payment, advanceRecovered = 0, locked = false, onClose, onMarkPaid, onUndoPaid,
 }) => {
   const summary = useMemo(
     () => calcMonth({ month, punchesByDate, overridesByDate, holidays }, settings),
@@ -62,6 +65,7 @@ const SalaryCardDialog: React.FC<Props> = ({
   const [reason, setReason] = useState('');
 
   const openEdit = (day: DayResult, field: 'in' | 'out') => {
+    if (locked) { toast.info('This month is generated. Reopen it from the Salary Run tab to edit times.'); return; }
     setTarget({ day, field });
     setValue((field === 'in' ? day.inTime : day.outTime) || '');
     setReason('');
@@ -87,8 +91,12 @@ const SalaryCardDialog: React.FC<Props> = ({
     }
   };
 
-  const advanceTotal = advances.reduce((a, x) => a + x.amount, 0);
+  const advanceTotal = advanceRecovered;
   const netPayable = summary.salary - advanceTotal;
+  const exportInfo = {
+    employeeName: employee.name, machineNo: employee.machine_no, monthLabel: monthLabel(month),
+    settings, summary, advanceRecovered,
+  };
   const paidDiffers = payment && payment.amount !== netPayable;
 
   const timeCell = (day: DayResult, field: 'in' | 'out') => {
@@ -164,7 +172,7 @@ const SalaryCardDialog: React.FC<Props> = ({
         <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Attendance / Salary Card: {employee.name}</DialogTitle>
-            <DialogDescription>{monthLabel(month)}. Click an In or Out time to correct it; every change is logged.</DialogDescription>
+            <DialogDescription>{monthLabel(month)}. {locked ? 'Generated and locked.' : 'Click an In or Out time to correct it; every change is logged.'}</DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -176,7 +184,7 @@ const SalaryCardDialog: React.FC<Props> = ({
             <Tile label="Holiday Hours (paid)" value={hoursStr(summary.holidayMin)} />
             <Tile label="Total Paid Hours" value={summary.paidHours.toFixed(2)} />
             <Tile label="Total Salary Calculated" value={inr(summary.salary)} />
-            <Tile label="Salary Advance (this month)" value={inr(advanceTotal)} />
+            <Tile label="Advance Recovered (this month)" value={inr(advanceTotal)} />
             <Tile label="Net Payable (salary - advance)" value={inr(netPayable)} strong />
           </div>
           <div className="text-xs text-muted-foreground">
@@ -232,7 +240,8 @@ const SalaryCardDialog: React.FC<Props> = ({
             {payment
               ? <Button variant="outline" onClick={onUndoPaid}>Undo "Paid"</Button>
               : <Button onClick={onMarkPaid}>Mark as paid ({inr(netPayable)})</Button>}
-            {onManageAdvances && <Button variant="outline" onClick={onManageAdvances}>Salary advances ({advances.length})</Button>}
+            <Button variant="outline" onClick={() => exportInfo && downloadSalaryCardXlsx(exportInfo)}>Excel</Button>
+            <Button variant="outline" onClick={() => exportInfo && downloadSalaryCardPdf(exportInfo)}>PDF</Button>
             <Button variant="outline" onClick={onClose}>Close</Button>
           </DialogFooter>
         </DialogContent>

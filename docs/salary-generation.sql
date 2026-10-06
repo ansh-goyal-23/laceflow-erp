@@ -178,3 +178,47 @@ grant select, insert, update, delete on public.salary_advances to authenticated;
 grant all on public.salary_advances to service_role;
 alter table public.salary_advances enable row level security;
 create policy "salary_advances_admin_all" on public.salary_advances for all to authenticated using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+
+-- Master employees, monthly salary runs, holiday confirmation (added later)
+alter table public.salary_employees add column if not exists joined_on date;
+alter table public.salary_employees add column if not exists left_on date;
+alter table public.salary_holidays add column if not exists confirmed boolean not null default true;
+
+create table if not exists public.salary_runs (
+  employee_id uuid not null references public.salary_employees(id) on delete cascade,
+  month text not null check (month ~ '^[0-9]{4}-[0-9]{2}$'),
+  monthly_salary numeric(12,2) not null,
+  working_hours numeric(5,2) not null,
+  lunch_included boolean not null default false,
+  holidays jsonb not null default '{}'::jsonb,
+  days_present integer not null default 0,
+  overtime_minutes integer not null default 0,
+  paid_hours numeric(10,2) not null default 0,
+  salary numeric(12,2) not null,
+  advance_balance_before numeric(12,2) not null default 0,
+  advance_recovered numeric(12,2) not null default 0 check (advance_recovered >= 0),
+  net_payable numeric(12,2) not null,
+  generated_at timestamptz not null default now(),
+  generated_by text,
+  primary key (employee_id, month)
+);
+create table if not exists public.salary_run_log (
+  id bigint generated always as identity primary key,
+  employee_id uuid not null references public.salary_employees(id) on delete cascade,
+  month text not null,
+  action text not null check (action in ('generate','reopen')),
+  reason text,
+  amount numeric(12,2),
+  by_email text,
+  at timestamptz not null default now()
+);
+revoke all on public.salary_runs, public.salary_run_log from anon;
+grant select, insert, update, delete on public.salary_runs to authenticated;
+grant select, insert on public.salary_run_log to authenticated;
+grant all on public.salary_runs, public.salary_run_log to service_role;
+revoke truncate, trigger, references on public.salary_runs, public.salary_run_log from authenticated;
+alter table public.salary_runs enable row level security;
+alter table public.salary_run_log enable row level security;
+create policy "salary_runs_admin_all" on public.salary_runs for all to authenticated using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+create policy "salary_run_log_admin_select" on public.salary_run_log for select to authenticated using (public.has_role(auth.uid(), 'admin'));
+create policy "salary_run_log_admin_insert" on public.salary_run_log for insert to authenticated with check (public.has_role(auth.uid(), 'admin'));
