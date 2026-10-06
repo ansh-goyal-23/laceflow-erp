@@ -1,272 +1,162 @@
--- Salary Generation schema. Keep this independent of existing payroll-agnostic modules.
--- Run the enum change by itself first, then run the remainder after it commits.
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'accounts';
+-- 20261006_salary_generation.sql  (public schema)
+--
+-- Salary Generation tab (admin-only): upload the thumb-print machine's
+-- attendance sheet, keep an employee list with salary + working hours,
+-- calculate attendance / overtime / salary per month, and log every manual
+-- edit of an in/out time.
+--
+-- ADMIN-ONLY at the database level (not just hidden in the UI): salaries are
+-- confidential. Every table below has a single admin-only RLS policy.
+--
+-- Design notes
+--  * salary_punches holds the RAW machine punches. They are never edited;
+--    re-uploading a month replaces that month's punches only.
+--  * Manual corrections live in salary_time_overrides (current state), and
+--    EVERY change is also appended to salary_time_edits (audit log). The log
+--    is append-only: no update/delete grant, no update/delete policy.
+--  * Employees are matched by the machine "No" (stable), not by name.
+--  * Overtime / salary are computed in the app (src/lib/salaryCalc.ts), not
+--    stored, so they always follow the latest edits and settings.
+--  * salary_payments records "Paid" with the amount at the time of payment,
+--    so a later edit shows up as a difference instead of silently changing
+--    history.
+-- SAFE / additive. Run in the Supabase SQL editor (if a big paste times out, run it in
+-- 3-4 chunks: tables, grants + RLS, policies, seed).
+-- notify pgrst, 'reload schema';  -- run once after, so the API sees the new tables
 
--- Storage bucket: create a private `salary-attendance` bucket in Storage before uploads.
-
-CREATE TABLE IF NOT EXISTS public.salary_rules_global (
-  id text PRIMARY KEY DEFAULT 'global' CHECK (id = 'global'),
-  ot_grace_minutes integer NOT NULL DEFAULT 20,
-  min_ot_minutes integer NOT NULL DEFAULT 0,
-  hours_rounding_minutes integer NOT NULL DEFAULT 30,
-  ignore_punches_before time NOT NULL DEFAULT '06:00',
-  lunch_window_start time NOT NULL DEFAULT '13:00',
-  lunch_window_end time NOT NULL DEFAULT '13:30',
-  holidays_are_paid boolean NOT NULL DEFAULT true,
-  holiday_hours_equal_working_hours boolean NOT NULL DEFAULT true,
-  advance_max_percent_of_salary numeric NOT NULL DEFAULT 50,
-  salary_pay_day integer NOT NULL DEFAULT 10,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+create table if not exists public.salary_employees (
+  id             uuid primary key default gen_random_uuid(),
+  machine_no     integer not null unique,
+  name           text not null,
+  department     text,
+  is_active      boolean not null default true,        -- false = has left
+  monthly_salary numeric(12, 2) check (monthly_salary >= 0),
+  working_hours  numeric(5, 2)  check (working_hours > 0 and working_hours <= 24),
+  -- true  = lunch is part of the paid working hours (12-hr / 10-hr workers)
+  -- false = lunch is extra, unpaid 30 min on top (8-hr workers)
+  lunch_included boolean not null default false,
+  created_at     timestamptz not null default now()
 );
-GRANT SELECT, INSERT, UPDATE ON public.salary_rules_global TO authenticated;
-GRANT ALL ON public.salary_rules_global TO service_role;
-ALTER TABLE public.salary_rules_global ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "salary rules read payroll roles" ON public.salary_rules_global FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "salary rules manage admin" ON public.salary_rules_global FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
-INSERT INTO public.salary_rules_global (id) VALUES ('global') ON CONFLICT (id) DO NOTHING;
 
-CREATE TABLE IF NOT EXISTS public.attendance_uploads (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  month text NOT NULL CHECK (month ~ '^\\d{4}-\\d{2}$'),
-  file_name text NOT NULL,
-  file_path text NOT NULL,
-  uploaded_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  uploaded_at timestamptz NOT NULL DEFAULT now(),
-  version integer NOT NULL DEFAULT 1,
-  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','previous')),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+create table if not exists public.salary_uploads (
+  id          uuid primary key default gen_random_uuid(),
+  month       text not null,                            -- 'YYYY-MM'
+  file_name   text,
+  uploaded_by text,
+  uploaded_at timestamptz not null default now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS attendance_uploads_active_month_idx ON public.attendance_uploads(month) WHERE status = 'active';
-GRANT SELECT, INSERT, UPDATE ON public.attendance_uploads TO authenticated;
-GRANT ALL ON public.attendance_uploads TO service_role;
-ALTER TABLE public.attendance_uploads ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "attendance uploads payroll roles" ON public.attendance_uploads FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "attendance uploads add payroll roles" ON public.attendance_uploads FOR INSERT TO authenticated
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "attendance uploads update payroll roles" ON public.attendance_uploads FOR UPDATE TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'))
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
 
-CREATE TABLE IF NOT EXISTS public.employees (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  machine_no text NOT NULL UNIQUE,
-  name text NOT NULL,
-  department text NOT NULL DEFAULT '',
-  is_active boolean NOT NULL DEFAULT true,
-  joined_on date,
-  left_on date,
-  created_from_upload_id uuid REFERENCES public.attendance_uploads(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  updated_at timestamptz NOT NULL DEFAULT now()
+create table if not exists public.salary_punches (
+  id          bigint generated always as identity primary key,
+  employee_id uuid not null references public.salary_employees(id) on delete cascade,
+  work_date   date not null,
+  punch_time  text not null check (punch_time ~ '^[0-9]{2}:[0-9]{2}$'),
+  upload_id   uuid references public.salary_uploads(id) on delete set null
 );
-GRANT SELECT, INSERT, UPDATE ON public.employees TO authenticated;
-GRANT ALL ON public.employees TO service_role;
-ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "employees payroll roles" ON public.employees FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "employees manage admin" ON public.employees FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
-CREATE POLICY "employees import payroll roles" ON public.employees FOR INSERT TO authenticated
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
+create index if not exists salary_punches_emp_date_idx on public.salary_punches (employee_id, work_date);
+create index if not exists salary_punches_date_idx on public.salary_punches (work_date);
 
-CREATE TABLE IF NOT EXISTS public.employee_salary_settings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  monthly_salary numeric NOT NULL CHECK (monthly_salary >= 0),
-  working_hours_per_day numeric NOT NULL CHECK (working_hours_per_day > 0),
-  shift_start_time time NOT NULL DEFAULT '09:00',
-  shift_length_incl_lunch_hours numeric NOT NULL,
-  lunch_minutes integer NOT NULL DEFAULT 30,
-  lunch_unpaid_if_out_before time NOT NULL DEFAULT '18:30',
-  effective_from date NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+create table if not exists public.salary_time_overrides (
+  employee_id uuid not null references public.salary_employees(id) on delete cascade,
+  work_date   date not null,
+  in_set      boolean not null default false,           -- true = in_time overrides the machine
+  in_time     text check (in_time is null or in_time ~ '^[0-9]{2}:[0-9]{2}$'),
+  out_set     boolean not null default false,
+  out_time    text check (out_time is null or out_time ~ '^[0-9]{2}:[0-9]{2}$'),
+  updated_at  timestamptz not null default now(),
+  primary key (employee_id, work_date)
 );
-CREATE INDEX IF NOT EXISTS employee_salary_settings_effective_idx ON public.employee_salary_settings(employee_id,effective_from DESC);
-GRANT SELECT, INSERT ON public.employee_salary_settings TO authenticated;
-GRANT ALL ON public.employee_salary_settings TO service_role;
-ALTER TABLE public.employee_salary_settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "salary settings payroll roles read" ON public.employee_salary_settings FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "salary settings admin insert" ON public.employee_salary_settings FOR INSERT TO authenticated
-  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
-CREATE TABLE IF NOT EXISTS public.punch_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  upload_id uuid NOT NULL REFERENCES public.attendance_uploads(id) ON DELETE CASCADE,
-  employee_id uuid NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  date date NOT NULL,
-  punch_time time NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+create table if not exists public.salary_time_edits (
+  id           bigint generated always as identity primary key,
+  employee_id  uuid not null references public.salary_employees(id) on delete cascade,
+  work_date    date not null,
+  field        text not null check (field in ('in', 'out')),
+  old_value    text,
+  new_value    text,
+  machine_value text,
+  reason       text not null check (length(btrim(reason)) > 0),
+  edited_by    uuid,
+  edited_by_email text,
+  edited_at    timestamptz not null default now()
 );
-CREATE INDEX IF NOT EXISTS punch_logs_date_employee_idx ON public.punch_logs(employee_id,date);
-GRANT SELECT, INSERT ON public.punch_logs TO authenticated;
-GRANT ALL ON public.punch_logs TO service_role;
-ALTER TABLE public.punch_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "punch logs payroll roles read" ON public.punch_logs FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "punch logs payroll roles insert" ON public.punch_logs FOR INSERT TO authenticated
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
+create index if not exists salary_time_edits_emp_idx on public.salary_time_edits (employee_id, work_date);
 
-CREATE TABLE IF NOT EXISTS public.attendance_days (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  month text NOT NULL CHECK (month ~ '^\\d{4}-\\d{2}$'),
-  date date NOT NULL,
-  raw_punches text[] NOT NULL DEFAULT '{}',
-  in_time_edited time,
-  out_time_edited time,
-  status text NOT NULL DEFAULT 'Absent' CHECK (status IN ('Present','Absent','Holiday')),
-  regular_minutes integer NOT NULL DEFAULT 0,
-  overtime_minutes integer NOT NULL DEFAULT 0,
-  flags jsonb NOT NULL DEFAULT '[]'::jsonb,
-  is_edited boolean NOT NULL DEFAULT false,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  UNIQUE (employee_id,date)
+create table if not exists public.salary_holidays (
+  holiday_date date primary key,
+  name         text not null
 );
-CREATE INDEX IF NOT EXISTS attendance_days_month_idx ON public.attendance_days(month,date);
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_days TO authenticated;
-GRANT ALL ON public.attendance_days TO service_role;
-ALTER TABLE public.attendance_days ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "attendance days payroll roles" ON public.attendance_days FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'))
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
 
-CREATE TABLE IF NOT EXISTS public.attendance_edits (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  date date NOT NULL,
-  field text NOT NULL CHECK (field IN ('in_time','out_time')),
-  old_value text,
-  new_value text,
-  reason text NOT NULL CHECK (length(trim(reason)) > 0),
-  edited_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  edited_at timestamptz NOT NULL DEFAULT now(),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+create table if not exists public.salary_payments (
+  employee_id uuid not null references public.salary_employees(id) on delete cascade,
+  month       text not null,                            -- 'YYYY-MM'
+  amount      numeric(12, 2) not null,                  -- salary at the time it was marked paid
+  paid_on     date not null default current_date,
+  remarks     text,
+  paid_by     text,
+  created_at  timestamptz not null default now(),
+  primary key (employee_id, month)
 );
-CREATE INDEX IF NOT EXISTS attendance_edits_employee_date_idx ON public.attendance_edits(employee_id,date,edited_at DESC);
-GRANT SELECT, INSERT ON public.attendance_edits TO authenticated;
-GRANT ALL ON public.attendance_edits TO service_role;
-ALTER TABLE public.attendance_edits ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "attendance edits payroll roles read" ON public.attendance_edits FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "attendance edits payroll roles append" ON public.attendance_edits FOR INSERT TO authenticated
-  WITH CHECK ((public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts')) AND edited_by = auth.uid());
 
-CREATE TABLE IF NOT EXISTS public.holidays (
-  date date PRIMARY KEY,
-  name text NOT NULL,
-  is_recurring_sunday boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
-);
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.holidays TO authenticated;
-GRANT ALL ON public.holidays TO service_role;
-ALTER TABLE public.holidays ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "holidays payroll roles read" ON public.holidays FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "holidays admin manage" ON public.holidays FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
+-- Grants: the audit log is append-only (select + insert only).
+grant select, insert, update, delete on public.salary_employees      to authenticated;
+grant select, insert, update, delete on public.salary_uploads        to authenticated;
+grant select, insert, update, delete on public.salary_punches        to authenticated;
+grant select, insert, update, delete on public.salary_time_overrides to authenticated;
+grant select, insert                 on public.salary_time_edits     to authenticated;
+grant select, insert, update, delete on public.salary_holidays       to authenticated;
+grant select, insert, update, delete on public.salary_payments       to authenticated;
+grant all on public.salary_employees, public.salary_uploads, public.salary_punches,
+             public.salary_time_overrides, public.salary_time_edits,
+             public.salary_holidays, public.salary_payments to service_role;
 
-CREATE TABLE IF NOT EXISTS public.advances (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  date date NOT NULL,
-  amount numeric NOT NULL CHECK (amount > 0),
-  type text NOT NULL CHECK (type IN ('Regular 25th','Emergency','Other')),
-  note text NOT NULL DEFAULT '',
-  entered_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  month_to_deduct_from text NOT NULL CHECK (month_to_deduct_from ~ '^\\d{4}-\\d{2}$'),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS advances_employee_month_idx ON public.advances(employee_id,month_to_deduct_from);
-GRANT SELECT, INSERT ON public.advances TO authenticated;
-GRANT ALL ON public.advances TO service_role;
-ALTER TABLE public.advances ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "advances payroll roles read" ON public.advances FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "advances payroll roles insert" ON public.advances FOR INSERT TO authenticated
-  WITH CHECK ((public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts')) AND entered_by = auth.uid());
+-- Default privileges can hand out more than the grants above, so tighten explicitly.
+-- The audit log must be append-only (RLS does not cover TRUNCATE, so revoke it).
+revoke all on public.salary_time_edits from authenticated, anon;
+grant select, insert on public.salary_time_edits to authenticated;
+revoke all on public.salary_employees, public.salary_uploads, public.salary_punches,
+              public.salary_time_overrides, public.salary_holidays, public.salary_payments from anon;
+revoke truncate, trigger, references on public.salary_employees, public.salary_uploads,
+              public.salary_punches, public.salary_time_overrides, public.salary_holidays,
+              public.salary_payments from authenticated;
 
-CREATE TABLE IF NOT EXISTS public.advance_recoveries (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  salary_month text NOT NULL CHECK (salary_month ~ '^\\d{4}-\\d{2}$'),
-  amount_recovered numeric NOT NULL DEFAULT 0 CHECK (amount_recovered >= 0),
-  remaining_balance_after numeric NOT NULL DEFAULT 0 CHECK (remaining_balance_after >= 0),
-  recovered_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  recovered_at timestamptz NOT NULL DEFAULT now(),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  UNIQUE (employee_id,salary_month)
-);
-GRANT SELECT, INSERT, DELETE ON public.advance_recoveries TO authenticated;
-GRANT ALL ON public.advance_recoveries TO service_role;
-ALTER TABLE public.advance_recoveries ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "recoveries payroll roles" ON public.advance_recoveries FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'))
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
+alter table public.salary_employees      enable row level security;
+alter table public.salary_uploads        enable row level security;
+alter table public.salary_punches        enable row level security;
+alter table public.salary_time_overrides enable row level security;
+alter table public.salary_time_edits     enable row level security;
+alter table public.salary_holidays       enable row level security;
+alter table public.salary_payments       enable row level security;
 
-CREATE TABLE IF NOT EXISTS public.salary_payments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  salary_month text NOT NULL CHECK (salary_month ~ '^\\d{4}-\\d{2}$'),
-  gross_salary numeric NOT NULL DEFAULT 0,
-  advance_recovered numeric NOT NULL DEFAULT 0,
-  amount_payable numeric NOT NULL DEFAULT 0,
-  status text NOT NULL DEFAULT 'Unpaid' CHECK (status IN ('Unpaid','Paid')),
-  paid_on date,
-  payment_mode text NOT NULL DEFAULT '',
-  remarks text NOT NULL DEFAULT '',
-  paid_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  changed_after_payment boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (employee_id,salary_month)
-);
-GRANT SELECT, INSERT, UPDATE ON public.salary_payments TO authenticated;
-GRANT ALL ON public.salary_payments TO service_role;
-ALTER TABLE public.salary_payments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "payments payroll roles read" ON public.salary_payments FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'accounts'));
-CREATE POLICY "payments admin manage" ON public.salary_payments FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "salary_employees_admin_all" on public.salary_employees;
+create policy "salary_employees_admin_all" on public.salary_employees for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "salary_uploads_admin_all" on public.salary_uploads;
+create policy "salary_uploads_admin_all" on public.salary_uploads for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "salary_punches_admin_all" on public.salary_punches;
+create policy "salary_punches_admin_all" on public.salary_punches for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "salary_time_overrides_admin_all" on public.salary_time_overrides;
+create policy "salary_time_overrides_admin_all" on public.salary_time_overrides for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "salary_holidays_admin_all" on public.salary_holidays;
+create policy "salary_holidays_admin_all" on public.salary_holidays for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "salary_payments_admin_all" on public.salary_payments;
+create policy "salary_payments_admin_all" on public.salary_payments for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
 
--- Database-enforced append-only attendance audit log.
-CREATE OR REPLACE FUNCTION public.reject_attendance_edit_mutation()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  RAISE EXCEPTION 'Attendance edit audit entries cannot be changed or deleted';
-END;
-$$;
-DROP TRIGGER IF EXISTS attendance_edits_append_only ON public.attendance_edits;
-CREATE TRIGGER attendance_edits_append_only BEFORE UPDATE OR DELETE ON public.attendance_edits
-FOR EACH ROW EXECUTE FUNCTION public.reject_attendance_edit_mutation();
+-- Audit log: admins can read and append, nobody can change or delete.
+drop policy if exists "salary_time_edits_admin_select" on public.salary_time_edits;
+create policy "salary_time_edits_admin_select" on public.salary_time_edits
+  for select to authenticated using (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "salary_time_edits_admin_insert" on public.salary_time_edits;
+create policy "salary_time_edits_admin_insert" on public.salary_time_edits
+  for insert to authenticated with check (public.has_role(auth.uid(), 'admin'));
 
-CREATE OR REPLACE FUNCTION public.flag_salary_changed_after_attendance_edit()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  UPDATE public.salary_payments
-     SET status = 'Unpaid', changed_after_payment = true, updated_at = now()
-   WHERE employee_id = NEW.employee_id
-     AND salary_month = to_char(NEW.date, 'YYYY-MM')
-     AND status = 'Paid';
-  RETURN NEW;
-END;
-$$;
-DROP TRIGGER IF EXISTS attendance_edit_reopen_salary ON public.attendance_edits;
-CREATE TRIGGER attendance_edit_reopen_salary AFTER INSERT ON public.attendance_edits
-FOR EACH ROW EXECUTE FUNCTION public.flag_salary_changed_after_attendance_edit();
+-- Seed: the paid holidays known for Aug 2026 (Sundays are automatic in the app).
+insert into public.salary_holidays (holiday_date, name) values
+  ('2026-08-15', 'Independence Day'),
+  ('2026-08-28', 'Raksha Bandhan')
+on conflict (holiday_date) do nothing;

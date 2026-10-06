@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo, UserCog, HardHat, Undo2 } from "lucide-react";
+import { LayoutDashboard, Tag, Users, FileText, LogOut, Factory, Plus, List, Upload, History, ChevronDown, Truck, FileScan, Brain, ShieldCheck, Activity, CalendarDays, ClipboardList, BarChart3, Package, Palette, Beaker, Boxes, PackageCheck, Inbox, ListTodo, UserCog, HardHat, Undo2, Wallet } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useAppSettings } from "@/lib/app-settings";
 import { Button } from "@/components/ui/button";
@@ -274,6 +274,20 @@ export function AppSidebar() {
           <Brain className="h-4 w-4" />
           AI Learning
         </Link>
+
+        {isAdmin && (
+          <Link
+            to="/salary-generation"
+            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+              pathname === "/salary-generation"
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            }`}
+          >
+            <Wallet className="h-4 w-4" />
+            Salary Generation
+          </Link>
+        )}
 
         {isAdmin && (
           <>
