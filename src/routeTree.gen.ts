@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedSalaryGenerationRouteImport } from './routes/_authenticated/salary-generation'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedBrandsRouteImport } from './routes/_authenticated/brands'
@@ -70,6 +71,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedSalaryGenerationRoute =
+  AuthenticatedSalaryGenerationRouteImport.update({
+    id: '/salary-generation',
+    path: '/salary-generation',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -330,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/salary-generation': typeof AuthenticatedSalaryGenerationRoute
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/admin/daily-report': typeof AuthenticatedAdminDailyReportRoute
   '/admin/user-activity': typeof AuthenticatedAdminUserActivityRoute
@@ -377,6 +385,7 @@ export interface FileRoutesByTo {
   '/brands': typeof AuthenticatedBrandsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/salary-generation': typeof AuthenticatedSalaryGenerationRoute
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/admin/daily-report': typeof AuthenticatedAdminDailyReportRoute
   '/admin/user-activity': typeof AuthenticatedAdminUserActivityRoute
@@ -426,6 +435,7 @@ export interface FileRoutesById {
   '/_authenticated/brands': typeof AuthenticatedBrandsRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/salary-generation': typeof AuthenticatedSalaryGenerationRoute
   '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/_authenticated/admin/daily-report': typeof AuthenticatedAdminDailyReportRoute
   '/_authenticated/admin/user-activity': typeof AuthenticatedAdminUserActivityRoute
@@ -475,6 +485,7 @@ export interface FileRouteTypes {
     | '/brands'
     | '/clients'
     | '/dashboard'
+    | '/salary-generation'
     | '/admin/audit-logs'
     | '/admin/daily-report'
     | '/admin/user-activity'
@@ -522,6 +533,7 @@ export interface FileRouteTypes {
     | '/brands'
     | '/clients'
     | '/dashboard'
+    | '/salary-generation'
     | '/admin/audit-logs'
     | '/admin/daily-report'
     | '/admin/user-activity'
@@ -570,6 +582,7 @@ export interface FileRouteTypes {
     | '/_authenticated/brands'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
+    | '/_authenticated/salary-generation'
     | '/_authenticated/admin/audit-logs'
     | '/_authenticated/admin/daily-report'
     | '/_authenticated/admin/user-activity'
@@ -639,6 +652,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/salary-generation': {
+      id: '/_authenticated/salary-generation'
+      path: '/salary-generation'
+      fullPath: '/salary-generation'
+      preLoaderRoute: typeof AuthenticatedSalaryGenerationRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
@@ -949,6 +969,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBrandsRoute: typeof AuthenticatedBrandsRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedSalaryGenerationRoute: typeof AuthenticatedSalaryGenerationRoute
   AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute
   AuthenticatedAdminDailyReportRoute: typeof AuthenticatedAdminDailyReportRoute
   AuthenticatedAdminUserActivityRoute: typeof AuthenticatedAdminUserActivityRoute
@@ -995,6 +1016,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBrandsRoute: AuthenticatedBrandsRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedSalaryGenerationRoute: AuthenticatedSalaryGenerationRoute,
   AuthenticatedAdminAuditLogsRoute: AuthenticatedAdminAuditLogsRoute,
   AuthenticatedAdminDailyReportRoute: AuthenticatedAdminDailyReportRoute,
   AuthenticatedAdminUserActivityRoute: AuthenticatedAdminUserActivityRoute,

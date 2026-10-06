@@ -2,7 +2,7 @@
 // Kept data-driven so new roles (Procurement / Store / Production / Accounts /
 // Dispatch, etc.) can be added later without changing call sites.
 
-export type AppRole = "admin" | "editor" | "viewer" | "user";
+export type AppRole = "admin" | "accounts" | "editor" | "viewer" | "user";
 
 export type ModuleKey =
   | "dashboard"
@@ -14,7 +14,8 @@ export type ModuleKey =
   | "yarn"
   | "ai_learning"
   | "admin"
-  | "user_management";
+  | "user_management"
+  | "salary_generation";
 
 export type PermissionAction =
   | "view"
@@ -40,6 +41,7 @@ const admin: RoleMatrix = {
   dashboard: ALL, brands: ALL, clients: ALL, purchase_orders: ALL,
   dispatch: ALL, reports: ALL, yarn: ALL, ai_learning: ALL,
   admin: ALL, user_management: ALL,
+  salary_generation: ALL,
 };
 
 const editor: RoleMatrix = {
@@ -53,6 +55,7 @@ const editor: RoleMatrix = {
   ai_learning: { view: true },
   admin: NONE,
   user_management: NONE,
+  salary_generation: NONE,
 };
 
 const viewer: RoleMatrix = {
@@ -60,10 +63,19 @@ const viewer: RoleMatrix = {
   purchase_orders: READ_ONLY, dispatch: READ_ONLY, reports: READ_ONLY,
   yarn: READ_ONLY, ai_learning: READ_ONLY,
   admin: NONE, user_management: NONE,
+  salary_generation: NONE,
+};
+
+const accounts: RoleMatrix = {
+  dashboard: NONE, brands: NONE, clients: NONE, purchase_orders: NONE,
+  dispatch: NONE, reports: NONE, yarn: NONE, ai_learning: NONE,
+  admin: NONE, user_management: NONE,
+  salary_generation: { view: true, edit: true, export: true, print: true },
 };
 
 const MATRIX: Record<AppRole, RoleMatrix> = {
   admin,
+  accounts,
   editor,
   viewer,
   user: viewer, // legacy "user" role behaves like viewer
@@ -94,8 +106,9 @@ export function canModifyRow(
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin",
   editor: "Editor",
+  accounts: "Accounts",
   viewer: "Viewer",
   user: "User",
 };
 
-export const ASSIGNABLE_ROLES: AppRole[] = ["admin", "editor", "viewer"];
+export const ASSIGNABLE_ROLES: AppRole[] = ["admin", "accounts", "editor", "viewer"];
