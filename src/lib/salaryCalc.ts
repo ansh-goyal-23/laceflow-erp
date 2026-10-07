@@ -14,7 +14,8 @@
  *    added to overtime.
  *  - Holidays (all Sundays + listed days) are paid and count as present. A
  *    holiday worked adds the time between IN and OUT as overtime, counted from
- *    the 09:00 shift start like any other day (arriving earlier earns nothing).
+ *    the 09:00 shift start like any other day (arriving earlier earns nothing),
+ *    and the 30-minute lunch (1:00-1:30) is deducted under the same rule as a normal day.
  *  - If the employee left mid-month, days after the last working day are not paid
  *    (no Sunday/holiday pay) and show as 'Left'; the monthly divisor stays the
  *    calendar days of the month.
@@ -169,11 +170,18 @@ export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
 
   const complete = effIn != null && effOut != null && effOut > effIn;
 
+  // Time worked on a holiday: counted from the 09:00 start, minus the 30-minute lunch when it applies (same rule as a normal day).
+  const holidayWorkedMin = (inM: number, outM: number) => {
+    const from = Math.max(inM, R.shiftStartMin);
+    const lunch = inM < R.lunchWindowStartMin && outM > R.lunchWindowEndMin && outM < lunchCutoff ? R.lunchMin : 0;
+    return Math.max(0, outM - from - lunch);
+  };
+
   // Paid holiday (Sunday or listed). Worked on a holiday => all time is overtime.
   if (holidayName) {
     return {
       ...base, status: 'Holiday', holidayName,
-      regularMin: 0, holidayMin: workingMin, otMin: complete ? Math.max(0, (effOut as number) - Math.max(effIn as number, R.shiftStartMin)) : 0,
+      regularMin: 0, holidayMin: workingMin, otMin: complete ? holidayWorkedMin(effIn as number, effOut as number) : 0,
     };
   }
 

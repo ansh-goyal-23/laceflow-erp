@@ -81,6 +81,16 @@ describe('day rules', () => {
     expect(d.otMin).toBe(240); // counted from 09:00, not 08:15
     expect(calcDay({ date: '2026-08-09', punches: ['07:00', '08:30'] }, s8).otMin).toBe(0);
   });
+  it('holiday worked: 30-minute lunch is deducted like a normal day', () => {
+    // 8-hr worker (lunch extra), in 08:45, out 17:31 -> 09:00 to 17:31 = 8h31m minus 30m lunch = 8h01m
+    expect(calcDay({ date: '2026-09-13', punches: ['08:45', '17:31'] }, s8).otMin).toBe(8 * 60 + 1);
+    // leaves before lunch ends: no deduction
+    expect(calcDay({ date: '2026-09-13', punches: ['09:00', '13:20'] }, s8).otMin).toBe(260);
+    // 12-hr worker (lunch inside hours) leaving before 18:30: lunch deducted; after 18:30: not
+    const s12: SalarySettings = { monthlySalary: 17000, workingHours: 12, lunchIncluded: true };
+    expect(calcDay({ date: '2026-09-13', punches: ['09:00', '17:00'] }, s12).otMin).toBe(450);
+    expect(calcDay({ date: '2026-09-13', punches: ['09:00', '20:00'] }, s12).otMin).toBe(660);
+  });
 });
 
 describe('employee leaving mid-month', () => {
