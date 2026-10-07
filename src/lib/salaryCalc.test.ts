@@ -23,9 +23,9 @@ describe('salary calculation, Aug 2026 (numbers confirmed with Ansh)', () => {
     const m = run('nigam', { monthlySalary: 51000, workingHours: 10, lunchIncluded: true });
     expect(m.daysPresent).toBe(31);
     expect(m.regularMin).toBe(240 * 60);
-    expect(fmtHMZero(m.otMin)).toBe('19h 9m');
-    expect(m.paidHours).toBeCloseTo(329.15, 2);
-    expect(m.salary).toBe(54150);
+    expect(fmtHMZero(m.otMin)).toBe('19h 44m');
+    expect(m.paidHours).toBeCloseTo(329.73, 2);
+    expect(m.salary).toBe(54246);
   });
 
   it('Dubey: 8 hrs, lunch extra', () => {
@@ -52,10 +52,12 @@ describe('day rules', () => {
     expect(fixed.status).toBe('Present');
     expect(fixed.outEdited).toBe(true);
   });
-  it('overtime is exact minutes and only after the 20-minute grace', () => {
-    // required out 17:30, leaves 17:50 -> exactly 20 min: no overtime
-    expect(calcDay({ date: '2026-08-06', punches: ['09:00', '17:50'] }, s8).otMin).toBe(0);
-    // 17:51 -> 21 min past: overtime is 21 minutes, not rounded to 30
+  it('overtime is exact minutes and only after the 14-minute grace', () => {
+    // required out 17:30: 0 to 14 minutes extra is not counted
+    expect(calcDay({ date: '2026-08-06', punches: ['09:00', '17:30'] }, s8).otMin).toBe(0);
+    expect(calcDay({ date: '2026-08-06', punches: ['09:00', '17:44'] }, s8).otMin).toBe(0);
+    // 17:45 -> 15 min past: overtime is the full 15 minutes, not rounded
+    expect(calcDay({ date: '2026-08-06', punches: ['09:00', '17:45'] }, s8).otMin).toBe(15);
     expect(calcDay({ date: '2026-08-06', punches: ['09:00', '17:51'] }, s8).otMin).toBe(21);
   });
   it('8-hr worker leaving at 19:00 gets 1h 30m, at 21:00 gets 3h 30m', () => {
@@ -174,8 +176,9 @@ describe('shifts', () => {
     expect(short.status).toBe('Absent');
     expect(short.otMin).toBe(450);
   });
-  it('2pm-10pm shift: overtime after the 20 minute grace', () => {
-    expect(calcDay({ date: '2026-08-05', punches: ['14:00', '22:15'] }, set(8, evening)).otMin).toBe(0);
+  it('2pm-10pm shift: overtime after the 14 minute grace', () => {
+    expect(calcDay({ date: '2026-08-05', punches: ['14:00', '22:14'] }, set(8, evening)).otMin).toBe(0);
+    expect(calcDay({ date: '2026-08-05', punches: ['14:00', '22:15'] }, set(8, evening)).otMin).toBe(15);
     expect(calcDay({ date: '2026-08-05', punches: ['14:00', '22:45'] }, set(8, evening)).otMin).toBe(45);
   });
   it('early punch more than 3 hours before the shift is ignored', () => {

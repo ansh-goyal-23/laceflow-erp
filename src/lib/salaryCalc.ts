@@ -6,7 +6,7 @@
  *    last punch = OUT. Punches before 06:00 are machine errors and ignored.
  *  - Shift starts 09:00. Arriving earlier earns nothing extra.
  *  - A late arrival must also leave late: required OUT = max(IN, 09:00) + shift length.
- *  - Overtime only if OUT is MORE than 20 minutes past the required OUT; then
+ *  - Overtime only if OUT is MORE than 14 minutes past the required OUT; then
  *    overtime is the exact extra time (hours + minutes, no rounding).
  *  - Otherwise worked time (minus lunch where applicable) is rounded to the
  *    nearest 30 min and capped at the working hours. Fewer hours than the
@@ -27,7 +27,7 @@
 
 export const SALARY_RULES = {
   shiftStartMin: 9 * 60,
-  graceMin: 20,
+  graceMin: 14,
   roundMin: 30,
   ignoreBeforeMin: 6 * 60,
   lunchMin: 30,
