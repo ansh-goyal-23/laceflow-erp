@@ -94,7 +94,7 @@ const SalaryGeneration: React.FC = () => {
               />
             </TabsContent>
             <TabsContent value="upload" className="mt-4"><UploadTab onFile={onFile} busy={upload.isPending} /></TabsContent>
-            <TabsContent value="employees" className="mt-4"><EmployeesTab employees={employees} /></TabsContent>
+            <TabsContent value="employees" className="mt-4"><EmployeesTab employees={employees} advances={advances} recoveries={recoveries} /></TabsContent>
             <TabsContent value="advances" className="mt-4"><AdvancesTab employees={employees} advances={advances} recoveries={recoveries} /></TabsContent>
             <TabsContent value="holidays" className="mt-4"><HolidaysTab holidays={holidayRows} /></TabsContent>
             <TabsContent value="audit" className="mt-4"><AuditTab employees={employees} /></TabsContent>

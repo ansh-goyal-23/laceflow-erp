@@ -17,6 +17,13 @@ export interface SalaryEmployee {
   lunch_included: boolean;
   joined_on: string | null;
   left_on: string | null;
+  /** 'hourly' = attendance based; 'fixed' = the monthly amount is paid as is. */
+  pay_type: 'hourly' | 'fixed';
+}
+
+export interface SalaryChangeRow {
+  id: number; employee_id: string | null; entity: 'employee' | 'advance' | 'upload'; action: 'edit' | 'delete';
+  field: string | null; old_value: string | null; new_value: string | null; note: string | null; by_email: string | null; at: string;
 }
 
 export interface SalaryHoliday { holiday_date: string; name: string; confirmed: boolean }
@@ -27,6 +34,7 @@ export interface SalaryRun {
   monthly_salary: number;
   working_hours: number;
   lunch_included: boolean;
+  pay_type: 'hourly' | 'fixed';
   holidays: Record<string, string>;
   days_present: number;
   overtime_minutes: number;
@@ -195,15 +203,43 @@ export function useSalaryEdits(employeeId: string | null, month: string) {
   });
 }
 
+type ChangeInput = Omit<SalaryChangeRow, 'id' | 'by_email' | 'at'>;
+
+/** Append rows to the change log (admin-only, append-only table). */
+async function logChanges(rows: ChangeInput[]) {
+  if (!rows.length) return;
+  const { data: u } = await supabase.auth.getUser();
+  const email = u?.user?.email || null;
+  const { error } = await sb.from('salary_change_log').insert(rows.map(r => ({ ...r, by_email: email })));
+  if (error) throw error;
+}
+
+const show = (v: unknown) => (v === null || v === undefined || v === '' ? null : String(v));
+
 export function useUpdateSalaryEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      id: string; monthly_salary: number | null; working_hours: number | null; lunch_included: boolean; is_active: boolean; left_on: string | null;
+      previous: SalaryEmployee; monthly_salary: number | null; working_hours: number | null; lunch_included: boolean;
+      is_active: boolean; left_on: string | null; pay_type: 'hourly' | 'fixed';
     }) => {
-      const { id, ...patch } = input;
-      const { error } = await sb.from('salary_employees').update(patch).eq('id', id);
+      const { previous, ...patch } = input;
+      const { error } = await sb.from('salary_employees').update(patch).eq('id', previous.id);
       if (error) throw error;
+      // The first time salary details are entered is not logged; every change after that is.
+      if (previous.monthly_salary != null || previous.working_hours != null) {
+        const fields: [string, unknown, unknown][] = [
+          ['Pay type', previous.pay_type, patch.pay_type],
+          ['Monthly salary', previous.monthly_salary, patch.monthly_salary],
+          ['Working hours', previous.working_hours, patch.working_hours],
+          ['Lunch included', previous.lunch_included, patch.lunch_included],
+          ['Working', previous.is_active, patch.is_active],
+          ['Date left', previous.left_on, patch.left_on],
+        ];
+        await logChanges(fields.filter(([, o, n]) => show(o) !== show(n)).map(([field, o, n]) => ({
+          employee_id: previous.id, entity: 'employee', action: 'edit', field, old_value: show(o), new_value: show(n), note: null,
+        })));
+      }
     },
     onSuccess: () => invalidateSalary(qc),
   });
@@ -417,12 +453,36 @@ export function useAddSalaryAdvance() {
   });
 }
 
+export function useUpdateSalaryAdvance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { previous: SalaryAdvance; amount: number; givenOn: string; note: string }) => {
+      const { previous } = input;
+      const { error } = await sb.from('salary_advances').update({
+        amount: input.amount, given_on: input.givenOn, month: input.givenOn.slice(0, 7), note: input.note.trim() || null,
+      }).eq('id', previous.id);
+      if (error) throw error;
+      const fields: [string, unknown, unknown][] = [
+        ['Amount', previous.amount, input.amount], ['Given on', previous.given_on, input.givenOn], ['Note', previous.note, input.note.trim() || null],
+      ];
+      await logChanges(fields.filter(([, o, n]) => show(o) !== show(n)).map(([field, o, n]) => ({
+        employee_id: previous.employee_id, entity: 'advance', action: 'edit', field, old_value: show(o), new_value: show(n), note: null,
+      })));
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
 export function useDeleteSalaryAdvance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await sb.from('salary_advances').delete().eq('id', id);
+    mutationFn: async (advance: SalaryAdvance) => {
+      const { error } = await sb.from('salary_advances').delete().eq('id', advance.id);
       if (error) throw error;
+      await logChanges([{
+        employee_id: advance.employee_id, entity: 'advance', action: 'delete', field: 'Advance entry',
+        old_value: `${advance.amount} on ${advance.given_on}${advance.note ? ` (${advance.note})` : ''}`, new_value: null, note: null,
+      }]);
     },
     onSuccess: () => invalidateSalary(qc),
   });
@@ -525,6 +585,46 @@ export function useSalaryRunLog() {
       const { data, error } = await sb.from('salary_run_log').select('*').order('at', { ascending: false }).limit(300);
       if (error) throw error;
       return (data || []).map((r: any) => ({ ...r, amount: r.amount == null ? null : Number(r.amount) }));
+    },
+  });
+}
+
+/** Delete an uploaded attendance sheet and the machine punches that came from it. Blocked once salary is generated for that month. */
+export function useDeleteSalaryUpload() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (upload: { id: string; month: string; file_name: string | null }) => {
+      const { count, error: e0 } = await sb.from('salary_runs').select('employee_id', { count: 'exact', head: true }).eq('month', upload.month);
+      if (e0) throw e0;
+      if (count) throw new Error(`Salary for ${upload.month} is already generated for ${count} employee(s). Reopen those first, then delete the sheet.`);
+      const { error: e1 } = await sb.from('salary_punches').delete().eq('upload_id', upload.id);
+      if (e1) throw e1;
+      const { error: e2 } = await sb.from('salary_uploads').delete().eq('id', upload.id);
+      if (e2) throw e2;
+      // If this was the last sheet for the month, clear any punches left over from replaced uploads too.
+      const { count: left, error: e3 } = await sb.from('salary_uploads').select('id', { count: 'exact', head: true }).eq('month', upload.month);
+      if (e3) throw e3;
+      if (!left) {
+        const { from, to } = monthRange(upload.month);
+        const { error: e4 } = await sb.from('salary_punches').delete().gte('work_date', from).lte('work_date', to);
+        if (e4) throw e4;
+      }
+      await logChanges([{
+        employee_id: null, entity: 'upload', action: 'delete', field: 'Attendance sheet',
+        old_value: `${upload.month}: ${upload.file_name || 'file'}`, new_value: null, note: null,
+      }]);
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+export function useSalaryChangeLog() {
+  return useQuery({
+    queryKey: ['salary_change_log'],
+    queryFn: async (): Promise<SalaryChangeRow[]> => {
+      const { data, error } = await sb.from('salary_change_log').select('*').order('at', { ascending: false }).limit(300);
+      if (error) throw error;
+      return data || [];
     },
   });
 }

@@ -222,3 +222,27 @@ alter table public.salary_run_log enable row level security;
 create policy "salary_runs_admin_all" on public.salary_runs for all to authenticated using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
 create policy "salary_run_log_admin_select" on public.salary_run_log for select to authenticated using (public.has_role(auth.uid(), 'admin'));
 create policy "salary_run_log_admin_insert" on public.salary_run_log for insert to authenticated with check (public.has_role(auth.uid(), 'admin'));
+
+-- Fixed-salary workers and change log (added later)
+alter table public.salary_employees add column if not exists pay_type text not null default 'hourly' check (pay_type in ('hourly','fixed'));
+alter table public.salary_runs add column if not exists pay_type text not null default 'hourly' check (pay_type in ('hourly','fixed'));
+create table if not exists public.salary_change_log (
+  id bigint generated always as identity primary key,
+  employee_id uuid references public.salary_employees(id) on delete set null,
+  entity text not null check (entity in ('employee','advance','upload')),
+  action text not null check (action in ('edit','delete')),
+  field text,
+  old_value text,
+  new_value text,
+  note text,
+  by_email text,
+  at timestamptz not null default now()
+);
+create index if not exists salary_change_log_emp_idx on public.salary_change_log (employee_id, at);
+revoke all on public.salary_change_log from anon;
+grant select, insert on public.salary_change_log to authenticated;
+grant all on public.salary_change_log to service_role;
+revoke truncate, trigger, references on public.salary_change_log from authenticated;
+alter table public.salary_change_log enable row level security;
+create policy "salary_change_log_admin_select" on public.salary_change_log for select to authenticated using (public.has_role(auth.uid(), 'admin'));
+create policy "salary_change_log_admin_insert" on public.salary_change_log for insert to authenticated with check (public.has_role(auth.uid(), 'admin'));

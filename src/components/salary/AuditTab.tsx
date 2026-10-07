@@ -2,14 +2,15 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { dayLabel, inr, monthLabel } from '@/components/salary/common';
-import { useSalaryAuditEdits, useSalaryRunLog, type SalaryEmployee } from '@/hooks/useSalary';
+import { useSalaryAuditEdits, useSalaryChangeLog, useSalaryRunLog, type SalaryEmployee } from '@/hooks/useSalary';
 
 const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN');
 
 const AuditTab: React.FC<{ employees: SalaryEmployee[] }> = ({ employees }) => {
   const { data: edits = [] } = useSalaryAuditEdits();
   const { data: runLog = [] } = useSalaryRunLog();
-  const name = (id: string) => employees.find(e => e.id === id)?.name || 'Unknown';
+  const { data: changes = [] } = useSalaryChangeLog();
+  const name = (id: string | null) => (id ? employees.find(e => e.id === id)?.name || 'Unknown' : '-');
 
   return (
     <div className="space-y-6">
@@ -34,6 +35,35 @@ const AuditTab: React.FC<{ employees: SalaryEmployee[] }> = ({ employees }) => {
                   <TableCell className="text-right">{r.amount != null ? inr(r.amount) : '-'}</TableCell>
                   <TableCell className="text-sm">{r.reason || '-'}</TableCell>
                   <TableCell className="text-xs">{r.by_email || 'unknown'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-semibold">Employee details, advances and deleted sheets</h3>
+        <div className="rounded-lg border bg-card overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>When</TableHead><TableHead>Employee</TableHead><TableHead>Type</TableHead><TableHead>What</TableHead>
+                <TableHead>Change</TableHead><TableHead>By</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {changes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No changes yet. The first entry of a person's details is not logged; later edits are.</TableCell></TableRow>}
+              {changes.map(c => (
+                <TableRow key={c.id}>
+                  <TableCell className="whitespace-nowrap text-xs">{stamp(c.at)}</TableCell>
+                  <TableCell>{name(c.employee_id)}</TableCell>
+                  <TableCell>{c.entity === 'employee' ? 'Employee details' : c.entity === 'advance' ? 'Advance' : 'Attendance sheet'}</TableCell>
+                  <TableCell className="text-sm">{c.action === 'delete' ? 'Deleted' : 'Edited'}{c.field ? `: ${c.field}` : ''}</TableCell>
+                  <TableCell className="text-sm">
+                    {c.action === 'delete' ? <span>{c.old_value}</span> : <><span className="line-through">{c.old_value ?? 'none'}</span> to <b>{c.new_value ?? 'none'}</b></>}
+                  </TableCell>
+                  <TableCell className="text-xs">{c.by_email || 'unknown'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

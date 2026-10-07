@@ -49,6 +49,7 @@ const adminNav: { to: string; label: string; icon: typeof Plus }[] = [
   { to: "/admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
   { to: "/admin/user-activity", label: "User Activity", icon: Activity },
   { to: "/admin/daily-report", label: "Daily Work Report", icon: CalendarDays },
+  { to: "/admin/salary-generation", label: "Salary Generation", icon: Wallet },
 ];
 
 export function AppSidebar() {
@@ -274,20 +275,6 @@ export function AppSidebar() {
           <Brain className="h-4 w-4" />
           AI Learning
         </Link>
-
-        {isAdmin && (
-          <Link
-            to="/salary-generation"
-            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-              pathname === "/salary-generation"
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            }`}
-          >
-            <Wallet className="h-4 w-4" />
-            Salary Generation
-          </Link>
-        )}
 
         {isAdmin && (
           <>

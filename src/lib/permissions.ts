@@ -70,7 +70,7 @@ const accounts: RoleMatrix = {
   dashboard: NONE, brands: NONE, clients: NONE, purchase_orders: NONE,
   dispatch: NONE, reports: NONE, yarn: NONE, ai_learning: NONE,
   admin: NONE, user_management: NONE,
-  salary_generation: { view: true, edit: true, export: true, print: true },
+  salary_generation: NONE,
 };
 
 const MATRIX: Record<AppRole, RoleMatrix> = {

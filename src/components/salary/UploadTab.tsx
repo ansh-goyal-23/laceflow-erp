@@ -1,15 +1,27 @@
 import React, { useRef } from 'react';
-import { Loader2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+import { Loader2, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { monthLabel } from '@/components/salary/common';
-import { useSalaryUploadsList } from '@/hooks/useSalary';
+import { useDeleteSalaryUpload, useSalaryUploadsList } from '@/hooks/useSalary';
 
 interface Props { onFile: (file: File | undefined) => void; busy: boolean }
 
 const UploadTab: React.FC<Props> = ({ onFile, busy }) => {
   const ref = useRef<HTMLInputElement>(null);
   const { data: uploads = [] } = useSalaryUploadsList();
+  const del = useDeleteSalaryUpload();
+
+  const remove = async (u: { id: string; month: string; file_name: string | null }) => {
+    if (!window.confirm(
+      `Delete the ${monthLabel(u.month)} attendance sheet${u.file_name ? ` (${u.file_name})` : ''}?\n\n` +
+      'The machine punches from it are removed. Manual time corrections, advances and payments are kept. The deletion is saved in the audit log.',
+    )) return;
+    try { await del.mutateAsync(u); toast.success('Attendance sheet deleted.'); }
+    catch (err: any) { toast.error(err?.message || 'Could not delete.'); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border bg-card p-6 space-y-3">
@@ -26,16 +38,24 @@ const UploadTab: React.FC<Props> = ({ onFile, busy }) => {
       <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Month</TableHead><TableHead>File</TableHead><TableHead>Uploaded by</TableHead><TableHead>Uploaded on</TableHead></TableRow>
+            <TableRow>
+              <TableHead>Month</TableHead><TableHead>File</TableHead><TableHead>Uploaded by</TableHead><TableHead>Uploaded on</TableHead>
+              <TableHead className="text-right">Delete</TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
-            {uploads.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No uploads yet.</TableCell></TableRow>}
+            {uploads.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No uploads yet.</TableCell></TableRow>}
             {uploads.map(u => (
               <TableRow key={u.id}>
                 <TableCell className="font-medium">{monthLabel(u.month)}</TableCell>
                 <TableCell>{u.file_name || '-'}</TableCell>
                 <TableCell className="text-sm">{u.uploaded_by || 'unknown'}</TableCell>
                 <TableCell className="text-xs">{new Date(u.uploaded_at).toLocaleString('en-IN')}</TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Delete this sheet" disabled={del.isPending} onClick={() => remove(u)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
