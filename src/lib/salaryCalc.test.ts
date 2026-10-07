@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
-import { calcMonth, calcDay, fmtHMZero, type SalarySettings } from '@/lib/salaryCalc';
+import { calcMonth, calcDay, fixedSalaryFor, fmtHMZero, lastDayIn, type SalarySettings } from '@/lib/salaryCalc';
 import { parseAttendanceWorkbook } from '@/lib/attendanceParser';
 import fixture from '@/test/fixtures/attendance-aug-2026.json';
 
@@ -74,6 +74,47 @@ describe('day rules', () => {
     expect(d.status).toBe('Holiday');
     expect(d.holidayMin).toBe(480);
     expect(d.otMin).toBe(240);
+  });
+  it('holiday worked: time before 09:00 does not count', () => {
+    const d = calcDay({ date: '2026-08-09', punches: ['08:15', '13:00'] }, s8); // a Sunday, in at 08:15
+    expect(d.status).toBe('Holiday');
+    expect(d.otMin).toBe(240); // counted from 09:00, not 08:15
+    expect(calcDay({ date: '2026-08-09', punches: ['07:00', '08:30'] }, s8).otMin).toBe(0);
+  });
+});
+
+describe('employee leaving mid-month', () => {
+  const s8: SalarySettings = { monthlySalary: 12500, workingHours: 8, lunchIncluded: false };
+  const holidays = { '2026-08-15': 'Independence Day' };
+  const punches: Record<string, string[]> = {};
+  for (let d = 3; d <= 14; d++) {
+    const date = `2026-08-${String(d).padStart(2, '0')}`;
+    if (new Date(date + 'T00:00:00').getDay() !== 0) punches[date] = ['09:00', '17:30'];
+  }
+  const full = calcMonth({ month: '2026-08', punchesByDate: punches, overridesByDate: {}, holidays }, s8);
+  const left = calcMonth({ month: '2026-08', punchesByDate: punches, overridesByDate: {}, holidays, lastDay: '2026-08-14' }, s8);
+
+  it('days after the last working day are Left and earn no Sunday/holiday pay', () => {
+    expect(left.days[14].status).toBe('Left'); // 15 Aug holiday
+    expect(left.days[15].status).toBe('Left'); // 16 Aug Sunday
+    expect(left.days.filter(d => d.status === 'Left')).toHaveLength(17);
+    expect(left.daysPresent).toBeLessThan(full.daysPresent);
+    expect(left.salary).toBeLessThan(full.salary);
+  });
+  it('days up to the last day are unchanged, divisor stays the calendar days', () => {
+    expect(left.days.slice(0, 14).map(d => d.status)).toEqual(full.days.slice(0, 14).map(d => d.status));
+    expect(left.salary).toBe(Math.round((12500 * left.paidMin) / (31 * 480)));
+  });
+  it('lastDayIn only applies when the person left before the month ended', () => {
+    expect(lastDayIn('2026-08-14', '2026-08')).toBe('2026-08-14');
+    expect(lastDayIn('2026-08-31', '2026-08')).toBeNull();
+    expect(lastDayIn('2026-09-10', '2026-08')).toBeNull();
+    expect(lastDayIn(null, '2026-08')).toBeNull();
+  });
+  it('fixed salary is prorated by calendar days up to the last working day', () => {
+    expect(fixedSalaryFor(31000, '2026-08', null)).toBe(31000);
+    expect(fixedSalaryFor(31000, '2026-08', '2026-08-10')).toBe(10000);
+    expect(fixedSalaryFor(31000, '2026-08', '2026-07-30')).toBe(0);
   });
 });
 

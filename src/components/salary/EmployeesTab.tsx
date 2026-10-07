@@ -47,7 +47,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
     const hours = form.hours.trim() === '' ? null : Number(form.hours);
     if (salary != null && (!Number.isFinite(salary) || salary < 0)) { toast.error('Enter a valid monthly salary.'); return; }
     if (!form.fixed && hours != null && (!Number.isFinite(hours) || hours <= 0 || hours > 24)) { toast.error('Working hours must be between 0 and 24.'); return; }
-    if (!form.active && !form.leftOn) { toast.error('Enter the date this person left.'); return; }
+    if (!form.active && !form.leftOn) { toast.error('Enter this person\'s last working day.'); return; }
     try {
       await update.mutateAsync({
         previous: editing, monthly_salary: salary, working_hours: form.fixed ? null : hours,
@@ -64,7 +64,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
       <p className="text-sm text-muted-foreground">
         The master list of everyone on the thumb-print machine. Set each person's monthly salary and working hours once; they are used for every
         month you generate. Choose "Fixed salary" for workers who are paid the same amount every month regardless of attendance. New people appear
-        here automatically when an attendance sheet is uploaded. Mark someone as Left to leave them out of future salary runs (their past months stay).
+        here automatically when an attendance sheet is uploaded. Mark someone as Left and enter their last working day: that month's salary is paid only up to that day, and later months leave them out.
         Changes to a person's details after the first entry are saved in the audit log.
       </p>
       {missing.length > 0 && (
@@ -111,7 +111,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
                   <TableCell className="text-right">{e.monthly_salary != null ? inr(e.monthly_salary) : <Badge variant="outline" className="text-amber-600 border-amber-400">Not set</Badge>}</TableCell>
                   <TableCell className="text-right">{fixed ? <span className="text-muted-foreground">-</span> : e.working_hours ?? <Badge variant="outline" className="text-amber-600 border-amber-400">Not set</Badge>}</TableCell>
                   <TableCell className="text-right">{bal > 0 ? inr(bal) : <span className="text-muted-foreground">-</span>}</TableCell>
-                  <TableCell>{e.is_active ? <Badge className="bg-emerald-600 hover:bg-emerald-600">Working</Badge> : <Badge variant="secondary">Left{e.left_on ? ` ${dayLabel(e.left_on)}` : ''}</Badge>}</TableCell>
+                  <TableCell>{e.is_active ? <Badge className="bg-emerald-600 hover:bg-emerald-600">Working</Badge> : <Badge variant="secondary">Left{e.left_on ? `, last day ${dayLabel(e.left_on)}` : ''}</Badge>}</TableCell>
                   <TableCell className="text-right"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => open(e)}><Pencil className="h-4 w-4" /></Button></TableCell>
                 </TableRow>
               );
@@ -153,7 +153,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
               <Label htmlFor="active" className="font-normal text-sm">Currently working (turn off if this person has left)</Label>
             </div>
             {!form.active && (
-              <div><Label>Date left</Label><Input type="date" value={form.leftOn} onChange={e => setForm({ ...form, leftOn: e.target.value })} /></div>
+              <div><Label>Last working day</Label><Input type="date" value={form.leftOn} onChange={e => setForm({ ...form, leftOn: e.target.value })} /></div>
             )}
           </div>
           <DialogFooter>

@@ -13,7 +13,11 @@
  *    working hours => the day is ABSENT, and the hours actually worked are
  *    added to overtime.
  *  - Holidays (all Sundays + listed days) are paid and count as present. A
- *    holiday worked adds all time between IN and OUT as overtime.
+ *    holiday worked adds the time between IN and OUT as overtime, counted from
+ *    the 09:00 shift start like any other day (arriving earlier earns nothing).
+ *  - If the employee left mid-month, days after the last working day are not paid
+ *    (no Sunday/holiday pay) and show as 'Left'; the monthly divisor stays the
+ *    calendar days of the month.
  *  - Salary = monthly / (calendar days in month x working hours) x paid hours,
  *    where paid hours = regular + holiday + overtime (no overtime premium).
  *
@@ -46,7 +50,7 @@ export interface TimeOverride {
   outTime?: string | null;
 }
 
-export type DayStatus = 'Present' | 'Absent' | 'Holiday';
+export type DayStatus = 'Present' | 'Absent' | 'Holiday' | 'Left';
 
 export interface DayResult {
   date: string;            // YYYY-MM-DD
@@ -169,7 +173,7 @@ export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
   if (holidayName) {
     return {
       ...base, status: 'Holiday', holidayName,
-      regularMin: 0, holidayMin: workingMin, otMin: complete ? (effOut as number) - (effIn as number) : 0,
+      regularMin: 0, holidayMin: workingMin, otMin: complete ? Math.max(0, (effOut as number) - Math.max(effIn as number, R.shiftStartMin)) : 0,
     };
   }
 
@@ -205,6 +209,23 @@ export interface CalcMonthInput {
   punchesByDate: Record<string, string[]>;
   overridesByDate: Record<string, TimeOverride>;
   holidays: Record<string, string>; // date -> name (Sundays are automatic)
+  /** Last working day (YYYY-MM-DD, inclusive). Later days of the month are not paid. */
+  lastDay?: string | null;
+}
+
+/** The last working day to apply in `month`, or null when the person worked the whole month. */
+export function lastDayIn(leftOn: string | null | undefined, month: string): string | null {
+  if (!leftOn) return null;
+  const end = `${month}-${String(daysInMonthOf(month)).padStart(2, '0')}`;
+  return leftOn < end ? leftOn : null;
+}
+
+/** Fixed monthly pay, prorated by calendar days up to the last working day. */
+export function fixedSalaryFor(monthly: number, month: string, lastDay: string | null): number {
+  if (!lastDay) return Math.round(monthly);
+  if (lastDay < `${month}-01`) return 0;
+  const n = daysInMonthOf(month);
+  return Math.round((monthly * Number(lastDay.slice(8, 10))) / n);
 }
 
 export function calcMonth(input: CalcMonthInput, s: SalarySettings): MonthSummary {
@@ -212,6 +233,14 @@ export function calcMonth(input: CalcMonthInput, s: SalarySettings): MonthSummar
   const days: DayResult[] = [];
   for (let d = 1; d <= n; d++) {
     const date = `${input.month}-${String(d).padStart(2, '0')}`;
+    if (input.lastDay && date > input.lastDay) {
+      const base = calcDay({ date, punches: [] }, s);
+      days.push({
+        ...base, status: 'Left', holidayName: undefined, rawPunches: [], machineIn: null, machineOut: null,
+        inTime: null, outTime: null, inEdited: false, outEdited: false, regularMin: 0, holidayMin: 0, otMin: 0, flags: [],
+      });
+      continue;
+    }
     days.push(calcDay({
       date,
       punches: input.punchesByDate[date] || [],

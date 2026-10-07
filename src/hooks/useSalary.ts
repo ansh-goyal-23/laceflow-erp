@@ -35,6 +35,7 @@ export interface SalaryRun {
   working_hours: number;
   lunch_included: boolean;
   pay_type: 'hourly' | 'fixed';
+  last_working_day: string | null;
   holidays: Record<string, string>;
   days_present: number;
   overtime_minutes: number;
@@ -234,7 +235,7 @@ export function useUpdateSalaryEmployee() {
           ['Working hours', previous.working_hours, patch.working_hours],
           ['Lunch included', previous.lunch_included, patch.lunch_included],
           ['Working', previous.is_active, patch.is_active],
-          ['Date left', previous.left_on, patch.left_on],
+          ['Last working day', previous.left_on, patch.left_on],
         ];
         await logChanges(fields.filter(([, o, n]) => show(o) !== show(n)).map(([field, o, n]) => ({
           employee_id: previous.id, entity: 'employee', action: 'edit', field, old_value: show(o), new_value: show(n), note: null,

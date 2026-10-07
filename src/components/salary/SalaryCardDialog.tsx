@@ -37,6 +37,8 @@ interface Props {
   advanceRecovered?: number;
   /** Month is generated: times cannot be edited until it is reopened. */
   locked?: boolean;
+  /** Last working day if the person left this month; later days show as Left. */
+  lastDay?: string | null;
   onClose: () => void;
   onMarkPaid: () => void;
   onUndoPaid: () => void;
@@ -52,11 +54,11 @@ const Tile: React.FC<{ label: string; value: string; strong?: boolean }> = ({ la
 );
 
 const SalaryCardDialog: React.FC<Props> = ({
-  employee, month, settings, punchesByDate, overridesByDate, holidays, payment, advanceRecovered = 0, locked = false, onClose, onMarkPaid, onUndoPaid,
+  employee, month, settings, punchesByDate, overridesByDate, holidays, payment, advanceRecovered = 0, locked = false, lastDay = null, onClose, onMarkPaid, onUndoPaid,
 }) => {
   const summary = useMemo(
-    () => calcMonth({ month, punchesByDate, overridesByDate, holidays }, settings),
-    [month, punchesByDate, overridesByDate, holidays, settings],
+    () => calcMonth({ month, punchesByDate, overridesByDate, holidays, lastDay }, settings),
+    [month, punchesByDate, overridesByDate, holidays, settings, lastDay],
   );
   const { data: edits = [] } = useSalaryEdits(employee.id, month);
   const saveEdit = useSaveTimeEdit();
@@ -126,6 +128,15 @@ const SalaryCardDialog: React.FC<Props> = ({
       </Tooltip>
     );
     const base = 'text-sm';
+    if (day.status === 'Left') {
+      return (
+        <TableRow key={day.date} className="bg-muted/40">
+          <TableCell className={base}>{dayLabel(day.date)}</TableCell>
+          <TableCell className={base}>{day.dow}</TableCell>
+          <TableCell colSpan={4} className="text-center text-muted-foreground">Left (after last working day)</TableCell>
+        </TableRow>
+      );
+    }
     if (day.status === 'Holiday' && noTimes) {
       return (
         <TableRow key={day.date} className="bg-muted/40">

@@ -15,7 +15,7 @@ const money = (v: number) => Math.round(v).toLocaleString('en-IN');
 
 const dayRow = (d: MonthSummary['days'][number]) => {
   const noTimes = !d.inTime && !d.outTime;
-  const label = d.status === 'Holiday' ? 'H / Holiday' : d.status === 'Absent' ? 'A / Absent' : hoursStr(d.regularMin);
+  const label = d.status === 'Left' ? 'Left' : d.status === 'Holiday' ? 'H / Holiday' : d.status === 'Absent' ? 'A / Absent' : hoursStr(d.regularMin);
   return [
     `${d.date.slice(8)}/${d.date.slice(5, 7)}`, d.dow,
     noTimes ? '' : d.inTime || '', noTimes ? '' : d.outTime || '',

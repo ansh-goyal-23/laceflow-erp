@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import SalaryCardDialog from '@/components/salary/SalaryCardDialog';
 import RulesHelp from '@/components/salary/RulesHelp';
-import { advanceBalanceFor, inr, monthLabel, settingsOf, today, type Recovery } from '@/components/salary/common';
-import { calcMonth, daysInMonthOf, fmtHMZero, type TimeOverride } from '@/lib/salaryCalc';
+import { advanceBalanceFor, dayLabel, inr, monthLabel, settingsOf, today, type Recovery } from '@/components/salary/common';
+import { calcMonth, daysInMonthOf, fixedSalaryFor, fmtHMZero, lastDayIn, type TimeOverride } from '@/lib/salaryCalc';
 import {
   useGenerateSalary, useMarkSalaryPaid, useReopenSalary, useUnmarkSalaryPaid,
   type SalaryAdvance, type SalaryEmployee, type SalaryPayment, type SalaryRun,
@@ -69,17 +69,19 @@ const SalaryRunTab: React.FC<Props> = ({ month, employees, punches, overrides, h
         // A generated month always uses the settings and holidays it was generated with.
         const s = run ? { monthlySalary: run.monthly_salary, workingHours: run.working_hours, lunchIncluded: run.lunch_included } : liveSettings;
         const hol = run ? run.holidays : holidays;
+        // If the person left this month, pay only up to the last working day (frozen in a generated run).
+        const lastDay = run ? run.last_working_day : lastDayIn(e.left_on, month);
         const summary = s && !fixed
-          ? calcMonth({ month, punchesByDate: punches[e.id] || {}, overridesByDate: overrides[e.id] || {}, holidays: hol }, s)
+          ? calcMonth({ month, punchesByDate: punches[e.id] || {}, overridesByDate: overrides[e.id] || {}, holidays: hol, lastDay }, s)
           : null;
         const balance = run ? run.advance_balance_before : advanceBalanceFor(e.id, month, advances, recoveries);
-        const amount: number | null = fixed ? (s ? s.monthlySalary : null) : summary ? summary.salary : null;
+        const amount: number | null = fixed ? (run ? run.salary : s ? fixedSalaryFor(s.monthlySalary, month, lastDay) : null) : summary ? summary.salary : null;
         const maxRecover = amount != null ? Math.max(0, Math.min(balance, amount)) : 0;
         const typed = recovery[e.id];
         const recover = run ? run.advance_recovered
           : amount != null ? (typed === undefined ? maxRecover : Math.min(Math.max(Number(typed) || 0, 0), maxRecover)) : 0;
         const review = summary ? summary.days.filter(d => d.flags.length > 0 && d.status !== 'Holiday').length : 0;
-        return { e, run, s, summary, fixed, amount, balance, maxRecover, recover, net: amount != null ? amount - recover : 0, review, payment: payments[e.id] };
+        return { e, run, s, summary, fixed, amount, lastDay, balance, maxRecover, recover, net: amount != null ? amount - recover : 0, review, payment: payments[e.id] };
       });
   }, [employees, punches, overrides, holidays, runs, advances, recoveries, recovery, payments, month, showAll, monthStart]);
 
@@ -103,6 +105,7 @@ const SalaryRunTab: React.FC<Props> = ({ month, employees, punches, overrides, h
       await generate.mutateAsync(pending.map(r => ({
         employee_id: r.e.id, month,
         pay_type: r.fixed ? 'fixed' as const : 'hourly' as const,
+        last_working_day: r.lastDay,
         monthly_salary: r.s!.monthlySalary, working_hours: r.s!.workingHours, lunch_included: r.s!.lunchIncluded,
         holidays: r.fixed ? {} : monthHolidays,
         days_present: r.summary ? r.summary.daysPresent : 0, overtime_minutes: r.summary ? r.summary.otMin : 0,
@@ -196,11 +199,12 @@ const SalaryRunTab: React.FC<Props> = ({ month, employees, punches, overrides, h
                   No attendance for {monthLabel(month)}. Upload that month's sheet, or pick another month.
                 </TableCell></TableRow>
               )}
-              {rows.map(({ e, run, s, summary, fixed, amount, balance, maxRecover, recover, net, review, payment }) => (
+              {rows.map(({ e, run, s, summary, fixed, amount, lastDay, balance, maxRecover, recover, net, review, payment }) => (
                 <TableRow key={e.id}>
                   <TableCell>
                     <div className="font-medium">{e.name}{!e.is_active && <Badge variant="secondary" className="ml-2">Left</Badge>}</div>
                     <div className="text-xs text-muted-foreground">Machine no. {e.machine_no}{fixed && <Badge variant="secondary" className="ml-2">Fixed salary</Badge>}</div>
+                    {lastDay && <div className="text-xs text-amber-600">Left: paid till {dayLabel(lastDay)}</div>}
                     {review > 0 && !run && <div className="text-xs text-amber-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{review} day(s) to review</div>}
                   </TableCell>
                   <TableCell className="text-right">{s ? inr(s.monthlySalary) : <span className="text-muted-foreground">-</span>}</TableCell>
@@ -286,6 +290,7 @@ const SalaryRunTab: React.FC<Props> = ({ month, employees, punches, overrides, h
           payment={card.payment}
           advanceRecovered={card.recover}
           locked={!!card.run}
+          lastDay={card.lastDay}
           onClose={() => setCardEmpId(null)}
           onMarkPaid={() => {
             if (!card.run) { toast.info('Generate the salary first, then mark it as paid.'); return; }

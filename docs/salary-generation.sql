@@ -246,3 +246,6 @@ revoke truncate, trigger, references on public.salary_change_log from authentica
 alter table public.salary_change_log enable row level security;
 create policy "salary_change_log_admin_select" on public.salary_change_log for select to authenticated using (public.has_role(auth.uid(), 'admin'));
 create policy "salary_change_log_admin_insert" on public.salary_change_log for insert to authenticated with check (public.has_role(auth.uid(), 'admin'));
+
+-- Last working day frozen into a generated salary (employee left mid-month)
+alter table public.salary_runs add column if not exists last_working_day date;
