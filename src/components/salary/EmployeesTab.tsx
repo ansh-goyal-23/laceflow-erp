@@ -9,19 +9,19 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AdvanceLedger from '@/components/salary/AdvanceLedger';
-import { advanceBalanceNow, dayLabel, inr, today, type Recovery } from '@/components/salary/common';
-import { useUpdateSalaryEmployee, type SalaryAdvance, type SalaryEmployee } from '@/hooks/useSalary';
+import { advanceBalanceNow, dayLabel, inr, shiftLabel, shiftOf, today, type Recovery } from '@/components/salary/common';
+import { useUpdateSalaryEmployee, type SalaryAdvance, type SalaryEmployee, type SalaryShift } from '@/hooks/useSalary';
 
-interface Props { employees: SalaryEmployee[]; advances: SalaryAdvance[]; recoveries: Recovery[] }
+interface Props { employees: SalaryEmployee[]; advances: SalaryAdvance[]; recoveries: Recovery[]; shifts: SalaryShift[] }
 
 const needsSetup = (e: SalaryEmployee) => e.monthly_salary == null || (e.pay_type !== 'fixed' && !e.working_hours);
 
-const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
+const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries, shifts }) => {
   const update = useUpdateSalaryEmployee();
   const [search, setSearch] = useState('');
   const [showLeft, setShowLeft] = useState(false);
   const [editing, setEditing] = useState<SalaryEmployee | null>(null);
-  const [form, setForm] = useState({ salary: '', hours: '', lunchIncluded: false, active: true, leftOn: '', fixed: false });
+  const [form, setForm] = useState({ salary: '', hours: '', lunchIncluded: false, active: true, leftOn: '', fixed: false, shiftId: '' });
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -38,6 +38,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
       salary: e.monthly_salary == null ? '' : String(e.monthly_salary),
       hours: e.working_hours == null ? '' : String(e.working_hours),
       lunchIncluded: e.lunch_included, active: e.is_active, leftOn: e.left_on || '', fixed: e.pay_type === 'fixed',
+      shiftId: shiftOf(e, shifts)?.id || '',
     });
   };
 
@@ -48,9 +49,13 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
     if (salary != null && (!Number.isFinite(salary) || salary < 0)) { toast.error('Enter a valid monthly salary.'); return; }
     if (!form.fixed && hours != null && (!Number.isFinite(hours) || hours <= 0 || hours > 24)) { toast.error('Working hours must be between 0 and 24.'); return; }
     if (!form.active && !form.leftOn) { toast.error('Enter this person\'s last working day.'); return; }
+    const prevShift = shiftOf(editing, shifts);
+    const newShift = shifts.find(s => s.id === form.shiftId) || null;
+    // keep the stored value unchanged when the effective shift did not change (null means General)
+    const shiftId = newShift && newShift.id === prevShift?.id ? editing.shift_id : (newShift?.id ?? null);
     try {
       await update.mutateAsync({
-        previous: editing, monthly_salary: salary, working_hours: form.fixed ? null : hours,
+        previous: editing, shift_id: shiftId, shiftNames: { from: prevShift?.name || 'None', to: newShift?.name || 'None' }, monthly_salary: salary, working_hours: form.fixed ? null : hours,
         lunch_included: form.fixed ? false : form.lunchIncluded,
         is_active: form.active, left_on: form.active ? null : form.leftOn, pay_type: form.fixed ? 'fixed' : 'hourly',
       });
@@ -89,6 +94,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
               <TableHead>Machine no.</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Department</TableHead>
+              <TableHead>Shift</TableHead>
               <TableHead>Pay type</TableHead>
               <TableHead className="text-right">Monthly Salary</TableHead>
               <TableHead className="text-right">Working Hours</TableHead>
@@ -98,7 +104,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No employees to show.</TableCell></TableRow>}
+            {rows.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No employees to show.</TableCell></TableRow>}
             {rows.map(e => {
               const fixed = e.pay_type === 'fixed';
               const bal = advanceBalanceNow(e.id, advances, recoveries).balance;
@@ -107,6 +113,7 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
                   <TableCell>{e.machine_no}</TableCell>
                   <TableCell className="font-medium">{e.name}</TableCell>
                   <TableCell>{e.department || <span className="text-muted-foreground">-</span>}</TableCell>
+                  <TableCell className="text-sm">{shiftOf(e, shifts)?.name || '-'}</TableCell>
                   <TableCell>{fixed ? <Badge variant="secondary">Fixed salary</Badge> : <span className="text-sm">By attendance</span>}</TableCell>
                   <TableCell className="text-right">{e.monthly_salary != null ? inr(e.monthly_salary) : <Badge variant="outline" className="text-amber-600 border-amber-400">Not set</Badge>}</TableCell>
                   <TableCell className="text-right">{fixed ? <span className="text-muted-foreground">-</span> : e.working_hours ?? <Badge variant="outline" className="text-amber-600 border-amber-400">Not set</Badge>}</TableCell>
@@ -137,15 +144,24 @@ const EmployeesTab: React.FC<Props> = ({ employees, advances, recoveries }) => {
               </Label>
             </div>
             <div><Label>Monthly salary (₹)</Label><Input inputMode="decimal" value={form.salary} onChange={e => setForm({ ...form, salary: e.target.value })} placeholder="e.g. 12500" /></div>
+            <div>
+              <Label>Shift</Label>
+              <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={form.shiftId} onChange={e => setForm({ ...form, shiftId: e.target.value })}>
+                {shifts.map(s => <option key={s.id} value={s.id}>{shiftLabel(s)}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">Decides when the day starts and which lunch rule applies. Create or manage shifts in the Shifts tab.</p>
+            </div>
             {!form.fixed && (
               <>
                 <div><Label>Working hours per day</Label><Input inputMode="decimal" value={form.hours} onChange={e => setForm({ ...form, hours: e.target.value })} placeholder="e.g. 8, 10 or 12" /></div>
+                {(shifts.find(s => s.id === form.shiftId)?.lunch_applies ?? true) && (
                 <div className="flex items-start gap-2">
                   <Switch checked={form.lunchIncluded} onCheckedChange={v => setForm({ ...form, lunchIncluded: v })} id="lunch" />
                   <Label htmlFor="lunch" className="font-normal text-sm leading-snug">
                     Lunch is included in the working hours (use for 10 and 12 hour workers). Leave off for 8 hour workers, whose 30 minute lunch is extra and unpaid.
                   </Label>
                 </div>
+                )}
               </>
             )}
             <div className="flex items-center gap-2">

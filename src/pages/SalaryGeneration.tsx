@@ -9,11 +9,12 @@ import AdvancesTab from '@/components/salary/AdvancesTab';
 import HolidaysTab from '@/components/salary/HolidaysTab';
 import AuditTab from '@/components/salary/AuditTab';
 import UploadTab from '@/components/salary/UploadTab';
+import ShiftsTab from '@/components/salary/ShiftsTab';
 import { monthLabel, prevMonth } from '@/components/salary/common';
 import { parseAttendanceWorkbook } from '@/lib/attendanceParser';
 import {
   useSalaryEmployees, useSalaryUploadedMonths, useSalaryPunches, useSalaryOverrides, useSalaryHolidays,
-  useSalaryPayments, useSalaryRuns, useSalaryAdvanceLedger, useSalaryRecoveries, useUploadAttendance,
+  useSalaryPayments, useSalaryRuns, useSalaryAdvanceLedger, useSalaryRecoveries, useSalaryShifts, useUploadAttendance,
 } from '@/hooks/useSalary';
 
 const SalaryGeneration: React.FC = () => {
@@ -30,6 +31,7 @@ const SalaryGeneration: React.FC = () => {
   const { data: runs = {} } = useSalaryRuns(month);
   const { data: advances = [] } = useSalaryAdvanceLedger();
   const { data: recoveries = [] } = useSalaryRecoveries();
+  const { data: shifts = [] } = useSalaryShifts();
   const upload = useUploadAttendance();
 
   // Only holidays with a confirmed date count in salary; Sundays are automatic.
@@ -80,6 +82,7 @@ const SalaryGeneration: React.FC = () => {
           <TabsTrigger value="run">Salary Run</TabsTrigger>
           <TabsTrigger value="upload">Upload Attendance</TabsTrigger>
           <TabsTrigger value="employees">Employees</TabsTrigger>
+          <TabsTrigger value="shifts">Shifts</TabsTrigger>
           <TabsTrigger value="advances">Advances</TabsTrigger>
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
@@ -90,11 +93,12 @@ const SalaryGeneration: React.FC = () => {
             <TabsContent value="run" className="mt-4">
               <SalaryRunTab
                 month={month} employees={employees} punches={punches} overrides={overrides} holidays={holidays}
-                payments={payments} runs={runs} advances={advances} recoveries={recoveries} goTo={setTab}
+                payments={payments} runs={runs} advances={advances} recoveries={recoveries} shifts={shifts} goTo={setTab}
               />
             </TabsContent>
             <TabsContent value="upload" className="mt-4"><UploadTab onFile={onFile} busy={upload.isPending} /></TabsContent>
-            <TabsContent value="employees" className="mt-4"><EmployeesTab employees={employees} advances={advances} recoveries={recoveries} /></TabsContent>
+            <TabsContent value="employees" className="mt-4"><EmployeesTab employees={employees} advances={advances} recoveries={recoveries} shifts={shifts} /></TabsContent>
+            <TabsContent value="shifts" className="mt-4"><ShiftsTab shifts={shifts} employees={employees} /></TabsContent>
             <TabsContent value="advances" className="mt-4"><AdvancesTab employees={employees} advances={advances} recoveries={recoveries} /></TabsContent>
             <TabsContent value="holidays" className="mt-4"><HolidaysTab holidays={holidayRows} /></TabsContent>
             <TabsContent value="audit" className="mt-4"><AuditTab employees={employees} /></TabsContent>

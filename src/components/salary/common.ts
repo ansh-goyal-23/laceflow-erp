@@ -1,5 +1,5 @@
-import { daysInMonthOf, type SalarySettings } from '@/lib/salaryCalc';
-import type { SalaryAdvance, SalaryEmployee } from '@/hooks/useSalary';
+import { daysInMonthOf, type SalarySettings, type ShiftTiming } from '@/lib/salaryCalc';
+import type { SalaryAdvance, SalaryEmployee, SalaryShift, ShiftSnapshot } from '@/hooks/useSalary';
 
 export const inr = (v: number) => '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 export const today = () => new Date().toISOString().slice(0, 10);
@@ -16,9 +16,35 @@ export const prevMonth = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-export const settingsOf = (e: SalaryEmployee): SalarySettings | null =>
+export const hmToMin = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+};
+export const to12h = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h < 12 ? 'am' : 'pm'}`;
+};
+export const shiftRange = (s: { start_time: string; end_time: string }) => `${to12h(s.start_time)} - ${to12h(s.end_time)}`;
+export const shiftLabel = (s: SalaryShift) => `${s.name} (${shiftRange(s)})`;
+export const crossesMidnight = (s: { start_time: string; end_time: string }) => hmToMin(s.end_time) <= hmToMin(s.start_time);
+
+export const timingOf = (s: SalaryShift | ShiftSnapshot | null | undefined): ShiftTiming | null => {
+  if (!s) return null;
+  const start = 'start_time' in s ? s.start_time : s.start;
+  const end = 'end_time' in s ? s.end_time : s.end;
+  const lunch = 'lunch_applies' in s ? s.lunch_applies : s.lunch;
+  return { startMin: hmToMin(start), endMin: hmToMin(end), lunch };
+};
+export const snapshotOf = (s: SalaryShift): ShiftSnapshot => ({ name: s.name, start: s.start_time, end: s.end_time, lunch: s.lunch_applies });
+
+/** The employee's shift (General if none is set). */
+export const shiftOf = (e: SalaryEmployee, shifts: SalaryShift[]): SalaryShift | null =>
+  shifts.find(s => s.id === e.shift_id) || shifts.find(s => s.name === 'General') || null;
+
+export const settingsOf = (e: SalaryEmployee, shifts: SalaryShift[] = []): SalarySettings | null =>
   e.monthly_salary != null && e.working_hours ? {
     monthlySalary: e.monthly_salary, workingHours: e.working_hours, lunchIncluded: e.lunch_included,
+    shift: timingOf(shiftOf(e, shifts)),
   } : null;
 
 export interface Recovery { employee_id: string; month: string; amount: number }

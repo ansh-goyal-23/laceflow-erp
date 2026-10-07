@@ -18,7 +18,7 @@ const dayRow = (d: MonthSummary['days'][number]) => {
   const label = d.status === 'Left' ? 'Left' : d.status === 'Holiday' ? 'H / Holiday' : d.status === 'Absent' ? 'A / Absent' : hoursStr(d.regularMin);
   return [
     `${d.date.slice(8)}/${d.date.slice(5, 7)}`, d.dow,
-    noTimes ? '' : d.inTime || '', noTimes ? '' : d.outTime || '',
+    noTimes ? '' : d.inTime || '', noTimes ? '' : `${d.outTime || ''}${d.outNextDay ? ' (+1)' : ''}`,
     label, fmtHM(d.otMin),
   ];
 };

@@ -112,7 +112,7 @@ const SalaryCardDialog: React.FC<Props> = ({
         className={`group inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent ${edited ? 'font-semibold text-amber-600 dark:text-amber-400' : ''}`}
         title={edited ? `Edited. Machine value: ${machine || 'none'}` : 'Click to edit'}
       >
-        <span className="tabular-nums">{t || '--:--'}</span>
+        <span className="tabular-nums">{t || '--:--'}{field === 'out' && day.outNextDay && <span className="ml-1 text-[10px] text-muted-foreground">+1 day</span>}</span>
         <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60" />
       </button>
     );

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
-import { calcMonth, calcDay, fixedSalaryFor, fmtHMZero, lastDayIn, type SalarySettings } from '@/lib/salaryCalc';
+import { calcMonth, calcDay, fixedSalaryFor, fmtHMZero, lastDayIn, type SalarySettings, type ShiftTiming } from '@/lib/salaryCalc';
 import { parseAttendanceWorkbook } from '@/lib/attendanceParser';
 import fixture from '@/test/fixtures/attendance-aug-2026.json';
 
@@ -156,5 +156,53 @@ describe('attendance sheet parser', () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['x']]), 'Summary');
     expect(() => parseAttendanceWorkbook(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }))).toThrow(/Logs/);
+  });
+});
+
+describe('shifts', () => {
+  const morning: ShiftTiming = { startMin: 6 * 60, endMin: 14 * 60, lunch: false };
+  const evening: ShiftTiming = { startMin: 14 * 60, endMin: 22 * 60, lunch: false };
+  const night: ShiftTiming = { startMin: 21 * 60, endMin: 9 * 60, lunch: false };
+  const set = (hours: number, shift: ShiftTiming, lunchIncluded = false): SalarySettings => ({ monthlySalary: 12000, workingHours: hours, lunchIncluded, shift });
+
+  it('6am-2pm shift: counted from 06:00, no lunch deducted', () => {
+    const d = calcDay({ date: '2026-08-05', punches: ['05:55', '14:05'] }, set(8, morning));
+    expect(d.status).toBe('Present');
+    expect(d.otMin).toBe(0);
+    // no lunch deduction: 06:00-13:40 is 7h40 -> short day, paid 7h30 as overtime (a day shift would deduct lunch)
+    const short = calcDay({ date: '2026-08-05', punches: ['06:00', '13:40'] }, set(8, morning));
+    expect(short.status).toBe('Absent');
+    expect(short.otMin).toBe(450);
+  });
+  it('2pm-10pm shift: overtime after the 20 minute grace', () => {
+    expect(calcDay({ date: '2026-08-05', punches: ['14:00', '22:15'] }, set(8, evening)).otMin).toBe(0);
+    expect(calcDay({ date: '2026-08-05', punches: ['14:00', '22:45'] }, set(8, evening)).otMin).toBe(45);
+  });
+  it('early punch more than 3 hours before the shift is ignored', () => {
+    const d = calcDay({ date: '2026-08-05', punches: ['02:30', '06:05', '14:02'] }, set(8, morning));
+    expect(d.inTime).toBe('06:05');
+    expect(d.flags.join()).toContain('before 03:00');
+  });
+  it('12-hour worker on a 6-2 shift gets no lunch either way', () => {
+    const d = calcDay({ date: '2026-08-05', punches: ['06:00', '18:00'] }, set(12, morning, true));
+    expect(d.status).toBe('Present');
+    expect(d.otMin).toBe(0);
+  });
+  it('night shift: evening In and next-morning Out belong to the same day', () => {
+    const punches = { '2026-08-03': ['21:05'], '2026-08-04': ['09:10', '21:00'], '2026-08-05': ['09:00'] };
+    const m = calcMonth({ month: '2026-08', punchesByDate: punches, overridesByDate: {}, holidays: {} }, set(12, night, true));
+    const d3 = m.days[2];
+    expect(d3.status).toBe('Present');
+    expect(d3.inTime).toBe('21:05');
+    expect(d3.outTime).toBe('09:10');
+    expect(d3.outNextDay).toBe(true);
+    expect(d3.otMin).toBe(0);
+    expect(m.days[3].status).toBe('Present'); // 4th evening 21:00 -> 5th morning 09:00
+    expect(m.days[4].status).toBe('Absent'); // 5th has no evening punch
+  });
+  it('night shift: an edited Out time is read as the next morning', () => {
+    const d = calcDay({ date: '2026-08-03', punches: ['21:00'], override: { outSet: true, outTime: '09:00' } }, set(12, night));
+    expect(d.status).toBe('Present');
+    expect(d.outNextDay).toBe(true);
   });
 });

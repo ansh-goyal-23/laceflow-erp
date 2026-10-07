@@ -42,7 +42,21 @@ export interface SalarySettings {
   workingHours: number;
   /** true = lunch is part of the paid working hours (e.g. 12-hr, 10-hr workers). false = extra 30 min lunch (8-hr workers). */
   lunchIncluded: boolean;
+  /** The employee's shift. Missing = the general 09:00 day shift with lunch (the original rules). */
+  shift?: ShiftTiming | null;
 }
+
+/** Times are minutes from midnight. A shift whose end is not after its start runs past midnight (e.g. 21:00-09:00). */
+export interface ShiftTiming {
+  startMin: number;
+  endMin: number;
+  /** true = the 1:00-1:30 pm lunch rules apply; false = no lunch is deducted on this shift. */
+  lunch: boolean;
+}
+
+export const shiftCrossesMidnight = (sh?: ShiftTiming | null) => !!sh && sh.endMin <= sh.startMin;
+/** For a night shift: clock times before this belong to the previous evening's shift (they are its Out). */
+export const shiftSplitMin = (sh: ShiftTiming) => Math.round((sh.startMin + sh.endMin) / 2);
 
 export interface TimeOverride {
   inSet?: boolean;
@@ -59,8 +73,9 @@ export interface DayResult {
   rawPunches: string[];    // all punches as recorded by the machine
   machineIn: string | null;
   machineOut: string | null;
-  inTime: string | null;   // effective (after manual edit)
+  inTime: string | null;   // effective (after manual edit), as a clock time HH:MM
   outTime: string | null;
+  outNextDay?: boolean;    // night shift: the Out time is on the next calendar day
   inEdited: boolean;
   outEdited: boolean;
   status: DayStatus;
@@ -94,8 +109,14 @@ export const toMin = (t: string | null | undefined): number | null => {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 };
 
-export const fmtTime = (min: number | null): string | null =>
-  min == null ? null : `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+export const fmtTime = (min: number | null): string | null => {
+  if (min == null) return null;
+  const m = ((min % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};
+
+/** Minutes as HH:MM that may run past 24:00 (used internally for night shifts, e.g. 33:05 = 09:05 next day). */
+const extStr = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 /** 150 -> "2h 30m"; 0 -> "-" */
 export const fmtHM = (min: number): string => {
@@ -124,17 +145,29 @@ export interface CalcDayInput {
 
 export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
   const R = SALARY_RULES;
+  const sh = s.shift || null;
+  const startMin = sh ? sh.startMin : R.shiftStartMin;
+  const crossing = shiftCrossesMidnight(sh);
+  const split = crossing ? shiftSplitMin(sh as ShiftTiming) : 0;
+  const lunchApplies = sh ? sh.lunch : true;
+  // Early punches are machine errors: ignored when more than 3 hours before the shift starts (06:00 for the 09:00 shift).
+  const ignoreBefore = crossing ? 0 : Math.max(0, startMin - 180);
+  // Night shift: a clock time before the split is on the next calendar day.
+  const toExt = (m: number | null) => (m != null && crossing && m < split ? m + 1440 : m);
+
   const [y, mo, d] = input.date.split('-').map(Number);
   const dowIdx = new Date(y, mo - 1, d).getDay();
   const holidayName = dowIdx === 0 ? 'Sunday' : input.holidayName || undefined;
   const workingMin = Math.round(s.workingHours * 60);
-  const shiftMin = workingMin + (s.lunchIncluded ? 0 : R.lunchMin);
-  const lunchCutoff = s.lunchIncluded ? R.lunchIncludedCutoffMin : 24 * 60;
+  const shiftMin = workingMin + (lunchApplies && !s.lunchIncluded ? R.lunchMin : 0);
+  const lunchCutoff = lunchApplies && s.lunchIncluded ? R.lunchIncludedCutoffMin : 24 * 60;
+  const lunchFor = (inM: number, outM: number) =>
+    lunchApplies && inM < R.lunchWindowStartMin && outM > R.lunchWindowEndMin && outM < lunchCutoff ? R.lunchMin : 0;
   const flags: string[] = [];
 
   const raw = [...input.punches].filter(p => toMin(p) != null).sort();
-  const valid = raw.filter(p => (toMin(p) as number) >= R.ignoreBeforeMin);
-  if (valid.length < raw.length) flags.push('Punch before 06:00 ignored');
+  const valid = raw.filter(p => (toMin(p) as number) >= ignoreBefore);
+  if (valid.length < raw.length) flags.push(`Punch before ${fmtTime(ignoreBefore)} ignored`);
 
   let machineIn: number | null = null;
   let machineOut: number | null = null;
@@ -144,13 +177,13 @@ export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
     if (valid.length > 2) flags.push(`${valid.length} punches: first and last used`);
   } else if (valid.length === 1) {
     const p = toMin(valid[0]) as number;
-    if (p < R.lunchWindowStartMin) machineIn = p; else machineOut = p;
+    if (p < startMin + 240) machineIn = p; else machineOut = p;
     flags.push('Only one punch');
   }
 
   const ov = input.override || {};
-  const effIn = ov.inSet ? toMin(ov.inTime) : machineIn;
-  const effOut = ov.outSet ? toMin(ov.outTime) : machineOut;
+  const effIn = ov.inSet ? toExt(toMin(ov.inTime)) : machineIn;
+  const effOut = ov.outSet ? toExt(toMin(ov.outTime)) : machineOut;
   if (ov.inSet && machineIn !== effIn) flags.push('In time edited');
   if (ov.outSet && machineOut !== effOut) flags.push('Out time edited');
   if (effIn != null && effOut != null && effOut <= effIn) flags.push('Out is not after In');
@@ -158,11 +191,12 @@ export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
   const base = {
     date: input.date,
     dow: DOW[dowIdx],
-    rawPunches: raw,
+    rawPunches: raw.map(p => fmtTime(toMin(p)) as string),
     machineIn: fmtTime(machineIn),
     machineOut: fmtTime(machineOut),
     inTime: fmtTime(effIn),
     outTime: fmtTime(effOut),
+    outNextDay: effOut != null && effOut >= 1440,
     inEdited: !!ov.inSet,
     outEdited: !!ov.outSet,
     flags,
@@ -170,12 +204,9 @@ export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
 
   const complete = effIn != null && effOut != null && effOut > effIn;
 
-  // Time worked on a holiday: counted from the 09:00 start, minus the 30-minute lunch when it applies (same rule as a normal day).
-  const holidayWorkedMin = (inM: number, outM: number) => {
-    const from = Math.max(inM, R.shiftStartMin);
-    const lunch = inM < R.lunchWindowStartMin && outM > R.lunchWindowEndMin && outM < lunchCutoff ? R.lunchMin : 0;
-    return Math.max(0, outM - from - lunch);
-  };
+  // Time worked on a holiday: counted from the shift start, minus the 30-minute lunch when it applies (same rule as a normal day).
+  const holidayWorkedMin = (inM: number, outM: number) =>
+    Math.max(0, outM - Math.max(inM, startMin) - lunchFor(inM, outM));
 
   // Paid holiday (Sunday or listed). Worked on a holiday => all time is overtime.
   if (holidayName) {
@@ -192,7 +223,7 @@ export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
 
   const inM = effIn as number;
   const outM = effOut as number;
-  const effectiveIn = Math.max(inM, R.shiftStartMin);
+  const effectiveIn = Math.max(inM, startMin);
   const requiredOut = effectiveIn + shiftMin;
   const extra = outM - requiredOut;
 
@@ -201,9 +232,7 @@ export function calcDay(input: CalcDayInput, s: SalarySettings): DayResult {
   }
 
   const span = outM - effectiveIn;
-  const onSiteAtLunch = inM < R.lunchWindowStartMin && outM > R.lunchWindowEndMin;
-  const lunch = onSiteAtLunch && outM < lunchCutoff ? R.lunchMin : 0;
-  const worked = Math.min(roundHalfUp(Math.max(span - lunch, 0), R.roundMin), workingMin);
+  const worked = Math.min(roundHalfUp(Math.max(span - lunchFor(inM, outM), 0), R.roundMin), workingMin);
 
   if (worked >= workingMin) {
     return { ...base, status: 'Present', regularMin: workingMin, holidayMin: 0, otMin: 0 };
@@ -236,6 +265,25 @@ export function fixedSalaryFor(monthly: number, month: string, lastDay: string |
   return Math.round((monthly * Number(lastDay.slice(8, 10))) / n);
 }
 
+const nextDate = (date: string) => {
+  const [y, m, d] = date.split('-').map(Number);
+  const n = new Date(y, m - 1, d + 1);
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+};
+
+/**
+ * Punches that belong to the shift that STARTS on `date`. For a day shift that is simply the day's punches. For a night shift
+ * crossing midnight it is the evening punches of `date` plus the morning punches of the next day (shown as 24:00+ internally).
+ */
+export function shiftPunchesFor(date: string, byDate: Record<string, string[]>, sh?: ShiftTiming | null): string[] {
+  const today = byDate[date] || [];
+  if (!sh || !shiftCrossesMidnight(sh)) return today;
+  const split = shiftSplitMin(sh);
+  const evening = today.filter(p => (toMin(p) as number) >= split);
+  const morning = (byDate[nextDate(date)] || []).filter(p => (toMin(p) as number) < split).map(p => extStr((toMin(p) as number) + 1440));
+  return [...evening, ...morning];
+}
+
 export function calcMonth(input: CalcMonthInput, s: SalarySettings): MonthSummary {
   const n = daysInMonthOf(input.month);
   const days: DayResult[] = [];
@@ -251,7 +299,7 @@ export function calcMonth(input: CalcMonthInput, s: SalarySettings): MonthSummar
     }
     days.push(calcDay({
       date,
-      punches: input.punchesByDate[date] || [],
+      punches: shiftPunchesFor(date, input.punchesByDate, s.shift),
       override: input.overridesByDate[date],
       holidayName: input.holidays[date],
     }, s));

@@ -19,7 +19,13 @@ export interface SalaryEmployee {
   left_on: string | null;
   /** 'hourly' = attendance based; 'fixed' = the monthly amount is paid as is. */
   pay_type: 'hourly' | 'fixed';
+  shift_id: string | null;
 }
+
+export interface SalaryShift { id: string; name: string; start_time: string; end_time: string; lunch_applies: boolean }
+
+/** A shift frozen into a generated salary. */
+export interface ShiftSnapshot { name: string; start: string; end: string; lunch: boolean }
 
 export interface SalaryChangeRow {
   id: number; employee_id: string | null; entity: 'employee' | 'advance' | 'upload'; action: 'edit' | 'delete';
@@ -36,6 +42,7 @@ export interface SalaryRun {
   lunch_included: boolean;
   pay_type: 'hourly' | 'fixed';
   last_working_day: string | null;
+  shift: ShiftSnapshot | null;
   holidays: Record<string, string>;
   days_present: number;
   overtime_minutes: number;
@@ -134,7 +141,10 @@ export function useSalaryPunches(month: string) {
   return useQuery({
     queryKey: ['salary_punches', month],
     queryFn: async (): Promise<Record<string, Record<string, string[]>>> => {
-      const { from, to } = monthRange(month);
+      const { from } = monthRange(month);
+      // include the 1st of next month: it holds the morning Out punches of the last night shift
+      const [yy, mm] = month.split('-').map(Number);
+      const to = `${mm === 12 ? yy + 1 : yy}-${String(mm === 12 ? 1 : mm + 1).padStart(2, '0')}-01`;
       const rows = await fetchAll(() =>
         sb.from('salary_punches').select('employee_id, work_date, punch_time').gte('work_date', from).lte('work_date', to).order('id'));
       const out: Record<string, Record<string, string[]>> = {};
@@ -222,11 +232,19 @@ export function useUpdateSalaryEmployee() {
   return useMutation({
     mutationFn: async (input: {
       previous: SalaryEmployee; monthly_salary: number | null; working_hours: number | null; lunch_included: boolean;
-      is_active: boolean; left_on: string | null; pay_type: 'hourly' | 'fixed';
+      is_active: boolean; left_on: string | null; pay_type: 'hourly' | 'fixed'; shift_id: string | null;
+      shiftNames?: { from: string; to: string };
     }) => {
-      const { previous, ...patch } = input;
+      const { previous, shiftNames, ...patch } = input;
       const { error } = await sb.from('salary_employees').update(patch).eq('id', previous.id);
       if (error) throw error;
+      // A change of shift is always logged.
+      if (previous.shift_id !== patch.shift_id) {
+        await logChanges([{
+          employee_id: previous.id, entity: 'employee', action: 'edit', field: 'Shift',
+          old_value: shiftNames?.from ?? null, new_value: shiftNames?.to ?? null, note: null,
+        }]);
+      }
       // The first time salary details are entered is not logged; every change after that is.
       if (previous.monthly_salary != null || previous.working_hours != null) {
         const fields: [string, unknown, unknown][] = [
@@ -259,6 +277,9 @@ export function useUploadAttendance() {
       if (eLock) throw eLock;
       if (locked) throw new Error(`Salary for ${parsed.month} is already generated for ${locked} employee(s). Reopen those first, then upload again.`);
 
+      const { data: gen } = await sb.from('salary_shifts').select('id').eq('name', 'General').maybeSingle();
+      const generalShiftId: string | null = gen?.id ?? null;
+
       // 1. Add employees we have not seen before (never overwrite salary settings).
       const { data: existing, error: e0 } = await sb.from('salary_employees').select('machine_no');
       if (e0) throw e0;
@@ -266,7 +287,7 @@ export function useUploadAttendance() {
       const fresh = parsed.employees.filter(e => !known.has(e.machineNo));
       if (fresh.length) {
         const { error } = await sb.from('salary_employees').upsert(
-          fresh.map(e => ({ machine_no: e.machineNo, name: e.name, department: e.department || null })),
+          fresh.map(e => ({ machine_no: e.machineNo, name: e.name, department: e.department || null, shift_id: generalShiftId })),
           { onConflict: 'machine_no', ignoreDuplicates: true },
         );
         if (error) throw error;
@@ -627,5 +648,71 @@ export function useSalaryChangeLog() {
       if (error) throw error;
       return data || [];
     },
+  });
+}
+
+export function useSalaryShifts() {
+  return useQuery({
+    queryKey: ['salary_shifts'],
+    queryFn: async (): Promise<SalaryShift[]> => {
+      const { data, error } = await sb.from('salary_shifts').select('*').order('created_at').order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
+export function useSaveShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id?: string; name: string; start_time: string; end_time: string; lunch_applies: boolean; previous?: SalaryShift }) => {
+      const { id, previous, ...row } = input;
+      if (id) {
+        const { error } = await sb.from('salary_shifts').update(row).eq('id', id);
+        if (error) throw error;
+        const fields: [string, unknown, unknown][] = previous ? [
+          ['name', previous.name, row.name], ['start', previous.start_time, row.start_time],
+          ['end', previous.end_time, row.end_time], ['lunch rules', previous.lunch_applies, row.lunch_applies],
+        ] : [];
+        await logChanges(fields.filter(([, o, n]) => show(o) !== show(n)).map(([f, o, n]) => ({
+          employee_id: null, entity: 'employee', action: 'edit', field: `Shift "${previous?.name}": ${f}`, old_value: show(o), new_value: show(n), note: null,
+        })));
+      } else {
+        const { error } = await sb.from('salary_shifts').insert(row);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+export function useDeleteShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (shift: SalaryShift) => {
+      const { error } = await sb.from('salary_shifts').delete().eq('id', shift.id);
+      if (error) throw error;
+      await logChanges([{
+        employee_id: null, entity: 'employee', action: 'delete', field: 'Shift',
+        old_value: `${shift.name} ${shift.start_time}-${shift.end_time}`, new_value: null, note: null,
+      }]);
+    },
+    onSuccess: () => invalidateSalary(qc),
+  });
+}
+
+/** Move one employee to a shift (from the Shifts tab). Always logged. */
+export function useSetEmployeeShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { employee: SalaryEmployee; shiftId: string | null; fromName: string; toName: string }) => {
+      const { error } = await sb.from('salary_employees').update({ shift_id: input.shiftId }).eq('id', input.employee.id);
+      if (error) throw error;
+      await logChanges([{
+        employee_id: input.employee.id, entity: 'employee', action: 'edit', field: 'Shift',
+        old_value: input.fromName, new_value: input.toName, note: null,
+      }]);
+    },
+    onSuccess: () => invalidateSalary(qc),
   });
 }

@@ -249,3 +249,26 @@ create policy "salary_change_log_admin_insert" on public.salary_change_log for i
 
 -- Last working day frozen into a generated salary (employee left mid-month)
 alter table public.salary_runs add column if not exists last_working_day date;
+
+-- Shifts (added later)
+create table if not exists public.salary_shifts (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  start_time text not null check (start_time ~ '^[0-9]{2}:[0-9]{2}$'),
+  end_time text not null check (end_time ~ '^[0-9]{2}:[0-9]{2}$'),
+  lunch_applies boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table public.salary_employees add column if not exists shift_id uuid references public.salary_shifts(id) on delete set null;
+alter table public.salary_runs add column if not exists shift jsonb;
+revoke all on public.salary_shifts from anon;
+grant select, insert, update, delete on public.salary_shifts to authenticated;
+grant all on public.salary_shifts to service_role;
+revoke truncate, trigger, references on public.salary_shifts from authenticated;
+alter table public.salary_shifts enable row level security;
+create policy "salary_shifts_admin_all" on public.salary_shifts for all to authenticated using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+insert into public.salary_shifts (name, start_time, end_time, lunch_applies) values
+  ('General', '09:00', '21:00', true), ('Morning', '06:00', '14:00', false),
+  ('Evening', '14:00', '22:00', false), ('Night', '21:00', '09:00', false)
+on conflict (name) do nothing;
+update public.salary_employees set shift_id = (select id from public.salary_shifts where name = 'General') where shift_id is null;

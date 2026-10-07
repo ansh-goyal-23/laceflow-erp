@@ -3,7 +3,8 @@ import { ChevronDown, HelpCircle } from 'lucide-react';
 
 const RULES: string[] = [
   'Hours come from the thumb-print machine: the first punch of the day is In and the last punch is Out. Punches before 06:00 are machine errors and are ignored.',
-  'The shift starts at 09:00. Coming earlier earns nothing extra. A late arrival must also leave late: the required Out time is the later of In time and 09:00, plus the shift length.',
+  'Each employee works in a shift (Shifts tab). The rules below use the shift start instead of 09:00: nothing is paid before it, early punches more than 3 hours before it are ignored, and overtime counts from start + working hours. Shifts with no lunch (for example 6 am-2 pm and 2 pm-10 pm) never deduct lunch, whatever the working hours are. A night shift (for example 9 pm-9 am) belongs to the day it starts: the evening punch is In and the next morning's punch is Out.',
+  'For the general 09:00 shift: the shift starts at 09:00. Coming earlier earns nothing extra. A late arrival must also leave late: the required Out time is the later of In time and 09:00, plus the shift length.',
   'Overtime is paid only when Out is more than 20 minutes after the required Out time, and then it is the exact extra time (no rounding).',
   'Otherwise the worked time (minus lunch where it applies) is rounded to the nearest 30 minutes and capped at the working hours. If it is less than the working hours, the day is Absent, and the hours actually worked are paid as overtime.',
   'For 8-hour workers the 30-minute lunch is extra and unpaid. For 10 and 12-hour workers lunch is inside the working hours and is deducted only if they leave before 18:30.',
